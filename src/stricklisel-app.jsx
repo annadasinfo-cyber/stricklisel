@@ -528,6 +528,12 @@ export default function StricklieselApp() {
   const [progList, setProgList] = useState([]);
   const [progSel, setProgSel] = useState("");
 
+  // ---- ABLAUF: mehrere protokolle nacheinander ----
+  const [queue, setQueue] = useState([]);
+  const [queueLoop, setQueueLoop] = useState(true);
+  const [queueIdx, setQueueIdx] = useState(-1);
+  const qRef = useRef({ running: false, items: [], idx: 0, timer: null });
+
   const A = useRef({ bed: null, kette: null, links: null, rechts: null, layers: [null, null, null] });
   const ctxRef = useRef(null);
   const analyser = useRef(null);
@@ -564,42 +570,112 @@ export default function StricklieselApp() {
   // ---- PROGRAMME ----
   async function loadProgList() {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/programme?select=name&order=updated_at.desc`, { headers: dbHeaders(getToken()) });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/protokolle?select=name&order=updated_at.desc`, { headers: dbHeaders(getToken()) });
       const d = await r.json();
       setProgList(Array.isArray(d) ? d.map((x) => x.name) : []);
     } catch {}
   }
   async function saveProg() {
     const name = progName.trim();
-    if (!name) { say("programm braucht einen namen", "err"); return; }
+    if (!name) { say("protokoll braucht einen namen", "err"); return; }
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/programme?on_conflict=user_id,name`, {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/protokolle?on_conflict=user_id,name`, {
         method: "POST",
         headers: { ...dbHeaders(getToken()), Prefer: "resolution=merge-duplicates" },
         body: JSON.stringify({ user_id: getUserId(), name, settings: cfg, updated_at: new Date().toISOString() }),
       });
       if (!r.ok) throw new Error(await r.text());
-      say("programm gespeichert: " + name, "ok"); loadProgList();
+      say("protokoll gespeichert: " + name, "ok"); loadProgList();
     } catch (e) { say("speichern: " + (e?.message || e), "err"); }
   }
   async function loadProg() {
-    if (!progSel) { say("kein programm gewählt", "err"); return; }
+    if (!progSel) { say("kein protokoll gewählt", "err"); return; }
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/programme?select=settings&name=eq.${encodeURIComponent(progSel)}`, { headers: dbHeaders(getToken()) });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/protokolle?select=settings&name=eq.${encodeURIComponent(progSel)}`, { headers: dbHeaders(getToken()) });
       const d = await r.json();
       if (!d?.[0]) throw new Error("nicht gefunden");
       setCfg({ ...DEFAULTS, ...d[0].settings });
       setProgName(progSel);
-      say("programm geladen: " + progSel, "ok");
+      say("protokoll geladen: " + progSel, "ok");
     } catch (e) { say("laden: " + (e?.message || e), "err"); }
   }
   async function delProg() {
-    if (!progSel) { say("kein programm gewählt", "err"); return; }
-    if (!confirm(`programm „${progSel}" wirklich löschen?`)) return;
+    if (!progSel) { say("kein protokoll gewählt", "err"); return; }
+    if (!confirm(`protokoll „${progSel}" wirklich löschen?`)) return;
     try {
-      await fetch(`${SUPABASE_URL}/rest/v1/programme?name=eq.${encodeURIComponent(progSel)}`, { method: "DELETE", headers: dbHeaders(getToken()) });
-      say("programm gelöscht: " + progSel, "ok"); setProgSel(""); loadProgList();
+      await fetch(`${SUPABASE_URL}/rest/v1/protokolle?name=eq.${encodeURIComponent(progSel)}`, { method: "DELETE", headers: dbHeaders(getToken()) });
+      say("protokoll gelöscht: " + progSel, "ok"); setProgSel(""); loadProgList();
     } catch (e) { say("löschen: " + (e?.message || e), "err"); }
+  }
+
+  // ---- ABLAUF ----
+  async function fetchProtokoll(name) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/protokolle?select=settings&name=eq.${encodeURIComponent(name)}`, { headers: dbHeaders(getToken()) });
+    const d = await r.json();
+    if (!d?.[0]) throw new Error("nicht gefunden: " + name);
+    return { ...DEFAULTS, ...d[0].settings };
+  }
+
+  // Stimmen für ein Protokoll bereitstellen (Cache macht das beim 2. Mal sofort).
+  // Trägerbett-Datei wird geteilt — die liegt nur im RAM, nicht in Supabase.
+  async function audioFor(c, label) {
+    const out = { bed: A.current.bed, kette: null, links: null, rechts: null, layers: [null, null, null] };
+    const mk = async (text) => (text?.trim() ? await synthToWav(text, c.voice) : null);
+    if (c.mode === "kette") out.kette = await mk(c.ketteText);
+    else if (c.mode === "ichdu") { out.links = await mk(c.linksText); out.rechts = await mk(c.rechtsText); }
+    else for (let i = 0; i < 3; i++) if (c.layers[i].on) out.layers[i] = await mk(c.layers[i].text);
+    return out;
+  }
+
+  async function startQueue() {
+    if (!queue.length) { say("ablauf ist leer", "err"); return; }
+    stopAll();
+    abortRef.current = false;
+    try {
+      say("ablauf wird vorbereitet …", "work");
+      const items = [];
+      for (let i = 0; i < queue.length; i++) {
+        const name = queue[i];
+        sayTts(`» ${name} · lade protokoll`, "work");
+        const c = await fetchProtokoll(name);
+        const audio = await audioFor(c, name);
+        items.push({ name, cfg: c, audio });
+      }
+      sayTts("» ablauf bereit", "ok");
+      qRef.current = { running: true, items, idx: 0, timer: null };
+      playQueueItem(0);
+    } catch (e) { say("ablauf: " + (e?.message || e), "err"); stopAll(); }
+  }
+
+  async function playQueueItem(i) {
+    const q = qRef.current;
+    if (!q.running) return;
+    if (i >= q.items.length) {
+      if (!queueLoop) { say("ablauf beendet", "ok"); stopAll(); return; }
+      i = 0;
+    }
+    q.idx = i; setQueueIdx(i);
+    const it = q.items[i];
+    try {
+      if (ctxRef.current) { ctxRef.current.close().catch(() => {}); ctxRef.current = null; }
+      const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: it.cfg.sr });
+      ctxRef.current = ctx;
+      const master = await build(ctx, it.cfg.len * 60, it.cfg, it.audio);
+      const an = ctx.createAnalyser(); an.fftSize = 4096; an.smoothingTimeConstant = 0.8;
+      master.connect(an); an.connect(ctx.destination);
+      analyser.current = an; setPlaying(true);
+      say(`ablauf ${i + 1}/${q.items.length} · ${it.name}`, "work");
+      if (q.timer) clearTimeout(q.timer);
+      q.timer = setTimeout(() => playQueueItem(i + 1), it.cfg.len * 60 * 1000);
+    } catch (e) { say("ablauf: " + (e?.message || e), "err"); stopAll(); }
+  }
+
+  function stopAll() {
+    const q = qRef.current;
+    if (q.timer) clearTimeout(q.timer);
+    qRef.current = { running: false, items: [], idx: 0, timer: null };
+    setQueueIdx(-1);
+    stop();
   }
 
   // ---- TTS ----
@@ -734,14 +810,14 @@ export default function StricklieselApp() {
 
         <Scope analyser={analyser} ctxRef={ctxRef} />
 
-        <Panel title="PROGRAMME" sub="einstellungen & texte · gerätübergreifend">
+        <Panel title="PROTOKOLLE" sub="einstellungen & texte · gerätübergreifend">
           <div className="rezrow">
-            <input placeholder="name des programms" value={progName} onChange={(e) => setProgName(e.target.value)} />
+            <input placeholder="name des protokolls" value={progName} onChange={(e) => setProgName(e.target.value)} />
             <button className="btn" onClick={saveProg}>⇥ speichern</button>
           </div>
           <div className="rezrow" style={{ marginTop: 10 }}>
             <select value={progSel} onChange={(e) => setProgSel(e.target.value)}>
-              <option value="">— gespeicherte programme —</option>
+              <option value="">— gespeicherte protokolle —</option>
               {progList.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
             <button className="btn" onClick={loadProg}>↑ laden</button>
@@ -753,6 +829,42 @@ export default function StricklieselApp() {
             <button onClick={async () => { await cacheClear(); sayTts("» cache geleert", "ok"); }}>cache leeren</button>
           </div>
           <p className="hint">audiodateien werden nicht gespeichert — nur regler, schalter und texte.</p>
+
+          <div className="divider">▼ ablauf · mehrere protokolle nacheinander</div>
+          <div className="rezrow">
+            <select value="" onChange={(e) => { if (e.target.value) setQueue([...queue, e.target.value]); }}>
+              <option value="">— protokoll anhängen —</option>
+              {progList.map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Switch mini checked={queueLoop} onChange={setQueueLoop} />
+              <span className="ltag">loop</span>
+            </div>
+          </div>
+
+          {queue.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {queue.map((n, i) => (
+                <div className="qitem" key={i + n}>
+                  <span className="qnum">{i + 1}</span>
+                  <span className={"qname" + (queueIdx === i ? " playing" : "")}>{n}</span>
+                  {queueIdx === i && <span className="qlive">▶ läuft</span>}
+                  <button onClick={() => { if (i === 0) return; const q = [...queue]; [q[i - 1], q[i]] = [q[i], q[i - 1]]; setQueue(q); }} disabled={i === 0}>↑</button>
+                  <button onClick={() => { if (i === queue.length - 1) return; const q = [...queue]; [q[i + 1], q[i]] = [q[i], q[i + 1]]; setQueue(q); }} disabled={i === queue.length - 1}>↓</button>
+                  <button onClick={() => setQueue(queue.filter((_, n2) => n2 !== i))}>✕</button>
+                </div>
+              ))}
+              <div className="actions" style={{ marginTop: 10 }}>
+                <button className="btn primary" onClick={startQueue}>▶ ablauf starten</button>
+                <button className="btn stop" onClick={() => { stopAll(); say("ablauf gestoppt"); }}>■ stop</button>
+              </div>
+              <p className="hint">
+                jedes protokoll läuft seine eigene länge, dann kommt das nächste{queueLoop ? " — und von vorn" : ""}.
+                stimmen werden vorher erzeugt (aus dem cache geht das sofort). <b>das trägerbett ist geteilt</b> —
+                audiodateien liegen nur im arbeitsspeicher, also gilt die datei, die gerade oben geladen ist.
+              </p>
+            </div>
+          )}
         </Panel>
 
         {/* ============ DIE BOTSCHAFT ============ */}
@@ -964,7 +1076,7 @@ export default function StricklieselApp() {
           </div>
           <div className="actions" style={{ marginTop: 18 }}>
             <button className="btn" disabled={playing} onClick={play}>▶ play</button>
-            <button className="btn stop" disabled={!playing} onClick={() => { stop(); say("gestoppt"); }}>■ stop</button>
+            <button className="btn stop" disabled={!playing} onClick={() => { stopAll(); say("gestoppt"); }}>■ stop</button>
             <button className="btn primary" onClick={render}>⇥ wav rendern</button>
             <span className={"status " + status.c}>{status.t}</span>
           </div>
@@ -1147,6 +1259,16 @@ function Styles() {
     color:var(--ink);font-family:var(--mono);font-size:12.5px;padding:9px 10px;min-width:130px;flex:1 1 150px}
   .rezrow input:focus,.rezrow select:focus{outline:none;border-color:var(--line-hot)}
   .rezrow .btn{padding:9px 14px;font-size:12.5px;flex:0 0 auto}
+  .qitem{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:5px;padding:7px 10px;margin-bottom:6px}
+  .qitem .qnum{font-family:var(--term);font-size:11px;color:var(--green-dim);min-width:14px}
+  .qitem .qname{flex:1;font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qitem .qname.playing{color:var(--green);text-shadow:var(--glow)}
+  .qitem .qlive{font-family:var(--term);font-size:10px;color:var(--green);letter-spacing:.08em}
+  .qitem button{font-family:var(--mono);font-size:11px;background:transparent;border:1px solid var(--line);
+    color:var(--muted);border-radius:4px;padding:2px 8px;cursor:pointer}
+  .qitem button:hover:not(:disabled){border-color:var(--line-hot);color:var(--green)}
+  .qitem button:disabled{opacity:.3;cursor:not-allowed}
 
   @media(prefers-reduced-motion:reduce){#rain{display:none}.cursor{animation:none}}
   @media(max-width:560px){.phead .psub{display:none}.phead .chev{margin-left:auto}.val{min-width:54px}}
