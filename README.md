@@ -1,75 +1,78 @@
 # stricklisel.app
 
-SubConstructor als private Operator-Konsole.
-Eigenes Repo, eigenes Vercel-Projekt, eigenes Supabase. Null Verbindung zu Lenormandia.
+SubConstructor — private Operator-Konsole.
+**Gleicher Aufbau wie Lenormandia**: React + Vite, eine App-Datei, handgeschriebener
+Supabase-Zugang über `fetch`, Session in `localStorage["sb_session"]`.
+
+Eigenes Repo, eigenes Vercel-Projekt, eigenes Supabase. **Null Verbindung zu Lenormandia.**
 
 ```
 stricklisel/
-├── index.html      ← die Konsole (alles drin, kein Build)
-├── supabase.sql    ← einmal im SQL Editor ausführen
-└── README.md       ← das hier
+├── package.json
+├── vite.config.js
+├── index.html
+├── .gitignore
+├── supabase.sql              ← einmal im SQL Editor ausführen
+└── src/
+    ├── main.jsx
+    └── stricklisel-app.jsx   ← die Konsole (wie lenormand-app.jsx)
 ```
 
 ---
 
-## 1 · Supabase-Projekt anlegen
+## Lokal arbeiten
 
-1. supabase.com → **New project** (Free). Name z. B. `stricklisel`.
-2. **SQL Editor** → New query → Inhalt von `supabase.sql` einfügen → **Run**.
-3. **Authentication → Providers → Email**: „Confirm email" **aus** (spart dir den Bestätigungsklick).
-4. **Authentication → Users → Add user** → deine Email + Passwort. Das ist dein Zugang.
-5. **Authentication → Sign In / Providers → Allow new users to sign up: AUS.**
-   → Damit kann sich **niemand** außer dir jemals einen Account anlegen. Das ist die eigentliche Tür.
-
-## 2 · Schlüssel eintragen
-
-Supabase → **Project Settings → API**. Dort stehen zwei Werte.
-In `index.html` ganz oben im Script-Block eintragen:
-
-```js
-const SUPA_URL = "https://xxxxxxxx.supabase.co";   // Project URL
-const SUPA_KEY = "eyJhbGciOi...";                  // anon / public key
+```
+npm install
+npm run dev
 ```
 
-Der anon-key **darf** im Quelltext stehen — er ist öffentlich gedacht.
-Geschützt wird durch RLS (siehe `supabase.sql`) und dadurch, dass Signup aus ist.
+## Supabase (einmalig)
 
-## 3 · GitHub
+1. **SQL Editor** → Inhalt von `supabase.sql` → **Run**
+2. **Authentication → Users → Add user** → deine Email + Passwort
+3. **Authentication → Providers → Email** → „Confirm email" **aus**
+4. **Sign In / Providers** → „Allow new users to sign up" **AUS** ← der eigentliche Riegel
 
-Neues Repo `stricklisel` (privat). Die drei Dateien rein.
+Die Schlüssel stehen schon oben in `stricklisel-app.jsx`.
+Der publishable key darf im Quelltext stehen — geschützt wird durch RLS + Signup-aus.
 
-## 4 · Vercel
+## Vercel
 
-1. vercel.com → **Add New → Project** → Repo `stricklisel` importieren.
-2. Framework Preset: **Other**. Kein Build Command, kein Output Directory.
-3. Deploy.
-4. **Settings → Domains** → `stricklisel.app` verbinden.
-
-Kein Build, kein Framework, keine Env-Variablen. Vercel liefert die HTML-Datei aus, fertig.
-
----
+- **Add New → Project** → Repo importieren
+- Framework Preset: **Vite** (erkennt er meist selbst)
+- Build Command: `npm run build` · Output Directory: `dist`
+- Deploy
 
 ## Was wo passiert
 
 | | wo |
 |---|---|
-| Login | Supabase |
-| Rezepte (Regler, Schalter, Texte) | Supabase |
+| Login, Programme | Supabase |
 | Audio erzeugen, mischen, rendern | **nur dein Browser** |
 | Sprachmodelle (Ilona / Thorsten) | **nur dein Browser** |
 | Deine Audiodateien | **verlassen das Gerät nie** |
 
-Rezepte speichern Einstellungen und Texte — **keine Audiodateien**.
-Am Mac gebaut, am iPad geladen.
+Programme speichern Einstellungen und Texte — **keine Audiodateien**.
+
+## TTS
+
+- **Sätze werden gepackt** (bis 180 Zeichen) → ca. 3,5× weniger Modellaufrufe als Satz-für-Satz.
+- **Cache** (IndexedDB): jedes erzeugte Häppchen wird gemerkt. Abbruch oder Neuladen
+  kostet nichts — beim nächsten Versuch kommen die fertigen Häppchen sofort zurück.
+  „cache leeren" sitzt im PROGRAMME-Panel.
+- **Ilona** (Xenova/mms-tts-deu) und **Thorsten** (Piper, `de_DE-thorsten-medium`) laden
+  beim ersten Klick einmalig, danach aus dem Browser-Speicher.
 
 ## Ehrliche Grenzen
 
-- **Handy bleibt zäh.** Die Sprachmodelle rechnen auf dem Gerät, nicht auf dem Server. Deployen macht die Konsole überall *erreichbar* — schwere Arbeit bleibt Mac-Arbeit.
+- **Handy bleibt zäh.** Die Sprachmodelle rechnen auf dem Gerät, nicht auf dem Server.
 - **Export gekappt bei 30 min.** Play kann 7 h, die WAV-Datei nicht.
 - **Ultraschall nur im WAV.** MP3 köpft alles über ~16 kHz.
 
-## Später mal
+## WRITING später rüberholen
 
-Struktur von Lenormandia ausleihen heißt: **Muster kopieren, nicht Daten teilen.**
-Gleicher Tabellenaufbau, gleiches RLS-Pattern — aber eigene Datenbank.
-Wenn hier was kracht, kracht hier was.
+In Lenormandia ist WRITING keine eigene Komponente, sondern ~50 State-Variablen
+(`writingHook`, `writingCards`, `writingNotes` …) verteilt in `LenormandApp`.
+Gleiche Sprache heißt: **ausschneiden und einfügen** statt neu schreiben.
+Gebraucht werden jeweils: der State-Block, der JSX-Block, die Save-Funktionen.
