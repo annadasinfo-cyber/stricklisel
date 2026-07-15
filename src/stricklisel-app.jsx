@@ -75,7 +75,7 @@ const DEFAULTS = {
   audOn: true, audGain: -20,
   ultraOn: true, ultraFreq: 17000, ultraGain: -6,
   entOn: false, entType: "binaural", entBand: "theta", entBeat: 6, entCarrier: 200, entVol: 35,
-  len: 10, fade: 4, sr: 48000,
+  playMode: "einmal", len: 10, fade: 4, sr: 48000,
   voice: "mms",
 };
 
@@ -91,6 +91,7 @@ const F = {
   min: (x) => { const h = Math.floor(x / 60), m = x % 60; return h ? h + " h" + (m ? " " + m + " min" : "") : m + " min"; },
   pan: (x) => (Number(x) === 0 ? "mitte" : (x < 0 ? "L " : "R ") + Math.abs(x)),
   spd: (x) => Number(x).toFixed(2).replace(".", ",") + "×",
+  clock: (s) => { const m = Math.floor(s / 60), r = Math.round(s % 60); return m + ":" + String(r).padStart(2, "0"); },
 };
 
 // ============================================================
@@ -239,6 +240,31 @@ function floatToWav(data, sr) {
 // AUDIO-ENGINE
 // ============================================================
 const dB = (v) => Math.pow(10, v / 20);
+
+// Wie lang ist dieses Audio? (für "einmal durch")
+async function measure(ab) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const b = await ctx.decodeAudioData(ab.slice(0));
+    const d = b.duration; ctx.close(); return d;
+  } catch { return 0; }
+}
+
+// Wie lang läuft die Botschaft EINMAL durch? (Tempo und Zeitversatz eingerechnet)
+function messageSeconds(cfg, A) {
+  const g = cfg.gap, D = A.dur || {};
+  if (cfg.mode === "kette") return (D.kette || 0) / cfg.ketteSpeed + g;
+  if (cfg.mode === "ichdu") return Math.max((D.links || 0) / cfg.linksSpeed, (D.rechts || 0) / cfg.rechtsSpeed) + g;
+  const fb = (D.layers || []).find((x) => x) || 0;
+  let m = 0;
+  for (let i = 0; i < 3; i++) {
+    const L = cfg.layers[i];
+    if (!L.on) continue;
+    const d = (D.layers || [])[i] || fb;
+    if (d) m = Math.max(m, L.off + d / L.spd + g);
+  }
+  return m;
+}
 const decode = async (ctx, ab) => await ctx.decodeAudioData(ab.slice(0));
 const panNode = (ctx, v) => { if (!ctx.createStereoPanner) return null; const p = ctx.createStereoPanner(); p.pan.value = v; return p; };
 
@@ -300,7 +326,8 @@ function applyOperator(ctx, input, cfg) {
 async function buildMessage(ctx, cfg, A) {
   const out = ctx.createGain(); out.gain.value = 1;
   const gap = cfg.gap; let any = false;
-  const src = (b) => { const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; return s; };
+  const rund = cfg.playMode !== "einmal";
+  const src = (b) => { const s = ctx.createBufferSource(); s.buffer = b; s.loop = rund; return s; };
   if (cfg.mode === "kette") {
     if (!A.kette) return null;
     const s = src(await padded(ctx, A.kette, gap)); s.playbackRate.value = cfg.ketteSpeed;
@@ -534,10 +561,18 @@ export default function StricklieselApp() {
   const [queueIdx, setQueueIdx] = useState(-1);
   const qRef = useRef({ running: false, items: [], idx: 0, timer: null });
 
-  const A = useRef({ bed: null, kette: null, links: null, rechts: null, layers: [null, null, null] });
+  const A = useRef({ bed: null, kette: null, links: null, rechts: null, layers: [null, null, null], dur: { kette: 0, links: 0, rechts: 0, layers: [0, 0, 0] } });
+  const [durTick, setDurTick] = useState(0); // erzwingt neuzeichnen wenn dauer sich ändert
   const ctxRef = useRef(null);
   const analyser = useRef(null);
   const abortRef = useRef(false);
+
+  // Gesamtlänge: einmal durch = so lang wie die botschaft, sonst der minuten-regler
+  const totalSeconds = (c, a) => {
+    if (c.playMode !== "einmal") return c.len * 60;
+    const m = messageSeconds(c, a);
+    return m ? m + Math.min(c.fade, m / 2) : 0;
+  };
 
   const say = (t, c) => setStatus({ t, c: c || "" });
   const sayTts = (t, c) => setTts({ t, c: c || "" });
@@ -619,11 +654,13 @@ export default function StricklieselApp() {
   // Stimmen für ein Protokoll bereitstellen (Cache macht das beim 2. Mal sofort).
   // Trägerbett-Datei wird geteilt — die liegt nur im RAM, nicht in Supabase.
   async function audioFor(c, label) {
-    const out = { bed: A.current.bed, kette: null, links: null, rechts: null, layers: [null, null, null] };
+    const out = { bed: A.current.bed, kette: null, links: null, rechts: null, layers: [null, null, null], dur: { kette: 0, links: 0, rechts: 0, layers: [0, 0, 0] } };
     const mk = async (text) => (text?.trim() ? await synthToWav(text, c.voice) : null);
-    if (c.mode === "kette") out.kette = await mk(c.ketteText);
-    else if (c.mode === "ichdu") { out.links = await mk(c.linksText); out.rechts = await mk(c.rechtsText); }
-    else for (let i = 0; i < 3; i++) if (c.layers[i].on) out.layers[i] = await mk(c.layers[i].text);
+    if (c.mode === "kette") { out.kette = await mk(c.ketteText); if (out.kette) out.dur.kette = await measure(out.kette); }
+    else if (c.mode === "ichdu") {
+      out.links = await mk(c.linksText); if (out.links) out.dur.links = await measure(out.links);
+      out.rechts = await mk(c.rechtsText); if (out.rechts) out.dur.rechts = await measure(out.rechts);
+    } else for (let i = 0; i < 3; i++) if (c.layers[i].on) { out.layers[i] = await mk(c.layers[i].text); if (out.layers[i]) out.dur.layers[i] = await measure(out.layers[i]); }
     return out;
   }
 
@@ -660,13 +697,14 @@ export default function StricklieselApp() {
       if (ctxRef.current) { ctxRef.current.close().catch(() => {}); ctxRef.current = null; }
       const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: it.cfg.sr });
       ctxRef.current = ctx;
-      const master = await build(ctx, it.cfg.len * 60, it.cfg, it.audio);
+      const secs = totalSeconds(it.cfg, it.audio) || it.cfg.len * 60;
+      const master = await build(ctx, secs, it.cfg, it.audio);
       const an = ctx.createAnalyser(); an.fftSize = 4096; an.smoothingTimeConstant = 0.8;
       master.connect(an); an.connect(ctx.destination);
       analyser.current = an; setPlaying(true);
       say(`ablauf ${i + 1}/${q.items.length} · ${it.name}`, "work");
       if (q.timer) clearTimeout(q.timer);
-      q.timer = setTimeout(() => playQueueItem(i + 1), it.cfg.len * 60 * 1000);
+      q.timer = setTimeout(() => playQueueItem(i + 1), secs * 1000);
     } catch (e) { say("ablauf: " + (e?.message || e), "err"); stopAll(); }
   }
 
@@ -715,11 +753,13 @@ export default function StricklieselApp() {
     abortRef.current = false; setGen(slot);
     try {
       const ab = await synthToWav(text, cfg.voice);
-      if (slot === "kette") A.current.kette = ab;
-      else if (slot === "links") A.current.links = ab;
-      else if (slot === "rechts") A.current.rechts = ab;
-      else A.current.layers[Number(slot.slice(-1))] = ab;
-      sayTts("» stimme erzeugt ✓", "ok");
+      const d = await measure(ab);
+      if (slot === "kette") { A.current.kette = ab; A.current.dur.kette = d; }
+      else if (slot === "links") { A.current.links = ab; A.current.dur.links = d; }
+      else if (slot === "rechts") { A.current.rechts = ab; A.current.dur.rechts = d; }
+      else { const i = Number(slot.slice(-1)); A.current.layers[i] = ab; A.current.dur.layers[i] = d; }
+      setDurTick((x) => x + 1);
+      sayTts("» stimme erzeugt ✓ · spricht " + F.clock(d), "ok");
     } catch (e) { sayTts("» " + (e?.message || e), "err"); }
     finally { setGen(null); abortRef.current = false; }
   }
@@ -727,12 +767,14 @@ export default function StricklieselApp() {
   const upload = (slot) => async (e) => {
     const f = e.target.files[0]; if (!f) return;
     const ab = await f.arrayBuffer();
-    if (slot === "bed") A.current.bed = ab;
-    else if (slot === "kette") A.current.kette = ab;
-    else if (slot === "links") A.current.links = ab;
-    else if (slot === "rechts") A.current.rechts = ab;
-    else A.current.layers[Number(slot.slice(-1))] = ab;
-    say("geladen: " + f.name);
+    if (slot === "bed") { A.current.bed = ab; say("geladen: " + f.name); return; }
+    const d = await measure(ab);
+    if (slot === "kette") { A.current.kette = ab; A.current.dur.kette = d; }
+    else if (slot === "links") { A.current.links = ab; A.current.dur.links = d; }
+    else if (slot === "rechts") { A.current.rechts = ab; A.current.dur.rechts = d; }
+    else { const i = Number(slot.slice(-1)); A.current.layers[i] = ab; A.current.dur.layers[i] = d; }
+    setDurTick((x) => x + 1);
+    say("geladen: " + f.name + " · " + F.clock(d));
   };
 
   // ---- PLAY / RENDER ----
@@ -745,7 +787,9 @@ export default function StricklieselApp() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: cfg.sr });
       ctxRef.current = ctx;
-      const master = await build(ctx, cfg.len * 60, cfg, A.current);
+      const secs = totalSeconds(cfg, A.current);
+      if (!secs) throw new Error("keine botschaft — erst text erzeugen oder datei laden");
+      const master = await build(ctx, secs, cfg, A.current);
       const an = ctx.createAnalyser(); an.fftSize = 4096; an.smoothingTimeConstant = 0.8;
       master.connect(an); an.connect(ctx.destination);
       analyser.current = an; setPlaying(true); say("spielt …", "work");
@@ -756,9 +800,11 @@ export default function StricklieselApp() {
     try {
       setProg(8); say("rendere …", "work"); setDl(null);
       const EXPORT_MAX = 30 * 60;
-      let seconds = cfg.len * 60;
+      let seconds = totalSeconds(cfg, A.current);
+      if (!seconds) throw new Error("keine botschaft — erst text erzeugen oder datei laden");
       const capped = seconds > EXPORT_MAX;
       if (capped) seconds = EXPORT_MAX;
+      // "einmal durch" wird nur gekappt, wenn der text wirklich länger als 30 min ist
       const octx = new OfflineAudioContext(2, Math.ceil(seconds * cfg.sr), cfg.sr);
       const master = await build(octx, seconds, cfg, A.current);
       master.connect(octx.destination);
@@ -798,6 +844,7 @@ export default function StricklieselApp() {
 
   // ---- KONSOLE ----
   const L = cfg.layers;
+  void durTick; // dauer-anzeige aktuell halten
   return (
     <>
       <Styles />
@@ -1066,8 +1113,26 @@ export default function StricklieselApp() {
 
         {/* ============ AUSGABE ============ */}
         <Panel title="AUSGABE" sub="rendern & play">
-          <div className="row">
-            <Slider label="gesamtlänge" value={cfg.len} onChange={(v) => set("len", v)} min={1} max={420} fmt={F.min} />
+          <div className="field" style={{ marginBottom: 14 }}>
+            <label className="cap">länge</label>
+            <Seg value={cfg.playMode} onChange={(v) => set("playMode", v)}
+              options={[{ v: "einmal", t: "einmal durch" }, { v: "dauer", t: "auf dauer schleifen" }]} />
+          </div>
+
+          {(() => {
+            const m = messageSeconds(cfg, A.current);
+            const tot = totalSeconds(cfg, A.current);
+            if (cfg.playMode !== "einmal") return null;
+            return (
+              <div className="explain">
+                {m ? <>die botschaft läuft <b>{F.clock(m)}</b> einmal durch{cfg.fade > 0 && <> · mit ausblenden <b>{F.clock(tot)}</b></>} — dann ist schluss, kein anschnitt.</>
+                   : <>noch keine botschaft — text erzeugen oder datei laden, dann steht hier die dauer.</>}
+              </div>
+            );
+          })()}
+
+          <div className="row" style={{ marginTop: 14 }}>
+            {cfg.playMode !== "einmal" && <Slider label="gesamtlänge" value={cfg.len} onChange={(v) => set("len", v)} min={1} max={420} fmt={F.min} />}
             <Slider label="ein-/ausblenden" value={cfg.fade} onChange={(v) => set("fade", v)} min={0} max={20} fmt={F.secI} />
             <div className="field"><label className="cap">sample-rate</label>
               <Seg value={cfg.sr} onChange={(v) => set("sr", Number(v))}
