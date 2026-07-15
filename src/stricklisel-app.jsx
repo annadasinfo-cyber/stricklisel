@@ -585,6 +585,165 @@ function Scope({ analyser, ctxRef }) {
 }
 
 // ============================================================
+// ABTEILUNG 17b · PRIORITY_MANAGER
+// ============================================================
+const PARAM_STD = ["sicher", "sanft", "schnell", "stabil", "effizient"];
+
+// Commit-Signatur nach Modul 17b: gekennzeichnete Zahlen-Buchstaben-Kombination.
+// Ohne O/0/I/1/l — die verwechselt man beim Abschreiben.
+function signaturErzeugen() {
+  const z = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const r = new Uint8Array(12);
+  crypto.getRandomValues(r);
+  const s = Array.from(r).map((x) => z[x % z.length]).join("");
+  return "AURA3-" + s.slice(0, 4) + "-" + s.slice(4, 8) + "-" + s.slice(8, 12);
+}
+const heute = () => new Date().toISOString().slice(0, 10);
+
+function Abteilung17b({ say }) {
+  const [liste, setListe] = useState([]);
+  const [projekt, setProjekt] = useState("");
+  const [param, setParam] = useState(PARAM_STD);
+  const [prio, setPrio] = useState(1);
+  const [start, setStart] = useState(heute());
+  const [ziel, setZiel] = useState("");
+  const [sig, setSig] = useState("");
+  const [msg, setMsg] = useState({ t: "", c: "" });
+
+  const aktiv = liste.filter((c) => c.status === "aktiv").length;
+  const frei = 3 - aktiv;
+
+  useEffect(() => { laden(); }, []);
+
+  async function laden() {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/commits?select=*&order=created_at.desc`, { headers: dbHeaders(getToken()) });
+      const d = await r.json();
+      setListe(Array.isArray(d) ? d : []);
+    } catch (e) { setMsg({ t: "» " + (e?.message || e), c: "err" }); }
+  }
+
+  async function execute() {
+    if (!projekt.trim()) { setMsg({ t: "» kein projekt eingetragen", c: "err" }); return; }
+    if (!sig) { setMsg({ t: "» keine signatur — ohne signatur kein commit", c: "err" }); return; }
+    if (aktiv >= 3) { setMsg({ t: "» drei prioritätsplätze belegt — erst einen beenden oder pausieren", c: "err" }); return; }
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/commits`, {
+        method: "POST", headers: { ...dbHeaders(getToken()), Prefer: "return=minimal" },
+        body: JSON.stringify({ user_id: getUserId(), projekt: projekt.trim(), parameter: param, prioritaet: prio, signatur: sig, start_datum: start || null, ziel_datum: ziel || null, status: "aktiv" }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setMsg({ t: "» command accepted · commit aktiv · priorität " + prio, c: "ok" });
+      setProjekt(""); setSig(""); setZiel(""); setParam(PARAM_STD); setStart(heute());
+      laden();
+    } catch (e) { setMsg({ t: "» " + (e?.message || e), c: "err" }); }
+  }
+
+  async function setzeStatus(c, status, wort) {
+    if (status === "beendet" && !confirm(`„${c.projekt}" beenden und ressourcen freigeben?`)) return;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/commits?id=eq.${c.id}`, {
+        method: "PATCH", headers: { ...dbHeaders(getToken()), Prefer: "return=minimal" },
+        body: JSON.stringify({ status, updated_at: new Date().toISOString() }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setMsg({ t: "» " + wort + " · " + c.projekt, c: "ok" });
+      laden();
+    } catch (e) { setMsg({ t: "» " + (e?.message || e), c: "err" }); }
+  }
+
+  async function loeschen(c) {
+    if (!confirm(`„${c.projekt}" aus dem archiv löschen?`)) return;
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/commits?id=eq.${c.id}`, { method: "DELETE", headers: dbHeaders(getToken()) });
+      laden();
+    } catch (e) { setMsg({ t: "» " + (e?.message || e), c: "err" }); }
+  }
+
+  const tage = (c) => {
+    if (!c.ziel_datum) return null;
+    const d = Math.ceil((new Date(c.ziel_datum) - new Date()) / 86400000);
+    return d < 0 ? "ziel überschritten" : d === 0 ? "ziel heute" : "noch " + d + " tage";
+  };
+
+  return (
+    <>
+      <div className="grouphead">NEUER COMMIT<span className="rule" /></div>
+
+      <Panel title="AURA3_COMMIT" sub={`${frei} von 3 prioritätsplätzen frei`}>
+        <div className="field">
+          <label className="cap">projekt</label>
+          <input className="ti" value={projekt} onChange={(e) => setProjekt(e.target.value)} placeholder="roman fertigstellen." />
+        </div>
+
+        <div className="field" style={{ marginTop: 14 }}>
+          <label className="cap">parameter</label>
+          <div className="parambox">
+            {PARAM_STD.map((p) => (
+              <label key={p} className={"parambtn" + (param.includes(p) ? " on" : "")}
+                onClick={() => setParam(param.includes(p) ? param.filter((x) => x !== p) : [...param, p])}>
+                {param.includes(p) ? "▪" : "▫"} {p}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="row" style={{ marginTop: 14 }}>
+          <div className="field"><label className="cap">start</label>
+            <input className="ti" type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
+          <div className="field"><label className="cap">ziel</label>
+            <input className="ti" type="date" value={ziel} onChange={(e) => setZiel(e.target.value)} /></div>
+          <div className="field"><label className="cap">priorität</label>
+            <Seg value={prio} onChange={(v) => setPrio(Number(v))} options={[{ v: 1, t: "1" }, { v: 2, t: "2" }, { v: 3, t: "3" }]} />
+          </div>
+        </div>
+
+        <div className="field" style={{ marginTop: 14 }}>
+          <label className="cap">commit-signatur</label>
+          <div className="rezrow">
+            <input className="ti sig" value={sig} readOnly placeholder="noch keine signatur" />
+            <button className="btn" onClick={() => setSig(signaturErzeugen())}>⟳ signatur erzeugen</button>
+          </div>
+          <p className="hint">gedanken ohne gültige commit-signatur werden als energie verarbeitet.</p>
+        </div>
+
+        <div className="actions" style={{ marginTop: 16 }}>
+          <button className="btn primary big" onClick={execute}>⏺ commit · execute</button>
+          <span className={"status " + msg.c}>{msg.t || "bereit"}</span>
+        </div>
+      </Panel>
+
+      <div className="grouphead">AKTIVE PRIORITÄTEN<span className="rule" /></div>
+
+      {!liste.length && <p className="hint" style={{ marginLeft: 4 }}>noch kein commit. aura3 definiert keine ziele.</p>}
+
+      {liste.map((c) => (
+        <div className={"commit " + c.status} key={c.id}>
+          <div className="chead">
+            <span className={"cdot " + c.status} />
+            <span className="cprio">P{c.prioritaet}</span>
+            <span className="cprojekt">{c.projekt}</span>
+            <span className="cstatus">{c.status}</span>
+          </div>
+          <div className="cmeta">
+            {(c.parameter || []).join(" · ")}
+            {c.start_datum && <> &nbsp;|&nbsp; start {c.start_datum}</>}
+            {c.ziel_datum && <> &nbsp;|&nbsp; ziel {c.ziel_datum} <b>({tage(c)})</b></>}
+          </div>
+          <div className="csig">{c.signatur}</div>
+          <div className="crec">
+            <button title="resume" disabled={c.status === "aktiv"} onClick={() => setzeStatus(c, "aktiv", "resume")}>▶</button>
+            <button title="pause" disabled={c.status !== "aktiv"} onClick={() => setzeStatus(c, "pausiert", "pause")}>❚❚</button>
+            <button title="exit · ressourcen freigeben" disabled={c.status === "beendet"} onClick={() => setzeStatus(c, "beendet", "exit · ressourcen freigegeben")}>■</button>
+            <button title="aus dem archiv löschen" className="del" onClick={() => loeschen(c)}>✕</button>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+// ============================================================
 // APP
 // ============================================================
 export default function StricklieselApp() {
@@ -605,6 +764,7 @@ export default function StricklieselApp() {
   const [playing, setPlaying] = useState(false);
   const [gen, setGen] = useState(null);
 
+  const [tab, setTab] = useState("konsole");
   const [progName, setProgName] = useState("");
   const [progList, setProgList] = useState([]);
   const [progSel, setProgSel] = useState("");
@@ -930,6 +1090,14 @@ export default function StricklieselApp() {
 
         <Scope analyser={analyser} ctxRef={ctxRef} />
 
+        <div className="tabs">
+          <button aria-pressed={tab === "konsole"} onClick={() => setTab("konsole")}>konsole</button>
+          <button aria-pressed={tab === "17b"} onClick={() => setTab("17b")}>abteilung 17b</button>
+        </div>
+
+        {tab === "17b" && <Abteilung17b say={say} />}
+
+        {tab === "konsole" && <>
         <Panel title="PROTOKOLLE" sub="einstellungen & texte · gerätübergreifend">
           <div className="rezrow">
             <input placeholder="name des protokolls" value={progName} onChange={(e) => setProgName(e.target.value)} />
@@ -1227,6 +1395,8 @@ export default function StricklieselApp() {
           )}
         </Panel>
 
+        </>}
+
         <div className="rabbit">// <b>follow the white rabbit</b> 🐇</div>
       </div>
     </>
@@ -1270,6 +1440,57 @@ function Styles() {
   #spectrum{display:block;width:100%;height:118px}
   .scope-lbl{position:absolute;top:8px;left:12px;font-family:var(--term);font-size:11px;letter-spacing:.14em;color:var(--dim)}
   .scope-ultra{position:absolute;bottom:7px;right:12px;font-family:var(--term);font-size:10.5px;color:var(--green);letter-spacing:.06em}
+
+  /* tabs unterm skope */
+  .tabs{display:flex;gap:6px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
+  .tabs button{font-family:var(--term);font-size:13px;letter-spacing:.14em;background:transparent;
+    border:1px solid var(--line);border-bottom:0;border-radius:5px 5px 0 0;color:var(--dim);
+    padding:9px 18px;cursor:pointer;transition:.12s;position:relative;top:1px}
+  .tabs button:hover{color:var(--green)}
+  .tabs button[aria-pressed="true"]{background:var(--panel);color:var(--green);
+    border-color:var(--line-hot);text-shadow:var(--glow)}
+
+  /* eingabefelder abteilung 17b */
+  .ti{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
+    color:var(--ink);font-family:var(--mono);font-size:13px;padding:10px;
+    caret-shape:block;caret-color:var(--green)}
+  .ti:focus{outline:none;border-color:var(--line-hot)}
+  .ti::placeholder{color:var(--dim)}
+  .ti.sig{font-family:var(--term);letter-spacing:.16em;color:var(--green);flex:1 1 220px}
+  .ti[type=date]{color-scheme:dark}
+
+  .parambox{display:flex;flex-wrap:wrap;gap:6px}
+  .parambtn{font-family:var(--mono);font-size:12.5px;color:var(--dim);background:var(--panel-2);
+    border:1px solid var(--line);border-radius:5px;padding:7px 12px;cursor:pointer;user-select:none;transition:.12s}
+  .parambtn:hover{color:var(--green)}
+  .parambtn.on{background:var(--green-dim);color:var(--white);border-color:var(--line-hot)}
+
+  .btn.big{padding:14px 26px;font-size:14px;letter-spacing:.08em}
+
+  /* commit-karten */
+  .commit{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:10px}
+  .commit.pausiert{opacity:.6}
+  .commit.beendet{opacity:.38}
+  .commit .chead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .cdot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dim)}
+  .cdot.aktiv{background:var(--green);box-shadow:var(--glow);animation:puls 2s ease-in-out infinite}
+  .cdot.pausiert{background:var(--amber)}
+  .cdot.beendet{background:var(--dim)}
+  @keyframes puls{50%{opacity:.35}}
+  .cprio{font-family:var(--term);font-size:12px;color:var(--green);letter-spacing:.1em;
+    border:1px solid var(--line-hot);border-radius:3px;padding:1px 6px}
+  .cprojekt{flex:1;font-size:14px;color:var(--ink);min-width:120px}
+  .cstatus{font-family:var(--term);font-size:10.5px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+  .cmeta{font-size:11.5px;color:var(--dim);margin-top:8px;line-height:1.6}
+  .cmeta b{color:var(--muted);font-weight:400}
+  .csig{font-family:var(--term);font-size:11px;letter-spacing:.14em;color:var(--green-dim);margin-top:6px}
+  .crec{display:flex;gap:6px;margin-top:12px}
+  .crec button{font-family:var(--mono);font-size:13px;background:var(--panel-2);border:1px solid var(--line);
+    color:var(--muted);border-radius:4px;padding:6px 14px;cursor:pointer;transition:.12s;min-width:44px}
+  .crec button:hover:not(:disabled){border-color:var(--line-hot);color:var(--green)}
+  .crec button:disabled{opacity:.25;cursor:not-allowed}
+  .crec button.del{margin-left:auto;min-width:auto;padding:6px 10px}
+  .crec button.del:hover{border-color:var(--danger);color:var(--danger)}
 
   .grouphead{display:flex;align-items:center;gap:14px;margin:30px 2px 12px;font-family:var(--term);
     font-size:15px;letter-spacing:.3em;color:var(--green);text-shadow:var(--glow)}
@@ -1325,7 +1546,8 @@ function Styles() {
 
   .modeblock{margin-top:14px}
   .ta{width:100%;min-height:72px;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
-    color:var(--ink);font-family:var(--mono);font-size:13px;padding:10px;resize:vertical;line-height:1.5}
+    color:var(--ink);font-family:var(--mono);font-size:13px;padding:10px;resize:vertical;line-height:1.5;
+    caret-shape:block;caret-color:var(--green)}
   .ta:focus{outline:none;border-color:var(--line-hot)}
   .ta::placeholder{color:var(--dim)}
   .btn.gen{margin-top:8px;font-size:13px;padding:9px 16px}
@@ -1380,7 +1602,8 @@ function Styles() {
   .gatebox .gm{font-family:var(--term);font-size:22px;letter-spacing:.12em;color:var(--green);text-shadow:var(--glow);margin-bottom:4px}
   .gatebox .gs{font-family:var(--term);font-size:11.5px;color:var(--dim);letter-spacing:.1em;margin-bottom:18px}
   .gatebox input{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
-    color:var(--ink);font-family:var(--mono);font-size:13px;padding:11px;margin-bottom:9px}
+    color:var(--ink);font-family:var(--mono);font-size:13px;padding:11px;margin-bottom:9px;
+    caret-shape:block;caret-color:var(--green)}
   .gatebox input:focus{outline:none;border-color:var(--line-hot)}
   .gatebox input::placeholder{color:var(--dim)}
   .gatebox .btn{width:100%;margin-top:5px}
@@ -1394,7 +1617,8 @@ function Styles() {
   .whoami button:hover{border-color:var(--line-hot);color:var(--green)}
   .rezrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .rezrow input,.rezrow select{background:var(--panel-2);border:1px solid var(--line);border-radius:5px;
-    color:var(--ink);font-family:var(--mono);font-size:12.5px;padding:9px 10px;min-width:130px;flex:1 1 150px}
+    color:var(--ink);font-family:var(--mono);font-size:12.5px;padding:9px 10px;min-width:130px;flex:1 1 150px;
+    caret-shape:block;caret-color:var(--green)}
   .rezrow input:focus,.rezrow select:focus{outline:none;border-color:var(--line-hot)}
   .rezrow .btn{padding:9px 14px;font-size:12.5px;flex:0 0 auto}
   .qitem{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--line);
