@@ -260,6 +260,24 @@ async function piperFloat(text, say) {
   return wavToFloat(ab);
 }
 
+// Häppchen können mit verschiedenen Abtastraten im Cache liegen (Ilona 16 kHz,
+// Thorsten 22,05 kHz, ältere Einträge 48 kHz). Ungleiche Raten in einer Datei
+// = falsches Tempo. Also alles auf eine gemeinsame Rate bringen.
+function resample(data, from, to) {
+  if (from === to || !from || !to) return data;
+  const ratio = to / from;
+  const n = Math.round(data.length * ratio);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = i / ratio;
+    const i0 = Math.floor(x);
+    const i1 = Math.min(i0 + 1, data.length - 1);
+    const f = x - i0;
+    out[i] = data[i0] * (1 - f) + data[i1] * f;
+  }
+  return out;
+}
+
 function floatToWav(data, sr) {
   const len = data.length, ab = new ArrayBuffer(44 + len * 2), dv = new DataView(ab);
   const ws = (o, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
@@ -512,11 +530,11 @@ function Rain() {
     rs(); addEventListener("resize", rs);
     const chars = "01アイウエオカキクケコサシスセソ<>/{}[]=+*".split("");
     const draw = () => {
-      g.fillStyle = "rgba(4,7,5,.06)"; g.fillRect(0, 0, c.width, c.height);
+      g.fillStyle = "rgba(4,7,5,.045)"; g.fillRect(0, 0, c.width, c.height);
       g.font = fs + "px monospace";
       for (let i = 0; i < cols; i++) {
         const t = chars[Math.floor(Math.random() * chars.length)];
-        g.fillStyle = Math.random() < 0.06 ? "rgba(215,255,225,1)" : "rgba(35,255,111,.9)";
+        g.fillStyle = Math.random() < 0.09 ? "rgba(235,255,240,1)" : "rgba(70,255,135,1)";
         g.fillText(t, i * fs, drops[i] * fs);
         if (drops[i] * fs > c.height && Math.random() > 0.975) drops[i] = 0;
         drops[i] += 0.5;
@@ -757,7 +775,8 @@ export default function StricklieselApp() {
     const useThorsten = voice === "thorsten";
     const synth = useThorsten ? null : await getSynth(sayTts);
     const chunks = chunkText(text);
-    const parts = []; let sr = 16000, hits = 0;
+    const parts = []; let hits = 0;
+    const items = []; // {audio, sr} — rate pro häppchen, wird am ende angeglichen
     for (let ci = 0; ci < chunks.length; ci++) {
       if (abortRef.current) throw new Error("abgebrochen");
       const key = await keyFor(voice, chunks[ci]);
@@ -769,17 +788,27 @@ export default function StricklieselApp() {
         r = { audio: g.audio, sampling_rate: g.sampling_rate };
         await cachePut(key, r);
       }
-      sr = r.sampling_rate;
-      parts.push(r.audio);
-      parts.push(new Float32Array(Math.round(sr * 0.35)));
+      items.push({ audio: r.audio, sr: r.sampling_rate });
       await new Promise((res) => setTimeout(res, 0));
     }
+    if (!items.length) throw new Error("nichts erzeugt");
+
+    // gemeinsame rate = die häufigste. abweichende häppchen werden angeglichen.
+    const zaehl = {};
+    items.forEach((it) => { zaehl[it.sr] = (zaehl[it.sr] || 0) + 1; });
+    const target = Number(Object.keys(zaehl).sort((a, b) => zaehl[b] - zaehl[a])[0]);
+    if (Object.keys(zaehl).length > 1) sayTts("» gleiche abtastraten an …", "work");
+
+    items.forEach((it) => {
+      parts.push(resample(it.audio, it.sr, target));
+      parts.push(new Float32Array(Math.round(target * 0.35)));
+    });
     let len = 0; parts.forEach((p) => (len += p.length));
     const all = new Float32Array(len); let o = 0;
     parts.forEach((p) => { all.set(p, o); o += p.length; });
-    parts.length = 0;
+    parts.length = 0; items.length = 0;
     if (useThorsten) killPiper(); // speicher zurückgeben
-    return floatToWav(all, sr);
+    return floatToWav(all, target);
   }
 
   async function generate(slot, text) {
@@ -1224,7 +1253,7 @@ function Styles() {
   html,body{margin:0}
   body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:14px;
     line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
-  #rain{position:fixed;inset:0;z-index:0;opacity:.22;pointer-events:none}
+  #rain{position:fixed;inset:0;z-index:0;opacity:.38;pointer-events:none}
   .wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:26px 18px 90px}
 
   .wordmark{font-family:var(--term);font-size:clamp(30px,6.2vw,52px);letter-spacing:.14em;
