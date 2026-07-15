@@ -200,7 +200,7 @@ async function getPiper(say) {
   if (piperP) return piperP;
   piperP = (async () => {
     say("» lade piper …", "work");
-    const tts = await import(/* @vite-ignore */ "https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm");
+    const tts = await import("@diffusionstudio/vits-web");
     const stored = await tts.stored().catch(() => []);
     if (stored.indexOf(PIPER_VOICE) === -1) {
       say("» lade thorsten … (einmalig)", "work");
@@ -212,16 +212,52 @@ async function getPiper(say) {
   return piperP;
 }
 
-async function piperFloat(text, say) {
-  const tts = await getPiper(say);
-  const blob = await tts.predict({ text, voiceId: PIPER_VOICE });
-  const ab = await blob.arrayBuffer();
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const buf = await ctx.decodeAudioData(ab);
-  const out = buf.getChannelData(0).slice();
-  const sr = buf.sampleRate;
-  ctx.close();
+// Piper läuft im Worker und wird regelmäßig entsorgt — sonst frisst er sich tot.
+// (vits-web baut pro predict() eine neue Session mit dem ganzen Modell und gibt sie nie frei.)
+const PIPER_RECYCLE = 15; // nach so vielen Häppchen: frischer Worker
+let piperW = null, piperUses = 0, piperSeq = 0;
+
+function newPiperWorker() {
+  const w = new Worker(new URL("./piper-worker.js", import.meta.url), { type: "module" });
+  w.pending = new Map();
+  w.onmessage = (e) => {
+    const { id, ok, ab, err } = e.data;
+    const p = w.pending.get(id);
+    if (!p) return;
+    w.pending.delete(id);
+    ok ? p.res(ab) : p.rej(new Error(err));
+  };
+  w.onerror = (e) => { w.pending.forEach((p) => p.rej(new Error(e.message || "worker-fehler"))); w.pending.clear(); };
+  return w;
+}
+function killPiper() { if (piperW) { piperW.terminate(); piperW = null; } piperUses = 0; }
+
+// WAV selbst auslesen — kein AudioContext. Sonst hätten wir hunderte davon.
+function wavToFloat(ab) {
+  const dv = new DataView(ab);
+  let sr = 22050, off = 12, dataOff = -1, dataLen = 0, bits = 16, ch = 1;
+  while (off + 8 <= dv.byteLength) {
+    const id = String.fromCharCode(dv.getUint8(off), dv.getUint8(off + 1), dv.getUint8(off + 2), dv.getUint8(off + 3));
+    const sz = dv.getUint32(off + 4, true);
+    if (id === "fmt ") { ch = dv.getUint16(off + 10, true); sr = dv.getUint32(off + 12, true); bits = dv.getUint16(off + 22, true); }
+    else if (id === "data") { dataOff = off + 8; dataLen = sz; break; }
+    off += 8 + sz + (sz % 2);
+  }
+  if (dataOff < 0) throw new Error("wav ohne data-block");
+  const n = Math.floor(dataLen / (bits / 8) / ch);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) out[i] = dv.getInt16(dataOff + i * 2 * ch, true) / 32768;
   return { audio: out, sampling_rate: sr };
+}
+
+async function piperFloat(text, say) {
+  await getPiper(say); // stellt sicher, dass das modell einmalig geladen ist
+  if (!piperW || piperUses >= PIPER_RECYCLE) { killPiper(); piperW = newPiperWorker(); }
+  piperUses++;
+  const id = ++piperSeq;
+  const w = piperW;
+  const ab = await new Promise((res, rej) => { w.pending.set(id, { res, rej }); w.postMessage({ id, text, voiceId: PIPER_VOICE }); });
+  return wavToFloat(ab);
 }
 
 function floatToWav(data, sr) {
@@ -742,6 +778,7 @@ export default function StricklieselApp() {
     const all = new Float32Array(len); let o = 0;
     parts.forEach((p) => { all.set(p, o); o += p.length; });
     parts.length = 0;
+    if (useThorsten) killPiper(); // speicher zurückgeben
     return floatToWav(all, sr);
   }
 
@@ -760,7 +797,14 @@ export default function StricklieselApp() {
       else { const i = Number(slot.slice(-1)); A.current.layers[i] = ab; A.current.dur.layers[i] = d; }
       setDurTick((x) => x + 1);
       sayTts("» stimme erzeugt ✓ · spricht " + F.clock(d), "ok");
-    } catch (e) { sayTts("» " + (e?.message || e), "err"); }
+    } catch (e) {
+      const raw = e?.message ?? e;
+      const msg = typeof raw === "number" || /^\d+$/.test(String(raw))
+        ? "wasm-abbruch (speicher) — fertige häppchen sind im cache, einfach nochmal auf erzeugen"
+        : String(raw);
+      sayTts("» " + msg, "err");
+      killPiper();
+    }
     finally { setGen(null); abortRef.current = false; }
   }
 
