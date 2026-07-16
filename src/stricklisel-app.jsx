@@ -969,6 +969,63 @@ function LogFiles() {
 }
 
 // ============================================================
+// HANDBUCH · DEFLEKTIONSREAKTOR_AURA3
+// Der Text liegt in /public — dort änderbar, ohne den Code anzufassen.
+// ============================================================
+function Handbuch() {
+  const [fassung, setFassung] = useState("lese");
+  const [text, setText] = useState("");
+  const [msg, setMsg] = useState({ t: "", c: "" });
+
+  useEffect(() => {
+    setText("");
+    setMsg({ t: "lade …", c: "work" });
+    fetch(fassung === "lese" ? "aura3.txt" : "aura3-vorlese.txt")
+      .then((r) => { if (!r.ok) throw new Error("nicht gefunden"); return r.text(); })
+      .then((s) => { setText(s); setMsg({ t: "", c: "" }); })
+      .catch((e) => setMsg({ t: "» " + (e?.message || e), c: "err" }));
+  }, [fassung]);
+
+  async function kopieren() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setMsg({ t: "vollständig kopiert · " + text.length.toLocaleString("de-DE") + " zeichen", c: "ok" });
+      setTimeout(() => setMsg({ t: "", c: "" }), 2500);
+    } catch {
+      setMsg({ t: "kopieren blockiert — text markieren und cmd+c", c: "err" });
+    }
+  }
+
+  const version = (text.match(/Version\s+([\d.]+)/) || [])[1];
+
+  return (
+    <>
+      <div className="grouphead">HANDBUCH<span className="rule" /></div>
+
+      <Panel title="DEFLEKTIONSREAKTOR_AURA3" sub={version ? "betriebssystem version " + version : ""}>
+        <div className="row" style={{ alignItems: "flex-end" }}>
+          <div className="field" style={{ flex: "0 0 auto" }}>
+            <label className="cap">fassung</label>
+            <Seg value={fassung} onChange={setFassung}
+              options={[{ v: "lese", t: "lesen" }, { v: "vorlese", t: "vorlesen" }]} />
+          </div>
+          <div className="actions" style={{ flex: 1, marginTop: 0 }}>
+            <button className="btn primary" disabled={!text} onClick={kopieren}>⧉ alles kopieren</button>
+            <span className={"status " + msg.c}>{msg.t || (text ? text.length.toLocaleString("de-DE") + " zeichen" : "…")}</span>
+          </div>
+        </div>
+        <p className="hint">
+          {fassung === "lese"
+            ? "die lesefassung — mit modulköpfen, (_)P und T.O.T.E."
+            : "für thorsten und ilona — pfeile, slashes und abkürzungen sind aufgelöst. diese hier gehört ins protokoll."}
+        </p>
+        <pre className="handbuch">{text}</pre>
+      </Panel>
+    </>
+  );
+}
+
+// ============================================================
 // APP
 // ============================================================
 export default function StricklieselApp() {
@@ -1310,17 +1367,19 @@ export default function StricklieselApp() {
       <div className="wrap">
         <header>
           <div className="wordmark">SUB<span className="slash">//</span>CONSTRUCTOR<span className="cursor" /><Uhr /></div>
-          <div className="subline"><b>operator console</b> · lokaler subliminal-build · nichts verlässt diese maschine</div>
+          <div className="subline"><b>operator console</b> · subliminal-build · deflektionsreaktor_aura3</div>
         </header>
 
         <Scope analyser={analyser} ctxRef={ctxRef} />
 
         <div className="tabs">
+          <button aria-pressed={tab === "handbuch"} onClick={() => setTab("handbuch")}>handbuch</button>
           <button aria-pressed={tab === "konsole"} onClick={() => setTab("konsole")}>konsole</button>
           <button aria-pressed={tab === "17b"} onClick={() => setTab("17b")}>abteilung 17b</button>
           <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
         </div>
 
+        {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "log" && <LogFiles />}
 
@@ -1697,6 +1756,15 @@ function Styles() {
   .parambtn.on{background:var(--green-dim);color:var(--white);border-color:var(--line-hot)}
 
   .btn.big{padding:14px 26px;font-size:14px;letter-spacing:.08em}
+
+  /* handbuch */
+  .handbuch{margin:14px 0 0;padding:16px;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:6px;max-height:66vh;overflow:auto;white-space:pre-wrap;word-break:break-word;
+    font-family:var(--mono);font-size:12.5px;line-height:1.7;color:var(--muted)}
+  .handbuch::-webkit-scrollbar{width:9px}
+  .handbuch::-webkit-scrollbar-track{background:var(--void)}
+  .handbuch::-webkit-scrollbar-thumb{background:var(--green-dim);border-radius:5px}
+  .handbuch::-webkit-scrollbar-thumb:hover{background:var(--green-mid)}
 
   /* monatsgitter */
   .mwrap{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px 16px;margin-bottom:12px}
