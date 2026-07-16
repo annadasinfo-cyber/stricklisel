@@ -1218,7 +1218,8 @@ function Skripte() {
   );
 
   const meine = alle.filter((s) => (aktOrdner ? s.ordner_id === aktOrdner : true));
-  const gefuellt = (s) => (Array.isArray(s.matrix) ? s.matrix.filter((x) => x && x.trim()).length : 0);
+  // mainstate (4) zählt nicht mit — der sagt nur, worum es geht. es gibt 8 stationen.
+  const gefuellt = (s) => (Array.isArray(s.matrix) ? s.matrix.filter((x, n) => n !== 4 && x && x.trim()).length : 0);
 
   // der baum: wurzeln, kinder, kindeskinder — aufklappbar
   const Baum = ({ eltern, tiefe }) => {
@@ -1238,7 +1239,7 @@ function Skripte() {
               <span className="bname">{s.name || "unbenannt"}</span>
               <span className="bsub">{(Array.isArray(s.matrix) ? s.matrix[4] : "") || "—"}</span>
             </button>
-            <span className="bmeta">{gefuellt(s)}/9</span>
+            <span className="bmeta">{gefuellt(s)}/8</span>
           </div>
           {offen && <Baum eltern={s.id} tiefe={tiefe + 1} />}
         </div>
@@ -1310,7 +1311,8 @@ function Skripte() {
       <Krumen ziel="matrix" />
       <div className="mx">
         {POS.map((p, i) => (
-          <button key={i} className={"zelle" + (gewaehlt === i ? " on" : "") + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "")}
+          <button key={i} style={{ "--o": SCHREIB_ORDER.indexOf(i) }}
+            className={"zelle" + (gewaehlt === i ? " on" : "") + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "")}
             onClick={() => setGewaehlt(i)}>
             {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
             <span className="zname">{p.k}</span>
@@ -1349,7 +1351,7 @@ function Skripte() {
 
       <div className="mx klein">
         {POS.map((p, i) => (
-          <div key={i} className={"zelle" + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "")}>
+          <div key={i} style={{ "--o": SCHREIB_ORDER.indexOf(i) }} className={"zelle" + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "")}>
             {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
             <span className="zname">{p.k}</span>
             <span className="ztext">{matrix[i] || "—"}</span>
@@ -1364,7 +1366,7 @@ function Skripte() {
         return (
           <div className={"szene" + (i === 4 ? " mitte" : "")} key={i}>
             <div className="skopf">
-              <span className="snr">{String(n + 1).padStart(2, "0")}</span>
+              <span className="snr">{i === 4 ? "00" : String(n).padStart(2, "0")}</span>
               <span className="zname">{POS[i].k}</span>
               {POS[i].akt > 0 && <span className="akt">{AKT_ROEMISCH[POS[i].akt]}</span>}
               <span className="smatrix">{matrix[i] || "—"}</span>
@@ -2219,7 +2221,10 @@ function Styles() {
   .kind:hover{background:var(--green-mid);color:#04150a}
 
   @media(max-width:640px){
+    /* einspaltig ergäbe die rasterreihenfolge — also die geschichte rückwärts.
+       hier zählt die erzählreihenfolge: mainstate, anfang, 1. kat … */
     .mx{grid-template-columns:1fr}
+    .mx .zelle{order:var(--o)}
     .seitenkopf{flex-wrap:wrap}
     .xfiles{order:-1;flex:1 1 100%;letter-spacing:.2em;font-size:13px;margin-bottom:4px}
     .otabs{max-width:100%}
