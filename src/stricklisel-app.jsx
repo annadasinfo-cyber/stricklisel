@@ -1067,6 +1067,298 @@ function Handbuch() {
 }
 
 // ============================================================
+// SKRIPTE · die 3x3-Matrix als Geschichte
+// ============================================================
+// Rasterlage (so wird sie gelesen und geschrieben):
+//   0 kartharsis      1 pay-off      2 anfang
+//   3 rückzug         4 mainstate    5 1. katastrophe
+//   6 3. katastrophe  7 midbuild     8 2. katastrophe
+const POS = [
+  { k: "kartharsis", akt: 3 }, { k: "pay-off", akt: 3 }, { k: "anfang", akt: 1 },
+  { k: "rückzug", akt: 2 }, { k: "mainstate", akt: 0 }, { k: "1. katastrophe", akt: 1 },
+  { k: "3. katastrophe", akt: 2 }, { k: "midbuild", akt: 2 }, { k: "2. katastrophe", akt: 2 },
+];
+// Geschrieben wird: mainstate zuerst, dann im uhrzeigersinn ab position 3.
+const SCHREIB_ORDER = [4, 2, 5, 8, 7, 6, 3, 0, 1];
+const AKT_ROEMISCH = { 1: "I", 2: "II", 3: "III" };
+const ZIEL_ABSATZ = 200;
+const leer9 = () => ["", "", "", "", "", "", "", "", ""];
+
+function Skripte() {
+  const [view, setView] = useState("projekte");
+  const [ordner, setOrdner] = useState([]);
+  const [alle, setAlle] = useState([]);
+  const [aktOrdner, setAktOrdner] = useState(""); // "" = alle
+  const [id, setId] = useState(null);
+  const [name, setName] = useState("");
+  const [hook, setHook] = useState("");
+  const [bemerkung, setBemerkung] = useState("");
+  const [matrix, setMatrix] = useState(leer9);
+  const [texte, setTexte] = useState(leer9);
+  const [elternId, setElternId] = useState(null);
+  const [elternPos, setElternPos] = useState(null);
+  const [gewaehlt, setGewaehlt] = useState(null);
+  const [msg, setMsg] = useState({ t: "bereit", c: "" });
+  const [dirty, setDirty] = useState(false);
+  const tRef = useRef(null);
+  const idRef = useRef(null);
+  useEffect(() => { idRef.current = id; }, [id]);
+
+  useEffect(() => { laden(); }, []);
+  useEffect(() => {
+    if (!dirty) return;
+    if (tRef.current) clearTimeout(tRef.current);
+    tRef.current = setTimeout(() => speichern(true), 2000);
+    return () => clearTimeout(tRef.current);
+  }, [name, hook, bemerkung, matrix, texte, dirty]);
+
+  const aendern = (fn) => { fn(); setDirty(true); };
+  const setM = (i, v) => aendern(() => setMatrix((m) => m.map((x, n) => (n === i ? v : x))));
+  const setT = (i, v) => aendern(() => setTexte((m) => m.map((x, n) => (n === i ? v : x))));
+
+  async function laden() {
+    try {
+      const [oR, sR] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/skript_ordner?select=*&order=created_at.asc`, { headers: dbHeaders(getToken()) }),
+        fetch(`${SUPABASE_URL}/rest/v1/skripte?select=*&order=updated_at.desc`, { headers: dbHeaders(getToken()) }),
+      ]);
+      const o = await oR.json(), s = await sR.json();
+      if (Array.isArray(o)) setOrdner(o);
+      if (Array.isArray(s)) setAlle(s);
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+  }
+
+  function neu(vorgabe = {}) {
+    setId(null); setName(vorgabe.name || ""); setHook(vorgabe.hook || ""); setBemerkung("");
+    setMatrix(vorgabe.matrix || leer9()); setTexte(leer9());
+    setElternId(vorgabe.eltern_id || null); setElternPos(vorgabe.eltern_pos ?? null);
+    setGewaehlt(null); setDirty(false); setMsg({ t: "neues skript", c: "" });
+  }
+
+  function oeffnen(s) {
+    setId(s.id); setName(s.name || ""); setHook(s.hook || ""); setBemerkung(s.bemerkung || "");
+    setMatrix(Array.isArray(s.matrix) && s.matrix.length === 9 ? s.matrix : leer9());
+    setTexte(Array.isArray(s.texte) && s.texte.length === 9 ? s.texte : leer9());
+    setElternId(s.eltern_id || null); setElternPos(s.eltern_pos ?? null);
+    setGewaehlt(null); setDirty(false); setMsg({ t: "geladen: " + (s.name || "unbenannt"), c: "ok" });
+  }
+
+  async function speichern(still) {
+    const nm = name.trim() || "unbenannt · " + new Date().toLocaleDateString("de-DE");
+    const body = {
+      user_id: getUserId(), ordner_id: aktOrdner || null, name: nm,
+      hook, bemerkung, matrix, texte, eltern_id: elternId, eltern_pos: elternPos,
+      updated_at: new Date().toISOString(),
+    };
+    try {
+      if (!still) setMsg({ t: "speichere …", c: "work" });
+      const cur = idRef.current;
+      const r = cur
+        ? await fetch(`${SUPABASE_URL}/rest/v1/skripte?id=eq.${cur}`, { method: "PATCH", headers: { ...dbHeaders(getToken()), Prefer: "return=representation" }, body: JSON.stringify(body) })
+        : await fetch(`${SUPABASE_URL}/rest/v1/skripte`, { method: "POST", headers: { ...dbHeaders(getToken()), Prefer: "return=representation" }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error(await r.text());
+      const d = await r.json();
+      if (!cur && d?.[0]?.id) setId(d[0].id);
+      setDirty(false);
+      setMsg({ t: "gespeichert · " + nm, c: "ok" });
+      laden();
+      return d?.[0]?.id || cur;
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); return null; }
+  }
+
+  async function loeschen(s) {
+    if (!confirm(`skript „${s.name}" löschen?`)) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/skripte?id=eq.${s.id}`, { method: "DELETE", headers: dbHeaders(getToken()) });
+    if (s.id === id) neu();
+    laden();
+  }
+
+  async function ordnerNeu() {
+    const n = prompt("name des projekts?");
+    if (!n?.trim()) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/skript_ordner`, { method: "POST", headers: dbHeaders(getToken()), body: JSON.stringify({ user_id: getUserId(), name: n.trim() }) });
+    laden();
+  }
+  async function ordnerWeg(o) {
+    if (!confirm(`projekt „${o.name}" löschen? die skripte darin bleiben.`)) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/skript_ordner?id=eq.${o.id}`, { method: "DELETE", headers: dbHeaders(getToken()) });
+    if (aktOrdner === o.id) setAktOrdner("");
+    laden();
+  }
+
+  // aus einer position ein eigenes skript machen — der baum
+  async function verzweigen(i) {
+    if (!matrix[i].trim()) { setMsg({ t: "erst beschreiben, was an der position passiert", c: "err" }); return; }
+    const eltern = await speichern(true);
+    if (!eltern) return;
+    const m = leer9(); m[4] = matrix[i];
+    neu({ name: POS[i].k + " · " + matrix[i].slice(0, 40), hook, matrix: m, eltern_id: eltern, eltern_pos: i });
+    setView("matrix");
+    setMsg({ t: "verzweigt · " + POS[i].k + " ist jetzt mainstate", c: "ok" });
+  }
+
+  // brotkrumen: den baum nach oben laufen
+  const krumen = (() => {
+    const k = []; let e = elternId, tiefe = 0;
+    while (e && tiefe++ < 12) { const s = alle.find((x) => x.id === e); if (!s) break; k.unshift(s); e = s.eltern_id; }
+    return k;
+  })();
+
+  const meine = alle.filter((s) => (aktOrdner ? s.ordner_id === aktOrdner : true));
+  const kinder = (pid, pos) => alle.filter((s) => s.eltern_id === pid && s.eltern_pos === pos);
+
+  // ---------- SEITE 1 ----------
+  if (view === "projekte") return (
+    <>
+      <div className="grouphead">SKRIPTE<span className="rule" /></div>
+      <Panel id="skripte-projekte" title="PROJEKTE" sub="ordner & gespeicherte skripte">
+        <div className="otabs">
+          <button className="otab neu" onClick={() => neu()}>+ neues skript</button>
+          <button className={"otab" + (aktOrdner === "" ? " on" : "")} onClick={() => setAktOrdner("")}>alle</button>
+          {ordner.map((o) => (
+            <span className={"otab" + (aktOrdner === o.id ? " on" : "")} key={o.id}>
+              <button onClick={() => setAktOrdner(o.id)}>{o.name}</button>
+              <i onClick={() => ordnerWeg(o)}>✕</i>
+            </span>
+          ))}
+          <button className="otab" onClick={ordnerNeu}>+ neu</button>
+        </div>
+
+        <div className="rezrow" style={{ marginTop: 14 }}>
+          <select value={id || ""} onChange={(e) => { const s = alle.find((x) => x.id === e.target.value); if (s) oeffnen(s); }}>
+            <option value="">— gespeicherte skripte —</option>
+            {meine.map((s) => <option key={s.id} value={s.id}>{s.name || "unbenannt"}{s.eltern_id ? " ↳" : ""}</option>)}
+          </select>
+          {id && <button className="btn stop" onClick={() => loeschen(alle.find((x) => x.id === id) || { id, name })}>■ löschen</button>}
+        </div>
+
+        {krumen.length > 0 && (
+          <div className="krumen">{krumen.map((s) => (
+            <span key={s.id}><button onClick={() => oeffnen(s)}>{s.name || "unbenannt"}</button> › </span>
+          ))}<b>{name || "neu"}</b></div>
+        )}
+
+        <div className="field" style={{ marginTop: 16 }}>
+          <label className="cap">session-name</label>
+          <input className="ti" value={name} onChange={(e) => aendern(() => setName(e.target.value))} placeholder="arbeitstitel" />
+        </div>
+        <div className="field" style={{ marginTop: 14 }}>
+          <label className="cap">the hook</label>
+          <textarea className="ta" value={hook} onChange={(e) => aendern(() => setHook(e.target.value))}
+            placeholder="der satz, der alles trägt" style={{ minHeight: 70 }} />
+        </div>
+        <div className="field" style={{ marginTop: 14 }}>
+          <label className="cap">bemerkungen</label>
+          <textarea className="ta" value={bemerkung} onChange={(e) => aendern(() => setBemerkung(e.target.value))}
+            placeholder="was is die idee" style={{ minHeight: 70 }} />
+        </div>
+
+        <div className="actions" style={{ marginTop: 16 }}>
+          <button className="btn primary" onClick={() => setView("matrix")}>weiter →</button>
+          <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
+        </div>
+      </Panel>
+    </>
+  );
+
+  // ---------- SEITE 2 ----------
+  if (view === "matrix") return (
+    <>
+      <div className="seitenkopf">
+        <button className="btn" onClick={() => setView("projekte")}>← zurück</button>
+        <span className="xfiles">x-files</span>
+        <button className="btn primary" onClick={() => setView("schreiben")}>weiter →</button>
+      </div>
+      <div className="mx">
+        {POS.map((p, i) => (
+          <button key={i} className={"zelle" + (gewaehlt === i ? " on" : "") + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "")}
+            onClick={() => setGewaehlt(i)}>
+            {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
+            <span className="zname">{p.k}</span>
+            <span className="ztext">{matrix[i] || "+"}</span>
+          </button>
+        ))}
+      </div>
+      {gewaehlt !== null && (
+        <div className="eingabe">
+          <div className="ekopf">
+            <span className="zname">{POS[gewaehlt].k}</span>
+            <button className="btn" onClick={() => setM(gewaehlt, "")}>✕ leeren</button>
+          </div>
+          <textarea className="ta" autoFocus value={matrix[gewaehlt]} onChange={(e) => setM(gewaehlt, e.target.value)}
+            placeholder="in kurzen worten: was passiert hier?" style={{ minHeight: 80 }} />
+        </div>
+      )}
+      <div className="actions" style={{ marginTop: 12 }}>
+        <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
+      </div>
+    </>
+  );
+
+  // ---------- SEITE 3 ----------
+  return (
+    <>
+      <div className="seitenkopf">
+        <button className="btn" onClick={() => setView("matrix")}>← zurück</button>
+        <span className="xfiles">{name || "unbenannt"}</span>
+        <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
+      </div>
+
+      {krumen.length > 0 && (
+        <div className="krumen">{krumen.map((s) => (
+          <span key={s.id}><button onClick={() => { oeffnen(s); setView("schreiben"); }}>{s.name || "unbenannt"}</button> › </span>
+        ))}<b>{name || "neu"}</b></div>
+      )}
+
+      {hook && <div className="hookzeile">🎯 {hook}</div>}
+
+      <div className="mx klein">
+        {POS.map((p, i) => (
+          <div key={i} className={"zelle" + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "")}>
+            {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
+            <span className="zname">{p.k}</span>
+            <span className="ztext">{matrix[i] || "—"}</span>
+          </div>
+        ))}
+      </div>
+
+      {SCHREIB_ORDER.map((i, n) => {
+        const w = zaehleWoerter(texte[i]);
+        const voll = w >= ZIEL_ABSATZ;
+        const kids = id ? kinder(id, i) : [];
+        return (
+          <div className={"szene" + (i === 4 ? " mitte" : "")} key={i}>
+            <div className="skopf">
+              <span className="snr">{String(n + 1).padStart(2, "0")}</span>
+              <span className="zname">{POS[i].k}</span>
+              {POS[i].akt > 0 && <span className="akt">{AKT_ROEMISCH[POS[i].akt]}</span>}
+              <span className="smatrix">{matrix[i] || "—"}</span>
+            </div>
+            <textarea className="ta" value={texte[i]} onChange={(e) => setT(i, e.target.value)} placeholder="…" />
+            <div className="logfoot">
+              <div className="logbar"><i style={{ width: Math.min(100, (w / ZIEL_ABSATZ) * 100) + "%" }} className={voll ? "voll" : ""} /></div>
+              <div className={"wcount" + (voll ? " voll" : "")}>
+                {voll ? <>✓ {w} wörter</> : <>{w} <span className="wziel">/ {ZIEL_ABSATZ}</span></>}
+              </div>
+            </div>
+            {i !== 4 && (
+              <div className="zweig">
+                {kids.map((k) => <button key={k.id} className="kind" onClick={() => { oeffnen(k); setView("schreiben"); }}>↳ {k.name}</button>)}
+                <button className="btn zweigbtn" onClick={() => verzweigen(i)}>→ zum mainstate machen</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <div className="actions" style={{ marginTop: 12 }}>
+        <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
+      </div>
+    </>
+  );
+}
+
+// ============================================================
 // APP
 // ============================================================
 export default function StricklieselApp() {
@@ -1418,11 +1710,13 @@ export default function StricklieselApp() {
           <button aria-pressed={tab === "konsole"} onClick={() => setTab("konsole")}>konsole</button>
           <button aria-pressed={tab === "17b"} onClick={() => setTab("17b")}>abteilung 17b</button>
           <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
+          <button aria-pressed={tab === "skripte"} onClick={() => setTab("skripte")}>skripte</button>
         </div>
 
         {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "log" && <LogFiles />}
+        {tab === "skripte" && <Skripte />}
 
         {tab === "konsole" && <>
         <Panel title="PROTOKOLLE" sub="einstellungen & texte · gerätübergreifend">
@@ -1765,9 +2059,9 @@ function Styles() {
   .uhr i{font-style:normal;opacity:.42;font-size:.68em}
   .subline{font-family:var(--term);color:var(--dim);font-size:13px;letter-spacing:.1em;margin-top:8px;
     display:flex;align-items:baseline;gap:14px}
-  .wetter{margin-left:auto;color:var(--muted);letter-spacing:.08em;white-space:nowrap;
-    font-variant-numeric:tabular-nums;cursor:default}
-  .wetter i{font-style:normal;color:var(--green);text-shadow:var(--glow);padding-right:3px}
+  .wetter{margin-left:auto;color:var(--ink);letter-spacing:.08em;white-space:nowrap;font-size:17px;
+    font-variant-numeric:tabular-nums;cursor:default;display:inline-flex;align-items:center;gap:6px}
+  .wetter i{font-style:normal;color:var(--green);text-shadow:var(--glow);font-size:22px;line-height:1}
   .subline b{color:var(--muted);font-weight:400}
 
   .scope{margin:16px 0 6px;border:1px solid var(--line);border-radius:6px;
@@ -1801,6 +2095,71 @@ function Styles() {
   .parambtn.on{background:var(--green-dim);color:var(--white);border-color:var(--line-hot)}
 
   .btn.big{padding:14px 26px;font-size:14px;letter-spacing:.08em}
+
+  /* skripte */
+  .seitenkopf{display:flex;align-items:center;gap:14px;margin:14px 0 14px}
+  .seitenkopf .btn{padding:9px 16px;font-size:12.5px}
+  .xfiles{flex:1;text-align:center;font-family:var(--term);font-size:15px;letter-spacing:.34em;
+    color:var(--green);text-shadow:var(--glow)}
+
+  .otabs{display:flex;flex-wrap:wrap;gap:6px}
+  .otab{display:inline-flex;align-items:center;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:5px;overflow:hidden;transition:.12s}
+  .otab>button,.otab:not(:has(button)){font-family:var(--mono);font-size:12.5px;color:var(--muted);
+    background:transparent;border:0;padding:7px 12px;cursor:pointer}
+  button.otab{font-family:var(--mono);font-size:12.5px;color:var(--muted);padding:7px 12px;cursor:pointer}
+  .otab:hover{border-color:var(--line-hot)}
+  .otab:hover>button{color:var(--green)}
+  .otab.on{background:var(--green-dim);border-color:var(--line-hot)}
+  .otab.on>button{color:var(--white)}
+  .otab.neu{color:var(--green);border-color:var(--line-hot)}
+  .otab>i{font-style:normal;font-size:10px;color:var(--dim);padding:0 8px 0 2px;cursor:pointer}
+  .otab>i:hover{color:var(--danger)}
+
+  .krumen{font-family:var(--term);font-size:11px;letter-spacing:.06em;color:var(--dim);margin-top:12px}
+  .krumen button{font-family:var(--term);font-size:11px;background:transparent;border:0;color:var(--muted);
+    cursor:pointer;padding:0;letter-spacing:.06em}
+  .krumen button:hover{color:var(--green)}
+  .krumen b{color:var(--green);font-weight:400}
+
+  .mx{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+  .zelle{position:relative;text-align:left;background:var(--panel);border:1px solid var(--line);
+    border-radius:6px;padding:12px 12px 14px;min-height:96px;cursor:pointer;transition:.12s;
+    display:flex;flex-direction:column;gap:7px}
+  button.zelle:hover{border-color:var(--line-hot)}
+  .zelle.voll{border-color:var(--green-dim)}
+  .zelle.on{border-color:var(--green);box-shadow:0 0 0 1px var(--green-dim),var(--glow)}
+  .zelle.mitte{background:var(--panel-2);border-color:var(--line-hot)}
+  .zname{font-family:var(--term);font-size:11.5px;letter-spacing:.16em;color:var(--green);text-transform:uppercase}
+  .ztext{font-size:12px;color:var(--muted);line-height:1.5;word-break:break-word}
+  .zelle:not(.voll) .ztext{color:var(--dim)}
+  .akt{position:absolute;top:9px;right:10px;font-family:var(--term);font-size:9px;letter-spacing:.1em;
+    color:var(--dim);opacity:.55}
+  .mx.klein .zelle{min-height:auto;padding:9px 10px 10px;cursor:default}
+  .mx.klein .zname{font-size:10px;letter-spacing:.12em}
+  .mx.klein .ztext{font-size:11px}
+
+  .eingabe{background:var(--panel);border:1px solid var(--line-hot);border-radius:6px;padding:12px}
+  .ekopf{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+  .ekopf .btn{margin-left:auto;padding:5px 11px;font-size:11.5px}
+
+  .hookzeile{font-size:13px;color:var(--muted);border-left:2px solid var(--green-dim);
+    padding:4px 0 4px 12px;margin-bottom:14px;font-style:italic}
+
+  .szene{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:10px}
+  .szene.mitte{border-color:var(--line-hot);background:var(--panel-2)}
+  .skopf{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .snr{font-family:var(--term);font-size:11px;color:var(--green-dim);letter-spacing:.1em}
+  .skopf .akt{position:static;opacity:.5}
+  .smatrix{flex:1;font-size:11.5px;color:var(--dim);font-style:italic;min-width:120px}
+  .szene .ta{min-height:120px}
+  .zweig{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .zweigbtn{padding:6px 12px;font-size:11.5px}
+  .kind{font-family:var(--mono);font-size:11.5px;background:var(--green-dim);border:1px solid var(--line-hot);
+    color:var(--white);border-radius:4px;padding:6px 12px;cursor:pointer}
+  .kind:hover{background:var(--green-mid);color:#04150a}
+
+  @media(max-width:640px){.mx{grid-template-columns:1fr}.xfiles{letter-spacing:.2em;font-size:13px}}
 
   /* handbuch */
   .handbuch{margin:14px 0 0;padding:16px;background:var(--panel-2);border:1px solid var(--line);
