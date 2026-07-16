@@ -1228,6 +1228,11 @@ function Skripte() {
     return kids.map((s) => {
       const enkel = meine.filter((x) => x.eltern_id === s.id);
       const offen = !zu[s.id];
+      // steht der mainstate-text schon im namen? dann nicht zweimal zeigen.
+      const nm = (s.name || "unbenannt").trim();
+      const sub = ((Array.isArray(s.matrix) ? s.matrix[4] : "") || "").trim();
+      const a = nm.toLowerCase(), b = sub.toLowerCase();
+      const doppelt = !b || a === b || (b.length > 6 && a.includes(b.slice(0, 24))) || (a.length > 6 && b.includes(a.slice(0, 24)));
       return (
         <div key={s.id}>
           <div className={"bzeile" + (s.id === id ? " on" : "")} style={{ paddingLeft: 8 + tiefe * 20 }}>
@@ -1236,8 +1241,8 @@ function Skripte() {
               {enkel.length ? (offen ? "▾" : "▸") : "·"}
             </button>
             <button className="bhaupt" onClick={() => oeffnen(s)}>
-              <span className="bname">{s.name || "unbenannt"}</span>
-              <span className="bsub">{(Array.isArray(s.matrix) ? s.matrix[4] : "") || "—"}</span>
+              <span className="bname">{nm}</span>
+              {!doppelt && <span className="bsub">{sub}</span>}
             </button>
             <span className="bmeta">{gefuellt(s)}/8</span>
           </div>
