@@ -764,10 +764,16 @@ function Abteilung17b({ say }) {
 const ZIEL_WOERTER = 750;
 const zaehleWoerter = (t) => (t.trim() ? t.trim().split(/\s+/).filter(Boolean).length : 0);
 const WOCHENTAG = ["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"];
+// "#idee, reaktor #glow" -> ["idee","reaktor","glow"]
+const tagsLesen = (s) => Array.from(new Set(
+  (s || "").split(/[\s,]+/).map((x) => x.replace(/^#+/, "").trim().toLowerCase()).filter(Boolean)
+));
+const tagsSchreiben = (a) => (a || []).map((x) => "#" + x).join(" ");
+
 const MONATE = ["januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember"];
 
 // Ein Monat als Kästchen — leer / beschrieben / voll.
-function MonatsGitter({ liste, datum, setDatum, monat, setMonat }) {
+function MonatsGitter({ liste, datum, setDatum, monat, setMonat, children }) {
   const [j, m] = monat.split("-").map(Number);
   const tage = new Date(j, m, 0).getDate();
   const heuteS = heute();
@@ -806,6 +812,7 @@ function MonatsGitter({ liste, datum, setDatum, monat, setMonat }) {
           );
         })}
       </div>
+      {children}
     </div>
   );
 }
@@ -814,7 +821,11 @@ function LogFiles() {
   const [datum, setDatum] = useState(heute());
   const [monat, setMonat] = useState(() => heute().slice(0, 7));
   const [text, setText] = useState("");
+  const [tagText, setTagText] = useState("");
   const [liste, setListe] = useState([]);
+  const [suche, setSuche] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
+  const [treffer, setTreffer] = useState(null);
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
   const [dirty, setDirty] = useState(false);
   const tRef = useRef(null);
@@ -838,16 +849,17 @@ function LogFiles() {
 
   async function laden() {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/logfiles?select=datum,woerter&order=datum.desc`, { headers: dbHeaders(getToken()) });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/logfiles?select=datum,woerter,tags&order=datum.desc`, { headers: dbHeaders(getToken()) });
       const d2 = await r.json();
       setListe(Array.isArray(d2) ? d2 : []);
     } catch {}
   }
   async function ladeTag(dt) {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/logfiles?select=text&datum=eq.${dt}`, { headers: dbHeaders(getToken()) });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/logfiles?select=text,tags&datum=eq.${dt}`, { headers: dbHeaders(getToken()) });
       const d2 = await r.json();
       setText(d2?.[0]?.text || "");
+      setTagText(tagsSchreiben(d2?.[0]?.tags));
       setDirty(false);
       setMsg(d2?.[0] ? { t: "eintrag geladen", c: "" } : { t: "neuer eintrag", c: "" });
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
@@ -858,7 +870,7 @@ function LogFiles() {
       const r = await fetch(`${SUPABASE_URL}/rest/v1/logfiles?on_conflict=user_id,datum`, {
         method: "POST",
         headers: { ...dbHeaders(getToken()), Prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify({ user_id: getUserId(), datum, text, woerter: w, updated_at: new Date().toISOString() }),
+        body: JSON.stringify({ user_id: getUserId(), datum, text, woerter: w, tags: tagsLesen(tagText), updated_at: new Date().toISOString() }),
       });
       if (!r.ok) throw new Error(await r.text());
       setDirty(false);
@@ -867,20 +879,71 @@ function LogFiles() {
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
 
+  async function suchen(q, tag) {
+    if (!q && !tag) { setTreffer(null); return; }
+    try {
+      let url = `${SUPABASE_URL}/rest/v1/logfiles?select=datum,woerter,text,tags&order=datum.desc&limit=60`;
+      if (q) url += `&text=ilike.*${encodeURIComponent(q)}*`;
+      if (tag) url += `&tags=cs.{${encodeURIComponent(tag)}}`;
+      const r = await fetch(url, { headers: dbHeaders(getToken()) });
+      const d2 = await r.json();
+      setTreffer(Array.isArray(d2) ? d2 : []);
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+  }
+  useEffect(() => { const id = setTimeout(() => suchen(suche, tagFilter), 350); return () => clearTimeout(id); }, [suche, tagFilter]);
+
+  // alle je vergebenen tags, häufigste zuerst
+  const alleTags = (() => {
+    const z = {};
+    liste.forEach((x) => (x.tags || []).forEach((tg) => { z[tg] = (z[tg] || 0) + 1; }));
+    return Object.keys(z).sort((a, b) => z[b] - z[a]);
+  })();
+
+  const schnipsel = (s, q) => {
+    if (!s) return "";
+    const i = q ? s.toLowerCase().indexOf(q.toLowerCase()) : -1;
+    const a = i > 40 ? i - 40 : 0;
+    return (a ? "… " : "") + s.slice(a, a + 130).replace(/\n+/g, " ") + (s.length > a + 130 ? " …" : "");
+  };
+
   return (
     <>
       <div className="grouphead">LOG-FILES<span className="rule" /></div>
 
-      <MonatsGitter liste={liste} datum={datum} setDatum={setDatum} monat={monat} setMonat={setMonat} />
+      <MonatsGitter liste={liste} datum={datum} setDatum={setDatum} monat={monat} setMonat={setMonat}>
+        <div className="suchzeile">
+          <input className="ti" value={suche} placeholder="⌕ in allen einträgen suchen …" onChange={(e) => setSuche(e.target.value)} />
+          {(suche || tagFilter) && <button className="btn" onClick={() => { setSuche(""); setTagFilter(""); }}>✕</button>}
+        </div>
+        {alleTags.length > 0 && (
+          <div className="chips">
+            {alleTags.map((tg) => (
+              <button key={tg} className={"chip" + (tagFilter === tg ? " on" : "")}
+                onClick={() => setTagFilter(tagFilter === tg ? "" : tg)}>#{tg}</button>
+            ))}
+          </div>
+        )}
+        {treffer && (
+          <div className="treffer">
+            <div className="tkopf">{treffer.length} {treffer.length === 1 ? "eintrag" : "einträge"}{tagFilter && <> mit <b>#{tagFilter}</b></>}</div>
+            {treffer.map((x) => (
+              <button key={x.datum} className="tzeile" onClick={() => { setDatum(x.datum); setSuche(""); setTagFilter(""); }}>
+                <span className="tdatum">{x.datum}</span>
+                <span className="tschnipsel">{schnipsel(x.text, suche)}</span>
+                <span className="twoerter">{x.woerter} w</span>
+              </button>
+            ))}
+            {!treffer.length && <div className="tkopf">nichts gefunden.</div>}
+          </div>
+        )}
+      </MonatsGitter>
 
       <Panel title={"EINTRAG #" + String(eintragNr).padStart(3, "0")}
              sub={WOCHENTAG[d.getDay()] + " · " + d.toLocaleDateString("de-DE")}>
         <div className="rezrow" style={{ marginBottom: 12 }}>
           <input className="ti" type="date" value={datum} max={heute()} onChange={(e) => setDatum(e.target.value)} style={{ flex: "0 0 auto", minWidth: 150 }} />
-          <select value="" onChange={(e) => e.target.value && setDatum(e.target.value)}>
-            <option value="">— frühere einträge —</option>
-            {liste.map((x) => <option key={x.datum} value={x.datum}>{x.datum} · {x.woerter} w</option>)}
-          </select>
+          <input className="ti tags" value={tagText} placeholder="#hashtags"
+            onChange={(e) => { setTagText(e.target.value); setDirty(true); }} />
           {datum !== heute() && <button className="btn" onClick={() => setDatum(heute())}>↺ heute</button>}
         </div>
 
@@ -1652,6 +1715,26 @@ function Styles() {
   .kasten.heute{outline:1px dotted var(--green-mid);outline-offset:2px}
   .kasten.gewaehlt{outline:1px solid var(--green);outline-offset:3px}
   .kasten.zukunft{opacity:.2;cursor:not-allowed}
+
+  /* suche + tags */
+  .suchzeile{display:flex;gap:8px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+  .suchzeile .btn{padding:9px 14px;font-size:12.5px;flex:0 0 auto}
+  .ti.tags{font-family:var(--term);letter-spacing:.06em;color:var(--green);flex:1 1 180px}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+  .chip{font-family:var(--term);font-size:11px;letter-spacing:.08em;background:transparent;
+    border:1px solid var(--line);color:var(--dim);border-radius:11px;padding:3px 10px;cursor:pointer;transition:.12s}
+  .chip:hover{border-color:var(--line-hot);color:var(--green)}
+  .chip.on{background:var(--green-dim);border-color:var(--line-hot);color:var(--white)}
+  .treffer{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+  .tkopf{font-family:var(--term);font-size:11px;letter-spacing:.12em;color:var(--dim);margin-bottom:8px}
+  .tkopf b{color:var(--green);font-weight:400}
+  .tzeile{display:flex;align-items:baseline;gap:12px;width:100%;text-align:left;background:transparent;
+    border:0;border-bottom:1px solid var(--line);padding:9px 2px;cursor:pointer;transition:.12s}
+  .tzeile:hover{background:var(--panel-2)}
+  .tzeile:hover .tdatum{color:var(--green)}
+  .tdatum{font-family:var(--term);font-size:11.5px;color:var(--muted);letter-spacing:.06em;flex:0 0 auto;transition:.12s}
+  .tschnipsel{flex:1;font-size:12px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .twoerter{font-family:var(--term);font-size:10.5px;color:var(--green-dim);flex:0 0 auto}
 
   /* log-files */
   .ta.log{min-height:340px;font-size:13.5px;line-height:1.65}
