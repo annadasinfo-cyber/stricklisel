@@ -1088,7 +1088,9 @@ function Skripte() {
   const [view, setView] = useState("projekte");
   const [ordner, setOrdner] = useState([]);
   const [alle, setAlle] = useState([]);
-  const [aktOrdner, setAktOrdner] = useState(""); // "" = alle
+  const [aktOrdner, setAktOrdner] = useState(""); // "" = alle (nur filter)
+  const [skriptOrdner, setSkriptOrdner] = useState(null); // der ordner DIESES skripts
+  const [zu, setZu] = useState({});
   const [id, setId] = useState(null);
   const [name, setName] = useState("");
   const [hook, setHook] = useState("");
@@ -1129,14 +1131,15 @@ function Skripte() {
   }
 
   function neu(vorgabe = {}) {
-    setId(null); setName(vorgabe.name || ""); setHook(vorgabe.hook || ""); setBemerkung("");
+    setId(null); setSkriptOrdner(vorgabe.ordner_id !== undefined ? vorgabe.ordner_id : (aktOrdner || null));
+    setName(vorgabe.name || ""); setHook(vorgabe.hook || ""); setBemerkung("");
     setMatrix(vorgabe.matrix || leer9()); setTexte(leer9());
     setElternId(vorgabe.eltern_id || null); setElternPos(vorgabe.eltern_pos ?? null);
     setGewaehlt(null); setDirty(false); setMsg({ t: "neues skript", c: "" });
   }
 
   function oeffnen(s) {
-    setId(s.id); setName(s.name || ""); setHook(s.hook || ""); setBemerkung(s.bemerkung || "");
+    setId(s.id); setSkriptOrdner(s.ordner_id || null); setName(s.name || ""); setHook(s.hook || ""); setBemerkung(s.bemerkung || "");
     setMatrix(Array.isArray(s.matrix) && s.matrix.length === 9 ? s.matrix : leer9());
     setTexte(Array.isArray(s.texte) && s.texte.length === 9 ? s.texte : leer9());
     setElternId(s.eltern_id || null); setElternPos(s.eltern_pos ?? null);
@@ -1146,7 +1149,7 @@ function Skripte() {
   async function speichern(still) {
     const nm = name.trim() || "unbenannt · " + new Date().toLocaleDateString("de-DE");
     const body = {
-      user_id: getUserId(), ordner_id: aktOrdner || null, name: nm,
+      user_id: getUserId(), ordner_id: skriptOrdner, name: nm,
       hook, bemerkung, matrix, texte, eltern_id: elternId, eltern_pos: elternPos,
       updated_at: new Date().toISOString(),
     };
@@ -1192,7 +1195,7 @@ function Skripte() {
     const eltern = await speichern(true);
     if (!eltern) return;
     const m = leer9(); m[4] = matrix[i];
-    neu({ name: POS[i].k + " · " + matrix[i].slice(0, 40), hook, matrix: m, eltern_id: eltern, eltern_pos: i });
+    neu({ name: POS[i].k, hook, matrix: m, eltern_id: eltern, eltern_pos: i, ordner_id: skriptOrdner });
     setView("matrix");
     setMsg({ t: "verzweigt · " + POS[i].k + " ist jetzt mainstate", c: "ok" });
   }
@@ -1204,7 +1207,44 @@ function Skripte() {
     return k;
   })();
 
+  // brotkrumen — auf jeder seite gleich, springen ohne die seite zu wechseln
+  const Krumen = ({ ziel }) => krumen.length === 0 ? null : (
+    <div className="krumen">
+      {krumen.map((s) => (
+        <span key={s.id}><button onClick={() => { oeffnen(s); if (ziel) setView(ziel); }}>{s.name || "unbenannt"}</button> › </span>
+      ))}
+      <b>{name || "neu"}</b>
+    </div>
+  );
+
   const meine = alle.filter((s) => (aktOrdner ? s.ordner_id === aktOrdner : true));
+  const gefuellt = (s) => (Array.isArray(s.matrix) ? s.matrix.filter((x) => x && x.trim()).length : 0);
+
+  // der baum: wurzeln, kinder, kindeskinder — aufklappbar
+  const Baum = ({ eltern, tiefe }) => {
+    const kids = meine.filter((s) => (s.eltern_id || null) === eltern);
+    if (!kids.length) return null;
+    return kids.map((s) => {
+      const enkel = meine.filter((x) => x.eltern_id === s.id);
+      const offen = !zu[s.id];
+      return (
+        <div key={s.id}>
+          <div className={"bzeile" + (s.id === id ? " on" : "")} style={{ paddingLeft: 8 + tiefe * 20 }}>
+            <button className="bpfeil" disabled={!enkel.length}
+              onClick={() => setZu((z) => ({ ...z, [s.id]: !z[s.id] }))}>
+              {enkel.length ? (offen ? "▾" : "▸") : "·"}
+            </button>
+            <button className="bhaupt" onClick={() => oeffnen(s)}>
+              <span className="bname">{s.name || "unbenannt"}</span>
+              <span className="bsub">{(Array.isArray(s.matrix) ? s.matrix[4] : "") || "—"}</span>
+            </button>
+            <span className="bmeta">{gefuellt(s)}/9</span>
+          </div>
+          {offen && <Baum eltern={s.id} tiefe={tiefe + 1} />}
+        </div>
+      );
+    });
+  };
   const kinder = (pid, pos) => alle.filter((s) => s.eltern_id === pid && s.eltern_pos === pos);
 
   // ---------- SEITE 1 ----------
@@ -1224,19 +1264,17 @@ function Skripte() {
           <button className="otab" onClick={ordnerNeu}>+ neu</button>
         </div>
 
-        <div className="rezrow" style={{ marginTop: 14 }}>
-          <select value={id || ""} onChange={(e) => { const s = alle.find((x) => x.id === e.target.value); if (s) oeffnen(s); }}>
-            <option value="">— gespeicherte skripte —</option>
-            {meine.map((s) => <option key={s.id} value={s.id}>{s.name || "unbenannt"}{s.eltern_id ? " ↳" : ""}</option>)}
-          </select>
-          {id && <button className="btn stop" onClick={() => loeschen(alle.find((x) => x.id === id) || { id, name })}>■ löschen</button>}
+        <div className="baum">
+          {meine.filter((s) => !s.eltern_id).length === 0 && <div className="bleer">noch kein skript. „+ neues skript" fängt an.</div>}
+          <Baum eltern={null} tiefe={0} />
         </div>
-
-        {krumen.length > 0 && (
-          <div className="krumen">{krumen.map((s) => (
-            <span key={s.id}><button onClick={() => oeffnen(s)}>{s.name || "unbenannt"}</button> › </span>
-          ))}<b>{name || "neu"}</b></div>
+        {id && (
+          <div className="rezrow" style={{ marginTop: 8 }}>
+            <button className="btn stop" onClick={() => loeschen(alle.find((x) => x.id === id) || { id, name })}>■ dieses skript löschen</button>
+          </div>
         )}
+
+        <Krumen />
 
         <div className="field" style={{ marginTop: 16 }}>
           <label className="cap">session-name</label>
@@ -1269,6 +1307,7 @@ function Skripte() {
         <span className="xfiles">x-files</span>
         <button className="btn primary" onClick={() => setView("schreiben")}>weiter →</button>
       </div>
+      <Krumen ziel="matrix" />
       <div className="mx">
         {POS.map((p, i) => (
           <button key={i} className={"zelle" + (gewaehlt === i ? " on" : "") + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "")}
@@ -1304,11 +1343,7 @@ function Skripte() {
         <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
       </div>
 
-      {krumen.length > 0 && (
-        <div className="krumen">{krumen.map((s) => (
-          <span key={s.id}><button onClick={() => { oeffnen(s); setView("schreiben"); }}>{s.name || "unbenannt"}</button> › </span>
-        ))}<b>{name || "neu"}</b></div>
-      )}
+      <Krumen ziel="schreiben" />
 
       {hook && <div className="hookzeile">🎯 {hook}</div>}
 
@@ -2042,10 +2077,11 @@ function Styles() {
   }
   *{box-sizing:border-box}
   html,body{margin:0}
+  html{overflow-x:hidden}
   body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:14px;
-    line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
+    line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden;max-width:100vw}
   #rain{position:fixed;inset:0;z-index:0;opacity:.38;pointer-events:none}
-  .wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:26px 18px 90px}
+  .wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:26px 18px 90px;overflow-x:hidden}
 
   .wordmark{font-family:var(--term);font-size:clamp(30px,6.2vw,52px);letter-spacing:.14em;
     color:var(--green);text-shadow:var(--glow);line-height:1;display:flex;align-items:center;flex-wrap:wrap}
@@ -2071,7 +2107,7 @@ function Styles() {
   .scope-ultra{position:absolute;bottom:7px;right:12px;font-family:var(--term);font-size:10.5px;color:var(--green);letter-spacing:.06em}
 
   /* tabs unterm skope */
-  .tabs{display:flex;gap:6px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
   .tabs button{font-family:var(--term);font-size:13px;letter-spacing:.14em;background:transparent;
     border:1px solid var(--line);border-bottom:0;border-radius:5px 5px 0 0;color:var(--dim);
     padding:9px 18px;cursor:pointer;transition:.12s;position:relative;top:1px}
@@ -2099,8 +2135,8 @@ function Styles() {
   /* skripte */
   .seitenkopf{display:flex;align-items:center;gap:14px;margin:14px 0 14px}
   .seitenkopf .btn{padding:9px 16px;font-size:12.5px}
-  .xfiles{flex:1;text-align:center;font-family:var(--term);font-size:15px;letter-spacing:.34em;
-    color:var(--green);text-shadow:var(--glow)}
+  .xfiles{flex:1;min-width:0;text-align:center;font-family:var(--term);font-size:15px;letter-spacing:.34em;
+    color:var(--green);text-shadow:var(--glow);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
   .otabs{display:flex;flex-wrap:wrap;gap:6px}
   .otab{display:inline-flex;align-items:center;background:var(--panel-2);border:1px solid var(--line);
@@ -2116,11 +2152,32 @@ function Styles() {
   .otab>i{font-style:normal;font-size:10px;color:var(--dim);padding:0 8px 0 2px;cursor:pointer}
   .otab>i:hover{color:var(--danger)}
 
-  .krumen{font-family:var(--term);font-size:11px;letter-spacing:.06em;color:var(--dim);margin-top:12px}
+  .krumen{font-family:var(--term);font-size:11px;letter-spacing:.06em;color:var(--dim);margin-top:12px;word-break:break-word}
   .krumen button{font-family:var(--term);font-size:11px;background:transparent;border:0;color:var(--muted);
     cursor:pointer;padding:0;letter-spacing:.06em}
   .krumen button:hover{color:var(--green)}
   .krumen b{color:var(--green);font-weight:400}
+
+  .baum{border:1px solid var(--line);border-radius:6px;background:var(--panel-2);margin-top:14px;
+    max-height:46vh;overflow-y:auto;overflow-x:hidden;padding:4px 0}
+  .baum::-webkit-scrollbar{width:8px}
+  .baum::-webkit-scrollbar-track{background:transparent}
+  .baum::-webkit-scrollbar-thumb{background:var(--green-dim);border-radius:4px}
+  .bleer{font-size:11.5px;color:var(--dim);padding:14px}
+  .bzeile{display:flex;align-items:center;gap:6px;padding-right:10px;transition:.1s;border-radius:4px}
+  .bzeile:hover{background:var(--panel)}
+  .bzeile.on{background:var(--green-dim)}
+  .bzeile.on .bname{color:var(--white)}
+  .bpfeil{font-family:var(--mono);font-size:10px;background:transparent;border:0;color:var(--green-dim);
+    cursor:pointer;padding:4px 3px;flex:0 0 auto;width:18px}
+  .bpfeil:hover:not(:disabled){color:var(--green)}
+  .bpfeil:disabled{opacity:.3;cursor:default}
+  .bhaupt{flex:1;min-width:0;display:flex;align-items:baseline;gap:9px;background:transparent;border:0;
+    text-align:left;cursor:pointer;padding:6px 0}
+  .bname{font-family:var(--term);font-size:12px;letter-spacing:.08em;color:var(--muted);flex:0 0 auto;transition:.1s}
+  .bhaupt:hover .bname{color:var(--green)}
+  .bsub{flex:1;min-width:0;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bmeta{font-family:var(--term);font-size:10px;color:var(--green-dim);flex:0 0 auto}
 
   .mx{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
   .zelle{position:relative;text-align:left;background:var(--panel);border:1px solid var(--line);
@@ -2151,15 +2208,22 @@ function Styles() {
   .skopf{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap}
   .snr{font-family:var(--term);font-size:11px;color:var(--green-dim);letter-spacing:.1em}
   .skopf .akt{position:static;opacity:.5}
-  .smatrix{flex:1;font-size:11.5px;color:var(--dim);font-style:italic;min-width:120px}
+  .smatrix{flex:1;font-size:12px;color:var(--ink);font-style:italic;min-width:120px}
   .szene .ta{min-height:120px}
   .zweig{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .zweigbtn{padding:6px 12px;font-size:11.5px}
+  .zweigbtn{padding:5px 11px;font-size:11px;color:var(--dim);border-color:var(--line);
+    background:transparent;opacity:.5;transition:.15s}
+  .zweigbtn:hover{opacity:1;color:var(--green);border-color:var(--line-hot)}
   .kind{font-family:var(--mono);font-size:11.5px;background:var(--green-dim);border:1px solid var(--line-hot);
     color:var(--white);border-radius:4px;padding:6px 12px;cursor:pointer}
   .kind:hover{background:var(--green-mid);color:#04150a}
 
-  @media(max-width:640px){.mx{grid-template-columns:1fr}.xfiles{letter-spacing:.2em;font-size:13px}}
+  @media(max-width:640px){
+    .mx{grid-template-columns:1fr}
+    .seitenkopf{flex-wrap:wrap}
+    .xfiles{order:-1;flex:1 1 100%;letter-spacing:.2em;font-size:13px;margin-bottom:4px}
+    .otabs{max-width:100%}
+  }
 
   /* handbuch */
   .handbuch{margin:14px 0 0;padding:16px;background:var(--panel-2);border:1px solid var(--line);
