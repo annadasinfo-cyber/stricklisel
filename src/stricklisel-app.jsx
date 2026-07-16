@@ -759,6 +759,105 @@ function Abteilung17b({ say }) {
 }
 
 // ============================================================
+// LOG-FILES · Operator-Logbuch
+// ============================================================
+const ZIEL_WOERTER = 750;
+const zaehleWoerter = (t) => (t.trim() ? t.trim().split(/\s+/).filter(Boolean).length : 0);
+const WOCHENTAG = ["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"];
+
+function LogFiles() {
+  const [datum, setDatum] = useState(heute());
+  const [text, setText] = useState("");
+  const [liste, setListe] = useState([]);
+  const [msg, setMsg] = useState({ t: "bereit", c: "" });
+  const [dirty, setDirty] = useState(false);
+  const tRef = useRef(null);
+
+  const w = zaehleWoerter(text);
+  const voll = w >= ZIEL_WOERTER;
+  const nr = liste.length ? liste.findIndex((x) => x.datum === datum) : -1;
+  const eintragNr = nr >= 0 ? liste.length - nr : liste.length + 1;
+  const d = new Date(datum + "T12:00:00");
+
+  useEffect(() => { laden(); }, []);
+  useEffect(() => { ladeTag(datum); }, [datum]);
+
+  // still speichern, 2 s nach dem letzten tastendruck
+  useEffect(() => {
+    if (!dirty) return;
+    if (tRef.current) clearTimeout(tRef.current);
+    tRef.current = setTimeout(() => speichern(true), 2000);
+    return () => clearTimeout(tRef.current);
+  }, [text, dirty]);
+
+  async function laden() {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/logfiles?select=datum,woerter&order=datum.desc`, { headers: dbHeaders(getToken()) });
+      const d2 = await r.json();
+      setListe(Array.isArray(d2) ? d2 : []);
+    } catch {}
+  }
+  async function ladeTag(dt) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/logfiles?select=text&datum=eq.${dt}`, { headers: dbHeaders(getToken()) });
+      const d2 = await r.json();
+      setText(d2?.[0]?.text || "");
+      setDirty(false);
+      setMsg(d2?.[0] ? { t: "eintrag geladen", c: "" } : { t: "neuer eintrag", c: "" });
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+  }
+  async function speichern(still) {
+    try {
+      if (!still) setMsg({ t: "übertrage …", c: "work" });
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/logfiles?on_conflict=user_id,datum`, {
+        method: "POST",
+        headers: { ...dbHeaders(getToken()), Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({ user_id: getUserId(), datum, text, woerter: w, updated_at: new Date().toISOString() }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setDirty(false);
+      setMsg({ t: "transmission saved · " + w + " wörter", c: "ok" });
+      laden();
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+  }
+
+  return (
+    <>
+      <div className="grouphead">LOG-FILES<span className="rule" /></div>
+
+      <Panel title={"EINTRAG #" + String(eintragNr).padStart(3, "0")}
+             sub={WOCHENTAG[d.getDay()] + " · " + d.toLocaleDateString("de-DE")}>
+        <div className="rezrow" style={{ marginBottom: 12 }}>
+          <input className="ti" type="date" value={datum} max={heute()} onChange={(e) => setDatum(e.target.value)} style={{ flex: "0 0 auto", minWidth: 150 }} />
+          <select value="" onChange={(e) => e.target.value && setDatum(e.target.value)}>
+            <option value="">— frühere einträge —</option>
+            {liste.map((x) => <option key={x.datum} value={x.datum}>{x.datum} · {x.woerter} w</option>)}
+          </select>
+          {datum !== heute() && <button className="btn" onClick={() => setDatum(heute())}>↺ heute</button>}
+        </div>
+
+        <textarea className="ta log" value={text}
+          onChange={(e) => { setText(e.target.value); setDirty(true); }}
+          placeholder={"> operator log\n> " + d.toLocaleDateString("de-DE") + "\n> was heute durch den reaktor ging …"} />
+
+        <div className="logfoot">
+          <div className="logbar"><i style={{ width: Math.min(100, (w / ZIEL_WOERTER) * 100) + "%" }} className={voll ? "voll" : ""} /></div>
+          <div className={"wcount" + (voll ? " voll" : "")}>
+            {voll ? <>✓ {w} wörter · mission completed</> : <>{w} <span className="wziel">/ {ZIEL_WOERTER} wörter</span></>}
+          </div>
+        </div>
+
+        <div className="actions" style={{ marginTop: 14 }}>
+          <button className="btn primary" onClick={() => speichern(false)}>⇥ übertragen</button>
+          <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
+        </div>
+        <p className="hint">speichert sich still von selbst, zwei sekunden nach dem letzten tastendruck.</p>
+      </Panel>
+    </>
+  );
+}
+
+// ============================================================
 // APP
 // ============================================================
 export default function StricklieselApp() {
@@ -1108,9 +1207,11 @@ export default function StricklieselApp() {
         <div className="tabs">
           <button aria-pressed={tab === "konsole"} onClick={() => setTab("konsole")}>konsole</button>
           <button aria-pressed={tab === "17b"} onClick={() => setTab("17b")}>abteilung 17b</button>
+          <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
         </div>
 
         {tab === "17b" && <Abteilung17b say={say} />}
+        {tab === "log" && <LogFiles />}
 
         {tab === "konsole" && <>
         <Panel title="PROTOKOLLE" sub="einstellungen & texte · gerätübergreifend">
@@ -1486,6 +1587,19 @@ function Styles() {
 
   .btn.big{padding:14px 26px;font-size:14px;letter-spacing:.08em}
 
+  /* log-files */
+  .ta.log{min-height:340px;font-size:13.5px;line-height:1.65}
+  .logfoot{display:flex;align-items:center;gap:14px;margin-top:8px}
+  .logbar{flex:1;height:2px;background:var(--line);overflow:hidden}
+  .logbar i{display:block;height:100%;background:var(--green-mid);transition:width .3s}
+  .logbar i.voll{background:var(--white);box-shadow:0 0 10px var(--green)}
+  .wcount{font-family:var(--term);font-size:12.5px;color:var(--muted);letter-spacing:.08em;
+    white-space:nowrap;font-variant-numeric:tabular-nums;transition:.3s}
+  .wcount .wziel{color:var(--dim)}
+  .wcount.voll{color:var(--white);text-shadow:0 0 12px var(--green),0 0 24px rgba(53,255,111,.5);
+    animation:fertig .5s ease-out}
+  @keyframes fertig{0%{transform:scale(1)}40%{transform:scale(1.14)}100%{transform:scale(1)}}
+
   /* commit-karten */
   .commit{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:10px}
   .commit.pausiert{opacity:.6}
@@ -1652,7 +1766,7 @@ function Styles() {
   .qitem button:disabled{opacity:.3;cursor:not-allowed}
 
   @media(prefers-reduced-motion:reduce){#rain{display:none}.cursor{animation:none}}
-  @media(max-width:560px){.uhr i{display:none}.phead .psub{display:none}.phead .chev{margin-left:auto}.val{min-width:54px}}
+  @media(max-width:560px){.uhr{display:none}.phead .psub{display:none}.phead .chev{margin-left:auto}.val{min-width:54px}}
     `}</style>
   );
 }
