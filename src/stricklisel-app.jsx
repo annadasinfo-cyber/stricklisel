@@ -529,6 +529,38 @@ function Slider({ label, value, onChange, min, max, step, fmt }) {
   );
 }
 
+// Wetter · Dümmer 19073 (53,576° N · 11,205° O)
+// Open-Meteo: kein schlüssel, kein konto, kein tracking.
+const WMO = {
+  0: ["☀︎", "klar"], 1: ["☀︎", "heiter"], 2: ["⛅︎", "wolkig"], 3: ["☁︎", "bedeckt"],
+  45: ["≡", "nebel"], 48: ["≡", "reifnebel"],
+  51: ["☂︎", "leichter niesel"], 53: ["☂︎", "niesel"], 55: ["☂︎", "starker niesel"],
+  56: ["☂︎", "gefrierender niesel"], 57: ["☂︎", "gefrierender niesel"],
+  61: ["☂︎", "leichter regen"], 63: ["☂︎", "regen"], 65: ["☂︎", "starker regen"],
+  66: ["☂︎", "gefrierender regen"], 67: ["☂︎", "gefrierender regen"],
+  71: ["❄︎", "leichter schnee"], 73: ["❄︎", "schnee"], 75: ["❄︎", "starker schnee"], 77: ["❄︎", "schneegriesel"],
+  80: ["☂︎", "schauer"], 81: ["☂︎", "schauer"], 82: ["☂︎", "starke schauer"],
+  85: ["❄︎", "schneeschauer"], 86: ["❄︎", "schneeschauer"],
+  95: ["⚡︎", "gewitter"], 96: ["⚡︎", "gewitter mit hagel"], 99: ["⚡︎", "gewitter mit hagel"],
+};
+
+function Wetter() {
+  const [w, setW] = useState(null);
+  useEffect(() => {
+    const holen = () =>
+      fetch("https://api.open-meteo.com/v1/forecast?latitude=53.576&longitude=11.205&current=temperature_2m,weather_code&timezone=Europe%2FBerlin")
+        .then((r) => r.json())
+        .then((d) => { if (d?.current) setW({ t: Math.round(d.current.temperature_2m), c: d.current.weather_code }); })
+        .catch(() => {});
+    holen();
+    const iv = setInterval(holen, 15 * 60 * 1000);
+    return () => clearInterval(iv);
+  }, []);
+  if (!w) return null;
+  const [sym, txt] = WMO[w.c] || ["·", "unbekannt"];
+  return <span className="wetter" title={"dümmer · " + txt}><i>{sym}</i> {w.t}°</span>;
+}
+
 function Uhr() {
   const [t, setT] = useState(() => new Date());
   useEffect(() => { const iv = setInterval(() => setT(new Date()), 1000); return () => clearInterval(iv); }, []);
@@ -1376,7 +1408,7 @@ export default function StricklieselApp() {
       <div className="wrap">
         <header>
           <div className="wordmark">SUB<span className="slash">//</span>CONSTRUCTOR<span className="cursor" /><Uhr /></div>
-          <div className="subline"><b>operator console</b> · subliminal-build · deflektionsreaktor_aura3</div>
+          <div className="subline"><span><b>operator console</b> · subliminal-build · deflektionsreaktor_aura3</span><Wetter /></div>
         </header>
 
         <Scope analyser={analyser} ctxRef={ctxRef} />
@@ -1731,7 +1763,11 @@ function Styles() {
     letter-spacing:.1em;font-size:clamp(18px,3.4vw,30px);line-height:1;
     font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:14px}
   .uhr i{font-style:normal;opacity:.42;font-size:.68em}
-  .subline{font-family:var(--term);color:var(--dim);font-size:13px;letter-spacing:.1em;margin-top:8px}
+  .subline{font-family:var(--term);color:var(--dim);font-size:13px;letter-spacing:.1em;margin-top:8px;
+    display:flex;align-items:baseline;gap:14px}
+  .wetter{margin-left:auto;color:var(--muted);letter-spacing:.08em;white-space:nowrap;
+    font-variant-numeric:tabular-nums;cursor:default}
+  .wetter i{font-style:normal;color:var(--green);text-shadow:var(--glow);padding-right:3px}
   .subline b{color:var(--muted);font-weight:400}
 
   .scope{margin:16px 0 6px;border:1px solid var(--line);border-radius:6px;
@@ -1992,7 +2028,7 @@ function Styles() {
   .qitem button:disabled{opacity:.3;cursor:not-allowed}
 
   @media(prefers-reduced-motion:reduce){#rain{display:none}.cursor{animation:none}}
-  @media(max-width:560px){.uhr{display:none}.phead .psub{display:none}.phead .chev{margin-left:auto}.val{min-width:54px}}
+  @media(max-width:560px){.uhr{display:none}.subline{font-size:11px;gap:8px}.phead .psub{display:none}.phead .chev{margin-left:auto}.val{min-width:54px}}
     `}</style>
   );
 }
