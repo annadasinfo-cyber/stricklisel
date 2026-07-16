@@ -520,6 +520,13 @@ function Slider({ label, value, onChange, min, max, step, fmt }) {
   );
 }
 
+function Uhr() {
+  const [t, setT] = useState(() => new Date());
+  useEffect(() => { const iv = setInterval(() => setT(new Date()), 1000); return () => clearInterval(iv); }, []);
+  const p = (n) => String(n).padStart(2, "0");
+  return <span className="uhr">{p(t.getHours())}:{p(t.getMinutes())}<i>:{p(t.getSeconds())}</i></span>;
+}
+
 function Rain() {
   const ref = useRef(null);
   useEffect(() => {
@@ -534,8 +541,16 @@ function Rain() {
       g.font = fs + "px monospace";
       for (let i = 0; i < cols; i++) {
         const t = chars[Math.floor(Math.random() * chars.length)];
-        g.fillStyle = Math.random() < 0.09 ? "rgba(235,255,240,1)" : "rgba(70,255,135,1)";
+        const r = Math.random();
+        if (r < 0.09) {            // helle spitze
+          g.shadowBlur = 0; g.fillStyle = "rgba(235,255,240,1)";
+        } else if (r < 0.22) {     // cursor-grün, glimmt wie der cursor oben
+          g.shadowBlur = 8; g.shadowColor = "rgba(53,255,111,.75)"; g.fillStyle = "#35ff6f";
+        } else {                   // der übliche regen
+          g.shadowBlur = 0; g.fillStyle = "rgba(70,255,135,1)";
+        }
         g.fillText(t, i * fs, drops[i] * fs);
+        g.shadowBlur = 0;
         if (drops[i] * fs > c.height && Math.random() > 0.975) drops[i] = 0;
         drops[i] += 0.5;
       }
@@ -1084,7 +1099,7 @@ export default function StricklieselApp() {
       <Rain />
       <div className="wrap">
         <header>
-          <div className="wordmark">SUB<span className="slash">//</span>CONSTRUCTOR<span className="cursor" /></div>
+          <div className="wordmark">SUB<span className="slash">//</span>CONSTRUCTOR<span className="cursor" /><Uhr /></div>
           <div className="subline"><b>operator console</b> · lokaler subliminal-build · nichts verlässt diese maschine</div>
         </header>
 
@@ -1432,6 +1447,10 @@ function Styles() {
   .cursor{display:inline-block;width:.5em;height:1em;background:var(--green);margin-left:.14em;
     translate:0 .12em;animation:blink 1.05s steps(1) infinite;box-shadow:var(--glow)}
   @keyframes blink{50%{opacity:0}}
+  .uhr{margin-left:auto;font-family:var(--term);color:var(--green);text-shadow:var(--glow);
+    letter-spacing:.1em;font-size:clamp(18px,3.4vw,30px);line-height:1;
+    font-variant-numeric:tabular-nums;white-space:nowrap;padding-left:14px}
+  .uhr i{font-style:normal;opacity:.42;font-size:.68em}
   .subline{font-family:var(--term);color:var(--dim);font-size:13px;letter-spacing:.1em;margin-top:8px}
   .subline b{color:var(--muted);font-weight:400}
 
@@ -1633,7 +1652,7 @@ function Styles() {
   .qitem button:disabled{opacity:.3;cursor:not-allowed}
 
   @media(prefers-reduced-motion:reduce){#rain{display:none}.cursor{animation:none}}
-  @media(max-width:560px){.phead .psub{display:none}.phead .chev{margin-left:auto}.val{min-width:54px}}
+  @media(max-width:560px){.uhr i{display:none}.phead .psub{display:none}.phead .chev{margin-left:auto}.val{min-width:54px}}
     `}</style>
   );
 }
