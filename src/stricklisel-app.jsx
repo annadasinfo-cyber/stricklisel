@@ -764,9 +764,55 @@ function Abteilung17b({ say }) {
 const ZIEL_WOERTER = 750;
 const zaehleWoerter = (t) => (t.trim() ? t.trim().split(/\s+/).filter(Boolean).length : 0);
 const WOCHENTAG = ["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"];
+const MONATE = ["januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember"];
+
+// Ein Monat als Kästchen — leer / beschrieben / voll.
+function MonatsGitter({ liste, datum, setDatum, monat, setMonat }) {
+  const [j, m] = monat.split("-").map(Number);
+  const tage = new Date(j, m, 0).getDate();
+  const heuteS = heute();
+  const map = {};
+  liste.forEach((x) => { map[x.datum] = x.woerter; });
+
+  const schieben = (n) => {
+    const d = new Date(j, m - 1 + n, 1);
+    const neu = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+    if (neu <= heuteS.slice(0, 7)) setMonat(neu);
+  };
+  const istHeuteMonat = monat >= heuteS.slice(0, 7);
+
+  return (
+    <div className="mwrap">
+      <div className="mnav">
+        <button onClick={() => schieben(-1)} title="voriger monat">◀</button>
+        <span className="mname">{MONATE[m - 1]} {j}</span>
+        <button onClick={() => schieben(1)} disabled={istHeuteMonat} title="nächster monat">▶</button>
+      </div>
+      <div className="mgrid">
+        {Array.from({ length: tage }, (_, i) => {
+          const d = j + "-" + String(m).padStart(2, "0") + "-" + String(i + 1).padStart(2, "0");
+          const w = map[d] || 0;
+          const zukunft = d > heuteS;
+          const cls = ["kasten"];
+          if (w >= ZIEL_WOERTER) cls.push("voll");
+          else if (w > 0) cls.push("teil");
+          if (d === datum) cls.push("gewaehlt");
+          if (d === heuteS) cls.push("heute");
+          if (zukunft) cls.push("zukunft");
+          return (
+            <button key={d} className={cls.join(" ")} disabled={zukunft}
+              title={i + 1 + ". " + MONATE[m - 1] + " · " + (w ? w + " wörter" : "leer")}
+              onClick={() => setDatum(d)} />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function LogFiles() {
   const [datum, setDatum] = useState(heute());
+  const [monat, setMonat] = useState(() => heute().slice(0, 7));
   const [text, setText] = useState("");
   const [liste, setListe] = useState([]);
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
@@ -780,7 +826,7 @@ function LogFiles() {
   const d = new Date(datum + "T12:00:00");
 
   useEffect(() => { laden(); }, []);
-  useEffect(() => { ladeTag(datum); }, [datum]);
+  useEffect(() => { ladeTag(datum); setMonat(datum.slice(0, 7)); }, [datum]);
 
   // still speichern, 2 s nach dem letzten tastendruck
   useEffect(() => {
@@ -824,6 +870,8 @@ function LogFiles() {
   return (
     <>
       <div className="grouphead">LOG-FILES<span className="rule" /></div>
+
+      <MonatsGitter liste={liste} datum={datum} setDatum={setDatum} monat={monat} setMonat={setMonat} />
 
       <Panel title={"EINTRAG #" + String(eintragNr).padStart(3, "0")}
              sub={WOCHENTAG[d.getDay()] + " · " + d.toLocaleDateString("de-DE")}>
@@ -1586,6 +1634,24 @@ function Styles() {
   .parambtn.on{background:var(--green-dim);color:var(--white);border-color:var(--line-hot)}
 
   .btn.big{padding:14px 26px;font-size:14px;letter-spacing:.08em}
+
+  /* monatsgitter */
+  .mwrap{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px 16px;margin-bottom:12px}
+  .mnav{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+  .mnav button{font-family:var(--mono);font-size:12px;background:transparent;border:1px solid var(--line);
+    color:var(--muted);border-radius:4px;padding:3px 10px;cursor:pointer;transition:.12s}
+  .mnav button:hover:not(:disabled){border-color:var(--line-hot);color:var(--green)}
+  .mnav button:disabled{opacity:.25;cursor:not-allowed}
+  .mname{font-family:var(--term);font-size:14px;letter-spacing:.2em;color:var(--green);text-shadow:var(--glow)}
+  .mgrid{display:flex;flex-wrap:wrap;gap:6px}
+  .kasten{width:15px;height:30px;padding:0;border-radius:2px;cursor:pointer;transition:.15s;
+    border:1px solid var(--line);background:transparent}
+  .kasten:hover:not(:disabled){border-color:var(--line-hot)}
+  .kasten.teil{border-color:var(--green-mid);box-shadow:inset 0 0 8px rgba(53,255,111,.4),0 0 5px rgba(53,255,111,.25)}
+  .kasten.voll{background:var(--green);border-color:var(--green);box-shadow:var(--glow)}
+  .kasten.heute{outline:1px dotted var(--green-mid);outline-offset:2px}
+  .kasten.gewaehlt{outline:1px solid var(--green);outline-offset:3px}
+  .kasten.zukunft{opacity:.2;cursor:not-allowed}
 
   /* log-files */
   .ta.log{min-height:340px;font-size:13.5px;line-height:1.65}
