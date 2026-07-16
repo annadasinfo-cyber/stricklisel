@@ -482,11 +482,20 @@ function Switch({ checked, onChange, mini }) {
   );
 }
 
+// Klappzustand überlebt das Neuladen — pro Box gemerkt.
 function Panel({ id, title, sub, sw, children }) {
-  const [open, setOpen] = useState(true);
+  const key = "panel:" + (id || title);
+  const [open, setOpen] = useState(() => {
+    try { const v = localStorage.getItem(key); return v === null ? true : v === "1"; } catch { return true; }
+  });
+  const kippen = () => setOpen((o) => {
+    const n = !o;
+    try { localStorage.setItem(key, n ? "1" : "0"); } catch {}
+    return n;
+  });
   return (
     <section className={"panel" + (open ? "" : " collapsed")}>
-      <div className="phead" onClick={() => setOpen(!open)}>
+      <div className="phead" onClick={kippen}>
         {sw}
         <span className="prompt">&gt;</span>
         <span className="pid">{title}</span>
@@ -938,7 +947,7 @@ function LogFiles() {
         )}
       </MonatsGitter>
 
-      <Panel title={"EINTRAG #" + String(eintragNr).padStart(3, "0")}
+      <Panel id="log-eintrag" title={"EINTRAG #" + String(eintragNr).padStart(3, "0")}
              sub={WOCHENTAG[d.getDay()] + " · " + d.toLocaleDateString("de-DE")}>
         <div className="rezrow" style={{ marginBottom: 12 }}>
           <input className="ti" type="date" value={datum} max={heute()} onChange={(e) => setDatum(e.target.value)} style={{ flex: "0 0 auto", minWidth: 150 }} />
