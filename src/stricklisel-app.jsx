@@ -1798,7 +1798,7 @@ function Kurve() {
   );
 }
 
-function Pausenschirm() {
+function Pausenschirm({ springe }) {
   const [ort, setOrt] = useState(RADAR_ORTE[0]);
   const [nm, setNm] = useState(25);
   const [flug, setFlug] = useState([]);
@@ -1904,16 +1904,15 @@ function Pausenschirm() {
         <div className="bgrid">
           {!buecher.length && <div className="pleer">noch kein projekt. die skripte warten.</div>}
           {buecher.map((b) => (
-            <div className="bkarte" key={b.id}>
-              <div className="bknr">00</div>
+            <button className="bkarte" key={b.id} onClick={() => springe(b.id, 4)}
+                    title="→ zum skript, wo das herkommt">
+              <div className="bknr">00 ↗</div>
               <div className="bkname">{b.name || "unbenannt"}</div>
               <div className="bkmain">{(Array.isArray(b.matrix) ? b.matrix[4] : "") || "— noch kein mainstate —"}</div>
               {b.hook && <div className="bkhook">🎯 {b.hook}</div>}
-            </div>
+            </button>
           ))}
         </div>
-
-        <Kurve />
 
         <div className="pgrid">
           <div className="pradar">
@@ -1985,6 +1984,8 @@ function Pausenschirm() {
             </div>
           ))}
         </div>
+
+        <Kurve />
 
         <div className="pfuss">// niemand kann dir sagen, was die matrix ist. du musst sie selbst sehen. 🐇</div>
       </div>
@@ -2358,7 +2359,7 @@ export default function StricklieselApp() {
         {tab === "log" && <LogFiles />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} />}
-        {tab === "think" && <Pausenschirm />}
+        {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} />}
 
         {tab === "konsole" && <>
         <Panel title="PROTOKOLLE" sub="einstellungen & texte · gerätübergreifend">
@@ -2883,8 +2884,9 @@ function Styles() {
   /* die laufenden bücher */
   .bgrid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px}
   .bkarte{flex:1 1 220px;min-width:0;background:var(--panel-2);border:1px solid var(--line);
-    border-radius:6px;padding:12px 13px;position:relative;transition:.15s}
+    border-radius:6px;padding:12px 13px;position:relative;transition:.15s;text-align:left;cursor:pointer}
   .bkarte:hover{border-color:var(--line-hot)}
+  .bkarte:hover .bknr{color:var(--green)}
   .bknr{position:absolute;top:9px;right:11px;font-family:var(--term);font-size:10px;color:var(--green-dim);letter-spacing:.1em}
   .bkname{font-family:var(--term);font-size:12px;letter-spacing:.12em;color:var(--green);
     text-shadow:var(--glow);margin-bottom:7px;padding-right:22px}
@@ -2893,7 +2895,7 @@ function Styles() {
     border-left:2px solid var(--green-dim);padding-left:8px}
 
   /* dramaturgie */
-  .kwrap{margin-bottom:22px}
+  .kwrap{margin-top:26px;padding-top:20px;border-top:1px dashed var(--line)}
   .ksvg{width:100%;display:block}
   .kberg{fill:none;stroke:var(--green-dim);stroke-width:1;opacity:.5}
   .kbergtext{font-family:var(--term);font-size:9px;fill:var(--dim);text-anchor:middle;letter-spacing:.16em}
