@@ -1636,7 +1636,7 @@ const RADAR_ORTE = [
   { n: "chicago", lat: 41.8781, lon: -87.6298 },
   { n: "tokio", lat: 35.6762, lon: 139.6503 },
 ];
-const RADIUS_NM = 100;
+const RADIEN = [15, 25, 50, 100];
 const rad = (g) => (g * Math.PI) / 180;
 
 function entfernung(la1, lo1, la2, lo2) {
@@ -1708,8 +1708,10 @@ function Kurve() {
             {k.akt && <text x={k.x} y={k.y - 42} className="kakt">{k.akt}</text>}
             <circle cx={k.x} cy={k.y} r="13" />
             <text x={k.x} y={k.y + 4} className="knr">{k.n}</text>
-            <text x={k.x + 22} y={k.y - 4} className="ktitel">{k.t}</text>
-            <text x={k.x + 22} y={k.y + 10} className="kunter">{k.u}</text>
+            <text x={k.x + (k.n === 5 ? -22 : 22)} y={k.y - 4} className="ktitel"
+                  textAnchor={k.n === 5 ? "end" : "start"}>{k.t}</text>
+            <text x={k.x + (k.n === 5 ? -22 : 22)} y={k.y + 10} className="kunter"
+                  textAnchor={k.n === 5 ? "end" : "start"}>{k.u}</text>
           </g>
         ))}
       </svg>
@@ -1722,6 +1724,7 @@ function Kurve() {
 
 function Pausenschirm() {
   const [ort, setOrt] = useState(RADAR_ORTE[0]);
+  const [nm, setNm] = useState(25);
   const [flug, setFlug] = useState([]);
   const [stand, setStand] = useState({ t: "verbinde …", c: "work" });
   const [commits, setCommits] = useState(0);
@@ -1749,7 +1752,7 @@ function Pausenschirm() {
   useEffect(() => {
     let tot = false;
     const holen = async () => {
-      const quellen = [`/api/flights?lat=${ort.lat}&lon=${ort.lon}&dist=${RADIUS_NM}`];
+      const quellen = [`/api/flights?lat=${ort.lat}&lon=${ort.lon}&dist=${nm}`];
       for (const u of quellen) {
         try {
           const r = await fetch(u);
@@ -1764,7 +1767,7 @@ function Pausenschirm() {
             kurs: a.track ?? 0,
             dist: entfernung(ort.lat, ort.lon, a.lat, a.lon),
             peil: peilung(ort.lat, ort.lon, a.lat, a.lon),
-          })).filter((a) => a.dist <= RADIUS_NM).sort((a, b) => a.dist - b.dist);
+          })).filter((a) => a.dist <= nm).sort((a, b) => a.dist - b.dist);
           setFlug(ac);
           setStand({ t: ac.length + " kontakte", c: "ok" });
           return;
@@ -1776,7 +1779,30 @@ function Pausenschirm() {
     holen();
     const iv = setInterval(holen, 12000);
     return () => { tot = true; clearInterval(iv); };
-  }, [ort]);
+  }, [ort, nm]);
+
+  // Ein echter Radar zeigt nur, was der zeiger gerade gestreift hat.
+  // Der punkt leuchtet auf, wenn der strahl vorbeikommt, und verblasst bis zur nächsten runde.
+  const sweepRef = useRef(null);
+  const punkte = useRef({});
+  useEffect(() => {
+    let raf; const PERIODE = 9000; // eine umdrehung
+    const tick = () => {
+      const w = ((Date.now() % PERIODE) / PERIODE) * 360;
+      if (sweepRef.current) sweepRef.current.setAttribute("transform", "rotate(" + w + ")");
+      flug.forEach((a) => {
+        const el = punkte.current[a.hex];
+        if (!el) return;
+        const peil = (a.peil + 360) % 360;
+        const seit = (w - peil + 360) % 360;      // grad, seit der strahl vorbei war
+        const op = Math.max(0, 1 - seit / 330);   // frisch = hell, dann verblassen
+        el.style.opacity = op;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [flug]);
 
   const p2 = (n) => String(n).padStart(2, "0");
   const up = p2(Math.floor(uptime / 3600)) + ":" + p2(Math.floor((uptime % 3600) / 60)) + ":" + p2(uptime % 60);
@@ -1828,18 +1854,21 @@ function Pausenschirm() {
                 ))}
                 <line x1={-R} y1="0" x2={R} y2="0" stroke="var(--line-hot)" strokeWidth="1" opacity=".3" />
                 <line x1="0" y1={-R} x2="0" y2={R} stroke="var(--line-hot)" strokeWidth="1" opacity=".3" />
-                <g className="sweep">
-                  <path d={`M 0 0 L 0 ${-R} A ${R} ${R} 0 0 1 ${R * 0.5} ${-R * 0.866} Z`} fill="url(#sweep)" />
+                <g ref={sweepRef}>
+                  <path d={`M 0 0 L 0 ${-R} A ${R} ${R} 0 0 0 ${-R * 0.34} ${-R * 0.94} Z`} fill="url(#sweep)" />
                   <line x1="0" y1="0" x2="0" y2={-R} stroke="var(--green)" strokeWidth="1.5" opacity=".9" />
                 </g>
                 <circle r="3" fill="var(--green)" className="mitte-punkt" />
                 {flug.map((a) => {
-                  const rr = (a.dist / RADIUS_NM) * R;
+                  const rr = (a.dist / nm) * R;
                   const x = rr * Math.sin(rad(a.peil)), y = -rr * Math.cos(rad(a.peil));
                   return (
-                    <g key={a.hex} transform={`translate(${x},${y})`}>
-                      <path d="M 0 -5 L 3.4 4 L 0 1.6 L -3.4 4 Z" fill="var(--green)" transform={`rotate(${a.kurs})`} opacity=".95" />
-                      <text x="7" y="3.5" className="rtext">{a.rufz}</text>
+                    <g key={a.hex} transform={`translate(${x},${y})`}
+                       ref={(el) => { if (el) punkte.current[a.hex] = el; else delete punkte.current[a.hex]; }}
+                       style={{ opacity: 0 }}>
+                      <circle r="2.6" fill="var(--green)" />
+                      <circle r="6" fill="none" stroke="var(--green)" strokeWidth=".6" opacity=".35" />
+                      <text x="9" y="3.5" className="rtext">{a.rufz}</text>
                     </g>
                   );
                 })}
@@ -1852,7 +1881,9 @@ function Pausenschirm() {
               <select value={ort.n} onChange={(e) => setOrt(RADAR_ORTE.find((o) => o.n === e.target.value))}>
                 {RADAR_ORTE.map((o) => <option key={o.n} value={o.n}>{o.n}</option>)}
               </select>
-              <span className="rradius">{RADIUS_NM} nm</span>
+              <select value={nm} onChange={(e) => setNm(Number(e.target.value))}>
+                {RADIEN.map((r) => <option key={r} value={r}>{r} nm</option>)}
+              </select>
               <span className={"status " + stand.c}>{stand.t}</span>
             </div>
           </div>
@@ -2763,7 +2794,7 @@ function Styles() {
 
   /* dramaturgie */
   .kwrap{margin-bottom:22px}
-  .ksvg{width:100%;display:block;overflow:visible}
+  .ksvg{width:100%;display:block}
   .kberg{fill:none;stroke:var(--green-dim);stroke-width:1;opacity:.5}
   .kbergtext{font-family:var(--term);font-size:9px;fill:var(--dim);text-anchor:middle;letter-spacing:.16em}
   .kkante line{stroke:var(--line-hot);stroke-width:1.5;transition:.2s}
@@ -2786,13 +2817,11 @@ function Styles() {
   .pgrid{display:flex;flex-wrap:wrap;gap:22px}
   .pradar{flex:0 0 auto;width:min(340px,100%);margin:0 auto}
   .rsvg{width:100%;display:block;filter:drop-shadow(0 0 6px rgba(53,255,111,.18))}
-  .sweep{transform-origin:0 0;animation:dreh 4s linear infinite}
-  @keyframes dreh{to{transform:rotate(360deg)}}
   .mitte-punkt{animation:blink 1.4s ease-in-out infinite}
   .rtext{font-family:var(--term);font-size:8px;fill:var(--muted);letter-spacing:.06em}
   .rhimmel{font-family:var(--term);font-size:9px;fill:var(--dim);text-anchor:middle;letter-spacing:.1em}
   .rfuss{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
-  .rfuss select{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;color:var(--green);
+  .rfuss select{flex:0 0 auto;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;color:var(--green);
     font-family:var(--term);font-size:12px;letter-spacing:.1em;padding:5px 8px;cursor:pointer}
   .rfuss select:focus{outline:none;border-color:var(--line-hot)}
   .rradius{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em}
