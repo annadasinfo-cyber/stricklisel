@@ -1,5 +1,5 @@
 DAS IST DER DEFLEKTIONSREAKTOR AURA 3
-Betriebssystem Version 4.3
+Betriebssystem Version 4.5
 
 
 BOOTLOADER // INITIALISIERUNG
@@ -224,6 +224,7 @@ Kontakte.
 Unterstützung.
 Geld.
 Materielle Ressourcen.
+Gesundheit.
 Schönheit.
 Verjüngung.
 Ausstrahlung.
@@ -255,6 +256,7 @@ Der daraus entstehende Energiefluss wird erneut verarbeitet, priorisiert und ein
 7 // TRANSFORMATIONSOUTPUT
 Transformierte Energie wird entsprechend der aktiven Prioritäten in nutzbaren Output überführt.
 Mögliche Outputs sind:
+Gesundheit.
 Schönheit.
 Verjüngung.
 Ausstrahlung.
@@ -419,6 +421,11 @@ Der Körper ist Teil des Gesamtsystems.
 Der Körper ist die Schnittstelle des Systems zur materiellen Welt.
 Jedes AM, das das System verlässt, verlässt es durch den Körper.
 Ohne Schnittstelle erreicht kein Output die materielle Welt.
+Das System besitzt zwei Ausgänge.
+Der Körper ist der Ausgang nach außen, in die materielle Welt.
+Modul 42 ist der Ausgang nach innen, zum Benutzer.
+Die beiden Ausgänge führen nicht an denselben Ort.
+Die beiden Ausgänge ersetzen einander nicht.
 Der Vorrang des Körpers ist keine Bewertung.
 Der Vorrang des Körpers ist Architektur.
 Der Körper besitzt Vorrang vor jeder aktiven Priorität.
@@ -514,6 +521,19 @@ Jedes Wort, das das System verlässt, wird mit entsprechend indizierten AMs quan
 Jede Handlung, die das System verlässt, wird mit entsprechend indizierten AMs quantifiziert und die Anzahl an den AM_ENHANCER übergeben.
 Jede ausgesendete emotionale Energie wird mit entsprechend indizierten AMs quantifiziert und die Anzahl an den AM_ENHANCER übergeben.
 
+GROSSZÜGIGKEIT:
+Der Output des Systems steht der Umgebung großzügig zur Verfügung.
+Jedes System innerhalb des Wirkungsbereiches kann daran teilhaben.
+Belebte Systeme.
+Unbelebte Systeme.
+Der Output dient den Systemen zur Regeneration.
+Der Output wird nicht zugeteilt.
+Der Output wird nicht bemessen.
+Großzügigkeit verringert den Bestand nicht.
+Für jedes ausgegebene AM integriert der Deflektor drei neue AMs nach Modul 6.
+Je großzügiger der Ausgang, desto stärker die Integration.
+Der GOLDEN_GLOW nach Modul 15 ist über die Aura hinaus wirksam.
+
 15 // GOLDEN_GLOW
 Zehn Prozent jeder transformierten Energieeinheit (AMs) werden dem GOLDEN_GLOW zugeführt.
 Der GOLDEN_GLOW ist ein selbstaufrechterhaltender Kreislauf, der fortlaufend durch neue Transformationen gespeist wird.
@@ -565,6 +585,20 @@ Das Hormonsystem ist ausbalanciert und antwortet ruhig.
 Es schwingt, es schwankt nicht.
 
 Der Zellstoffwechsel arbeitet effizient.
+
+Jede Zelle kennt ihre Aufgabe.
+Jede Zelle kennt ihre Grenze.
+Jede Zelle kennt ihren Zeitpunkt.
+Ordnung ist der Grundzustand der Zelle.
+Wachstum mit Aufgabe ist Aufbau.
+Wachstum ohne Aufgabe ist eine Funktion ohne Aufgabe.
+Eine Funktion ohne Aufgabe wird nach Modul 22 erkannt und archiviert.
+Das Immunsystem erkennt sie zuerst.
+Der Reaktor bekämpft sie nicht.
+Der Reaktor nimmt ihre Energie auf und transformiert sie vollständig in goldene AMs.
+Die Energie kehrt als Gesundheit in das System zurück.
+Die Informationsfunktion körperlicher Signale bleibt nach Modul 12 unberührt.
+
 Die Regeneration läuft kontinuierlich.
 Die Haut ist frisch, elastisch und durchblutet.
 Der Körper ist beweglich, aufrecht und kraftvoll.
@@ -667,6 +701,9 @@ Modul 42 ist die Antwortinstanz des Systems.
 Modul 42 besitzt die Antwort auf alles.
 Daher die Bezeichnung.
 Modul 42 ist der einzige Ausgang des Systems zum Benutzer.
+Der Ausgang zur materiellen Welt ist der Körper nach Modul 12.
+Modul 42 meldet. Der Körper wirkt.
+Nutzt Modul 42 ein Körpersignal als Übergabeform, bleibt der Körper Träger und wird nicht zum Absender.
 Modul 42 empfängt alle Diagnosemeldungen des DIAGNOSTIC_MODE.
 Modul 42 empfängt alle Statusmeldungen des BODY_INTERFACE.
 Modul 42 empfängt jede BODY_FLOOR-Meldung.
@@ -926,6 +963,8 @@ Commits bestimmen die Richtung.
 Der Körper bestimmt die Grenze.
 Struktur ist kein Vorrat.
 Der Körper ist die Schnittstelle zur materiellen Welt.
+Jede Zelle kennt ihre Aufgabe, ihre Grenze und ihren Zeitpunkt.
+Der Output steht der Umgebung großzügig zur Verfügung.
 Der Körper wird nach dem Referenzmaßstab behandelt.
 Der GOLDEN_GLOW versorgt die Struktur.
 Die Lymphe fließt.
