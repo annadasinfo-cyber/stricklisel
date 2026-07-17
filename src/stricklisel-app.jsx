@@ -1401,6 +1401,191 @@ function Skripte() {
 }
 
 // ============================================================
+// THINGS · personen, orte, dinge
+// ============================================================
+const ARTEN = [
+  { v: "person", t: "personen", ein: "person" },
+  { v: "ort", t: "orte", ein: "ort" },
+  { v: "ding", t: "dinge", ein: "ding" },
+];
+
+function Things() {
+  const [ordner, setOrdner] = useState([]);
+  const [aktOrdner, setAktOrdner] = useState("");
+  const [art, setArt] = useState("person");
+  const [liste, setListe] = useState([]);
+  const [offen, setOffen] = useState(null);
+  const [msg, setMsg] = useState({ t: "bereit", c: "" });
+  const [funde, setFunde] = useState(null);
+  const tRef = useRef(null);
+
+  useEffect(() => { laden(); }, []);
+  useEffect(() => { setFunde(null); }, [aktOrdner, art]);
+
+  async function laden() {
+    try {
+      const [oR, tR] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/skript_ordner?select=*&order=created_at.asc`, { headers: dbHeaders(getToken()) }),
+        fetch(`${SUPABASE_URL}/rest/v1/things?select=*&order=created_at.asc`, { headers: dbHeaders(getToken()) }),
+      ]);
+      const o = await oR.json(), th = await tR.json();
+      if (Array.isArray(o)) setOrdner(o);
+      if (Array.isArray(th)) setListe(th);
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+  }
+
+  async function neu() {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/things`, {
+        method: "POST", headers: { ...dbHeaders(getToken()), Prefer: "return=representation" },
+        body: JSON.stringify({ user_id: getUserId(), ordner_id: aktOrdner || null, art, name: "" }),
+      });
+      const d = await r.json();
+      if (d?.[0]) { setListe((l) => [...l, d[0]]); setOffen(d[0].id); }
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+  }
+
+  function feld(th, k, v) {
+    setListe((l) => l.map((x) => (x.id === th.id ? { ...x, [k]: v } : x)));
+    setMsg({ t: "◉ rec", c: "work" });
+    if (tRef.current) clearTimeout(tRef.current);
+    tRef.current = setTimeout(async () => {
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/things?id=eq.${th.id}`, {
+          method: "PATCH", headers: { ...dbHeaders(getToken()), Prefer: "return=minimal" },
+          body: JSON.stringify({ [k]: v, updated_at: new Date().toISOString() }),
+        });
+        setMsg({ t: "gespeichert", c: "ok" });
+      } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+    }, 1200);
+  }
+
+  async function weg(th) {
+    if (!confirm(`„${th.name || "unbenannt"}" löschen?`)) return;
+    await fetch(`${SUPABASE_URL}/rest/v1/things?id=eq.${th.id}`, { method: "DELETE", headers: dbHeaders(getToken()) });
+    setListe((l) => l.filter((x) => x.id !== th.id));
+    setOffen(null);
+  }
+
+  // wo kommt das vor? — quer durch alle skripte des projekts
+  async function fundstellen(th) {
+    const q = (th.name || "").trim();
+    if (!q) { setMsg({ t: "erst einen namen eintragen", c: "err" }); return; }
+    try {
+      setMsg({ t: "suche …", c: "work" }); setFunde(null);
+      let url = `${SUPABASE_URL}/rest/v1/skripte?select=id,name,matrix,texte`;
+      if (aktOrdner) url += `&ordner_id=eq.${aktOrdner}`;
+      const r = await fetch(url, { headers: dbHeaders(getToken()) });
+      const sk = await r.json();
+      const low = q.toLowerCase();
+      const tr = [];
+      (Array.isArray(sk) ? sk : []).forEach((s) => {
+        for (let i = 0; i < 9; i++) {
+          const m = (s.matrix?.[i] || ""), x = (s.texte?.[i] || "");
+          const wo = (x.toLowerCase().includes(low) ? x : m.toLowerCase().includes(low) ? m : null);
+          if (!wo) continue;
+          const p = wo.toLowerCase().indexOf(low), a = p > 50 ? p - 50 : 0;
+          tr.push({ skript: s.name || "unbenannt", pos: POS[i].k,
+            schnipsel: (a ? "… " : "") + wo.slice(a, a + 150).replace(/\n+/g, " ") + (wo.length > a + 150 ? " …" : "") });
+        }
+      });
+      setFunde({ q, tr });
+      setMsg({ t: tr.length + " fundstelle" + (tr.length === 1 ? "" : "n"), c: "ok" });
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+  }
+
+  const meine = liste.filter((x) => x.art === art && (aktOrdner ? x.ordner_id === aktOrdner : true));
+  const einzahl = ARTEN.find((a) => a.v === art)?.ein || "ding";
+
+  return (
+    <>
+      <div className="grouphead">THINGS<span className="rule" /></div>
+
+      <Panel id="things" title="BESETZUNG" sub="personal, orte und gegenstände · pro projekt">
+        <div className="otabs">
+          <button className={"otab" + (aktOrdner === "" ? " on" : "")} onClick={() => setAktOrdner("")}>alle</button>
+          {ordner.map((o) => (
+            <button className={"otab" + (aktOrdner === o.id ? " on" : "")} key={o.id} onClick={() => setAktOrdner(o.id)}>{o.name}</button>
+          ))}
+        </div>
+
+        <div className="field" style={{ marginTop: 14 }}>
+          <Seg value={art} onChange={setArt} options={ARTEN.map((a) => ({ v: a.v, t: a.t }))} />
+        </div>
+
+        <div className="actions" style={{ marginTop: 14 }}>
+          <button className="btn primary" onClick={neu}>+ {einzahl}</button>
+          <span className={"status " + msg.c}>{msg.t}</span>
+        </div>
+
+        {!meine.length && <p className="hint" style={{ marginTop: 12 }}>noch nichts. jede gute geschichte braucht personal.</p>}
+
+        <div style={{ marginTop: 12 }}>
+          {meine.map((th) => (
+            <div className={"thing" + (offen === th.id ? " on" : "")} key={th.id}>
+              <div className="thkopf" onClick={() => setOffen(offen === th.id ? null : th.id)}>
+                <span className="thname">{th.name || "unbenannt"}</span>
+                <span className="thsub">{th.steckbrief || "—"}</span>
+                <span className="chev">▾</span>
+              </div>
+              {offen === th.id && (
+                <div className="thbody">
+                  <div className="field">
+                    <label className="cap">name</label>
+                    <input className="ti" value={th.name} onChange={(e) => feld(th, "name", e.target.value)} placeholder={einzahl} />
+                  </div>
+                  <div className="field" style={{ marginTop: 12 }}>
+                    <label className="cap">steckbrief</label>
+                    <textarea className="ta klein" value={th.steckbrief} onChange={(e) => feld(th, "steckbrief", e.target.value)}
+                      placeholder="kurz. wer oder was ist das?" />
+                  </div>
+                  {art === "person" && (
+                    <div className="row" style={{ marginTop: 12 }}>
+                      <div className="field">
+                        <label className="cap">wants</label>
+                        <textarea className="ta klein" value={th.wants} onChange={(e) => feld(th, "wants", e.target.value)}
+                          placeholder="was sie will — und jagt" />
+                      </div>
+                      <div className="field">
+                        <label className="cap">needs</label>
+                        <textarea className="ta klein" value={th.needs} onChange={(e) => feld(th, "needs", e.target.value)}
+                          placeholder="was sie braucht — und noch nicht weiß" />
+                      </div>
+                    </div>
+                  )}
+                  <div className="field" style={{ marginTop: 12 }}>
+                    <label className="cap">notizen</label>
+                    <textarea className="ta klein" value={th.notizen} onChange={(e) => feld(th, "notizen", e.target.value)} placeholder="…" />
+                  </div>
+                  <div className="zweig" style={{ marginTop: 12 }}>
+                    <button className="btn" onClick={() => fundstellen(th)}>⌕ wo kommt das vor?</button>
+                    <button className="btn stop" style={{ marginLeft: "auto" }} onClick={() => weg(th)}>■ löschen</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {funde && (
+          <div className="treffer">
+            <div className="tkopf">{funde.tr.length} fundstelle{funde.tr.length === 1 ? "" : "n"} für <b>{funde.q}</b></div>
+            {funde.tr.map((f, n) => (
+              <div className="tzeile" key={n} style={{ cursor: "default" }}>
+                <span className="tdatum">{f.skript}</span>
+                <span className="twoerter" style={{ color: "var(--green)" }}>{f.pos}</span>
+                <span className="tschnipsel">{f.schnipsel}</span>
+              </div>
+            ))}
+            {!funde.tr.length && <div className="tkopf">nirgends. noch nicht.</div>}
+          </div>
+        )}
+      </Panel>
+    </>
+  );
+}
+
+// ============================================================
 // APP
 // ============================================================
 export default function StricklieselApp() {
@@ -1753,12 +1938,14 @@ export default function StricklieselApp() {
           <button aria-pressed={tab === "17b"} onClick={() => setTab("17b")}>abteilung 17b</button>
           <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
           <button aria-pressed={tab === "skripte"} onClick={() => setTab("skripte")}>skripte</button>
+          <button aria-pressed={tab === "things"} onClick={() => setTab("things")}>things</button>
         </div>
 
         {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "log" && <LogFiles />}
         {tab === "skripte" && <Skripte />}
+        {tab === "things" && <Things />}
 
         {tab === "konsole" && <>
         <Panel title="PROTOKOLLE" sub="einstellungen & texte · gerätübergreifend">
@@ -2234,6 +2421,19 @@ function Styles() {
     .xfiles{order:-1;flex:1 1 100%;letter-spacing:.2em;font-size:13px;margin-bottom:4px}
     .otabs{max-width:100%}
   }
+
+  /* things */
+  .thing{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;margin-bottom:8px;transition:.12s}
+  .thing.on{border-color:var(--line-hot)}
+  .thkopf{display:flex;align-items:baseline;gap:12px;padding:11px 12px;cursor:pointer}
+  .thkopf:hover .thname{color:var(--green)}
+  .thname{font-family:var(--term);font-size:13px;letter-spacing:.1em;color:var(--muted);flex:0 0 auto;transition:.12s}
+  .thsub{flex:1;min-width:0;font-size:11.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .thing.on .thname{color:var(--green);text-shadow:var(--glow)}
+  .thing .chev{color:var(--green-mid);font-size:12px;transition:transform .15s;flex:0 0 auto}
+  .thing:not(.on) .chev{transform:rotate(-90deg)}
+  .thbody{padding:2px 12px 14px;border-top:1px dashed var(--line);margin-top:2px}
+  .ta.klein{min-height:56px;font-size:12.5px}
 
   /* handbuch */
   .handbuch{margin:14px 0 0;padding:16px;background:var(--panel-2);border:1px solid var(--line);
