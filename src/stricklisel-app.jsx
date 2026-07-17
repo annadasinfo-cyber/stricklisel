@@ -1651,18 +1651,94 @@ function peilung(la1, lo1, la2, lo2) {
   return (Math.atan2(y, x) * 180) / Math.PI;
 }
 
+// Die Fünf-Punkt-Struktur — nach Annis Zeichnung.
+//   1 hoch · 2 tief · 3 hoch · 4 am tiefsten · 5 hoch
+const KURVE = [
+  { n: 1, x: 70, y: 90, t: "erstes / auslösendes ereignis", u: "(geheimnis)", akt: "akt I",
+    frage: "was ist das schlimmste, das in dieser situation passieren kann?" },
+  { n: 2, x: 275, y: 300, t: "erster wendepunkt", u: "erster tiefpunkt",
+    frage: "was kann uns noch helfen, diese aufgabe zu lösen?" },
+  { n: 3, x: 500, y: 80, t: "die tragweite eröffnet sich", u: "und entwickelt sich weiter", akt: "akt II",
+    frage: "hier muss die ↑ und ↓ struktur erkennbar werden." },
+  { n: 4, x: 725, y: 345, t: "zweiter wendepunkt", u: "tiefster punkt der geschichte",
+    frage: "hier helfen neue hoffnung, hilfe von außen oder eine wandlung im charakter." },
+  { n: 5, x: 930, y: 70, t: "ende / lösung", u: "positives momentum",
+    frage: "die situation in neuem licht — neuer sinn oder veränderung richtung lösung." },
+];
+const KANTEN = [
+  { a: 0, b: 1, t: "das problem wird kreiert" },
+  { a: 1, b: 2, t: "vom ersten schock erholend — neue hoffnung" },
+  { a: 2, b: 3, t: "das problem wird weiter vertieft" },
+  { a: 3, b: 4, t: "das problem wird gelöst" },
+];
+
+function Kurve() {
+  const [wach, setWach] = useState(null);
+  const p = (i) => KURVE[i];
+  return (
+    <div className="kwrap">
+      <div className="ptitel">dramaturgie</div>
+      <svg viewBox="0 0 1000 420" className="ksvg">
+        {/* back story */}
+        <path d="M 330 300 L 400 190 L 470 300 Z" className="kberg" />
+        <text x="400" y="286" className="kbergtext">back story</text>
+
+        {KANTEN.map((k, i) => {
+          const a = p(k.a), b = p(k.b);
+          return (
+            <g key={i} className={"kkante" + (wach === k.a || wach === k.b ? " an" : "")}>
+              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
+              <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 8}
+                transform={`rotate(${(Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI} ${(a.x + b.x) / 2} ${(a.y + b.y) / 2 - 8})`}>
+                {k.t}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* omg-punkt auf der letzten kante */}
+        <g className="komg">
+          <circle cx={(p(3).x + p(4).x) / 2 - 20} cy={(p(3).y + p(4).y) / 2 + 30} r="4" />
+          <text x={(p(3).x + p(4).x) / 2 - 10} cy="0" y={(p(3).y + p(4).y) / 2 + 34}>omg · hopp oder topp</text>
+        </g>
+
+        {KURVE.map((k, i) => (
+          <g key={k.n} className={"kknoten" + (wach === i ? " an" : "")}
+             onMouseEnter={() => setWach(i)} onMouseLeave={() => setWach(null)} onClick={() => setWach(wach === i ? null : i)}>
+            {k.akt && <text x={k.x} y={k.y - 42} className="kakt">{k.akt}</text>}
+            <circle cx={k.x} cy={k.y} r="13" />
+            <text x={k.x} y={k.y + 4} className="knr">{k.n}</text>
+            <text x={k.x + 22} y={k.y - 4} className="ktitel">{k.t}</text>
+            <text x={k.x + 22} y={k.y + 10} className="kunter">{k.u}</text>
+          </g>
+        ))}
+      </svg>
+      <div className={"kfrage" + (wach !== null ? " an" : "")}>
+        {wach !== null ? <><b>{KURVE[wach].n}</b> {KURVE[wach].frage}</> : "punkt antippen — dann steht hier die frage dazu."}
+      </div>
+    </div>
+  );
+}
+
 function Pausenschirm() {
   const [ort, setOrt] = useState(RADAR_ORTE[0]);
   const [flug, setFlug] = useState([]);
   const [stand, setStand] = useState({ t: "verbinde …", c: "work" });
   const [commits, setCommits] = useState(0);
   const [uptime, setUptime] = useState(0);
-  const [jetzt, setJetzt] = useState(new Date());
+  const [buecher, setBuecher] = useState([]);
   const startRef = useRef(Date.now());
 
   useEffect(() => {
-    const iv = setInterval(() => { setUptime(Math.floor((Date.now() - startRef.current) / 1000)); setJetzt(new Date()); }, 1000);
+    const iv = setInterval(() => setUptime(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
     return () => clearInterval(iv);
+  }, []);
+
+  // die 00-mainstates der laufenden projekte — worum geht es gerade?
+  useEffect(() => {
+    fetch(`${SUPABASE_URL}/rest/v1/skripte?select=id,name,matrix,hook&eltern_id=is.null&order=updated_at.desc&limit=3`,
+      { headers: dbHeaders(getToken()) })
+      .then((r) => r.json()).then((d) => setBuecher(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1673,10 +1749,7 @@ function Pausenschirm() {
   useEffect(() => {
     let tot = false;
     const holen = async () => {
-      const quellen = [
-        `https://api.adsb.lol/v2/lat/${ort.lat}/lon/${ort.lon}/dist/${RADIUS_NM}`,
-        `https://opendata.adsb.fi/api/v2/lat/${ort.lat}/lon/${ort.lon}/dist/${RADIUS_NM}`,
-      ];
+      const quellen = [`/api/flights?lat=${ort.lat}&lon=${ort.lon}&dist=${RADIUS_NM}`];
       for (const u of quellen) {
         try {
           const r = await fetch(u);
@@ -1722,12 +1795,23 @@ function Pausenschirm() {
 
   return (
     <>
-      <div className="grouphead">PAUSENSCHIRM<span className="rule" /></div>
+      <div className="grouphead">☕️ THINK-PAD<span className="rule" /></div>
 
       <div className="pschirm">
-        <div className="puhr">
-          {p2(jetzt.getHours())}:{p2(jetzt.getMinutes())}<i>:{p2(jetzt.getSeconds())}</i>
+        <div className="ptitel">worum es gerade geht</div>
+        <div className="bgrid">
+          {!buecher.length && <div className="pleer">noch kein projekt. die skripte warten.</div>}
+          {buecher.map((b) => (
+            <div className="bkarte" key={b.id}>
+              <div className="bknr">00</div>
+              <div className="bkname">{b.name || "unbenannt"}</div>
+              <div className="bkmain">{(Array.isArray(b.matrix) ? b.matrix[4] : "") || "— noch kein mainstate —"}</div>
+              {b.hook && <div className="bkhook">🎯 {b.hook}</div>}
+            </div>
+          ))}
         </div>
+
+        <Kurve />
 
         <div className="pgrid">
           <div className="pradar">
@@ -2154,7 +2238,7 @@ export default function StricklieselApp() {
           <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
           <button aria-pressed={tab === "skripte"} onClick={() => setTab("skripte")}>skripte</button>
           <button aria-pressed={tab === "things"} onClick={() => setTab("things")}>things</button>
-          <button aria-pressed={tab === "pause"} onClick={() => setTab("pause")}>pause</button>
+          <button aria-pressed={tab === "think"} onClick={() => setTab("think")}>think</button>
         </div>
 
         {tab === "handbuch" && <Handbuch />}
@@ -2162,7 +2246,7 @@ export default function StricklieselApp() {
         {tab === "log" && <LogFiles />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} />}
-        {tab === "pause" && <Pausenschirm />}
+        {tab === "think" && <Pausenschirm />}
 
         {tab === "konsole" && <>
         <Panel title="PROTOKOLLE" sub="einstellungen & texte · gerätübergreifend">
@@ -2665,10 +2749,40 @@ function Styles() {
   /* pausenschirm */
   .pschirm{background:linear-gradient(180deg,#08120c,#050b07);border:1px solid var(--line);
     border-radius:6px;padding:20px 18px 16px}
-  .puhr{font-family:var(--term);font-size:clamp(44px,9vw,86px);letter-spacing:.1em;line-height:1;
-    color:var(--green);text-shadow:0 0 14px rgba(53,255,111,.5);text-align:center;
-    font-variant-numeric:tabular-nums;margin-bottom:18px}
-  .puhr i{font-style:normal;opacity:.35;font-size:.46em}
+  /* die laufenden bücher */
+  .bgrid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px}
+  .bkarte{flex:1 1 220px;min-width:0;background:var(--panel-2);border:1px solid var(--line);
+    border-radius:6px;padding:12px 13px;position:relative;transition:.15s}
+  .bkarte:hover{border-color:var(--line-hot)}
+  .bknr{position:absolute;top:9px;right:11px;font-family:var(--term);font-size:10px;color:var(--green-dim);letter-spacing:.1em}
+  .bkname{font-family:var(--term);font-size:12px;letter-spacing:.12em;color:var(--green);
+    text-shadow:var(--glow);margin-bottom:7px;padding-right:22px}
+  .bkmain{font-size:12.5px;color:var(--ink);line-height:1.55}
+  .bkhook{font-size:11px;color:var(--dim);font-style:italic;margin-top:7px;
+    border-left:2px solid var(--green-dim);padding-left:8px}
+
+  /* dramaturgie */
+  .kwrap{margin-bottom:22px}
+  .ksvg{width:100%;display:block;overflow:visible}
+  .kberg{fill:none;stroke:var(--green-dim);stroke-width:1;opacity:.5}
+  .kbergtext{font-family:var(--term);font-size:9px;fill:var(--dim);text-anchor:middle;letter-spacing:.16em}
+  .kkante line{stroke:var(--line-hot);stroke-width:1.5;transition:.2s}
+  .kkante text{font-family:var(--term);font-size:9px;fill:var(--dim);text-anchor:middle;letter-spacing:.06em;transition:.2s}
+  .kkante.an line{stroke:var(--green);filter:drop-shadow(0 0 5px rgba(53,255,111,.6))}
+  .kkante.an text{fill:var(--muted)}
+  .komg circle{fill:var(--amber);opacity:.9}
+  .komg text{font-family:var(--term);font-size:9px;fill:var(--amber);letter-spacing:.08em;opacity:.85}
+  .kknoten{cursor:pointer}
+  .kknoten circle{fill:var(--panel);stroke:var(--green-mid);stroke-width:1.5;transition:.2s}
+  .kknoten.an circle{stroke:var(--green);fill:var(--green-dim);filter:drop-shadow(0 0 8px rgba(53,255,111,.7))}
+  .knr{font-family:var(--term);font-size:11px;fill:var(--green);text-anchor:middle}
+  .ktitel{font-family:var(--term);font-size:10px;fill:var(--muted);letter-spacing:.06em}
+  .kunter{font-family:var(--term);font-size:9px;fill:var(--dim);letter-spacing:.06em}
+  .kakt{font-family:var(--term);font-size:10px;fill:var(--green);text-anchor:middle;letter-spacing:.2em;opacity:.7}
+  .kfrage{font-family:var(--term);font-size:11.5px;color:var(--dim);letter-spacing:.05em;min-height:1.4em;
+    border-left:2px solid var(--line);padding:5px 0 5px 12px;margin-top:6px;transition:.2s}
+  .kfrage.an{color:var(--muted);border-color:var(--green)}
+  .kfrage b{color:var(--green);font-weight:400;padding-right:5px}
   .pgrid{display:flex;flex-wrap:wrap;gap:22px}
   .pradar{flex:0 0 auto;width:min(340px,100%);margin:0 auto}
   .rsvg{width:100%;display:block;filter:drop-shadow(0 0 6px rgba(53,255,111,.18))}
