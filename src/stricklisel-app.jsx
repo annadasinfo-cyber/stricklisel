@@ -1074,15 +1074,32 @@ function Handbuch() {
 //   3 rückzug         4 mainstate    5 1. katastrophe
 //   6 3. katastrophe  7 midbuild     8 2. katastrophe
 const POS = [
-  { k: "kartharsis", akt: 3 }, { k: "pay-off", akt: 3 }, { k: "anfang", akt: 1 },
-  { k: "rückzug", akt: 2 }, { k: "mainstate", akt: 0 }, { k: "1. katastrophe", akt: 1 },
-  { k: "3. katastrophe", akt: 2 }, { k: "midbuild", akt: 2 }, { k: "2. katastrophe", akt: 2 },
+  { k: "kartharsis", akt: 3, gk: "kartharsis" },
+  { k: "pay-off", akt: 3, gk: "pay off" },
+  { k: "anfang", akt: 1, gk: "anfang" },
+  { k: "rückzug", akt: 2, gk: "rückzug" },
+  { k: "mainstate", akt: 0, gk: "mainstate" },
+  { k: "1. katastrophe", akt: 1, gk: "erste katastrophe" },
+  { k: "3. katastrophe", akt: 2, gk: "dritte katastrophe" },
+  { k: "midbuild", akt: 2, gk: "midbuild" },
+  { k: "2. katastrophe", akt: 2, gk: "zweite katastrophe" },
 ];
 // Geschrieben wird: mainstate zuerst, dann im uhrzeigersinn ab position 3.
 const SCHREIB_ORDER = [4, 2, 5, 8, 7, 6, 3, 0, 1];
 const AKT_ROEMISCH = { 1: "I", 2: "II", 3: "III" };
 const ZIEL_ABSATZ = 200;
 const leer9 = () => ["", "", "", "", "", "", "", "", ""];
+
+// Die 3x3-karte zeigt nur den ersten satz — sonst wird sie unförmig
+// und man kann sie nicht mehr auf einen blick lesen.
+const erstSatz = (s) => {
+  const x = (s || "").trim();
+  if (!x) return "";
+  // satzende = punkt/!/? — aber nicht mitten in "..." und nicht in "E0.01_E1.01"
+  const m = x.match(/^[^\n]*?[.!?](?![.!?])(?=\s|$)/);
+  const e = (m ? m[0] : x.split("\n")[0]).trim();
+  return e.length > 130 ? e.slice(0, 127) + "…" : e;
+};
 
 // Damit man sich nicht verläuft: jede ebene eine eigene farbe.
 //   0 wurzel = das buch        · grün
@@ -1092,11 +1109,11 @@ const leer9 = () => ["", "", "", "", "", "", "", "", ""];
 const EBENE_FARBE = ["var(--green)", "var(--amber)", "#e88fc0", "#9b8cf0"];
 const farbe = (n) => EBENE_FARBE[Math.min(n, EBENE_FARBE.length - 1)];
 
-function Skripte({ sprung, setSprung }) {
+function Skripte({ sprung, setSprung, projekt, setProjekt }) {
   const [view, setView] = useState("projekte");
   const [ordner, setOrdner] = useState([]);
   const [alle, setAlle] = useState([]);
-  const [aktOrdner, setAktOrdner] = useState(""); // "" = alle (nur filter)
+  const aktOrdner = projekt, setAktOrdner = setProjekt; // "" = alle (nur filter)
   const [skriptOrdner, setSkriptOrdner] = useState(null); // der ordner DIESES skripts
   const [zu, setZu] = useState({});
   const [id, setId] = useState(null);
@@ -1115,7 +1132,7 @@ function Skripte({ sprung, setSprung }) {
   const eingabeRef = useRef(null);
   useEffect(() => { idRef.current = id; }, [id]);
 
-  useEffect(() => { laden(); }, []);
+  useEffect(() => { laden(); }, [projekt]);
 
   // sprung aus THINGS: skript öffnen, auf die schreibseite, zur position scrollen
   useEffect(() => {
@@ -1152,7 +1169,8 @@ function Skripte({ sprung, setSprung }) {
         fetch(`${SUPABASE_URL}/rest/v1/skripte?select=*&order=updated_at.desc`, { headers: dbHeaders(getToken()) }),
       ]);
       const o = await oR.json(), s = await sR.json();
-      if (Array.isArray(o)) setOrdner(o);
+      // das projekt, an dem gerade gearbeitet wird, steht vorn — sonst sucht man ewig
+      if (Array.isArray(o)) setOrdner(o.slice().sort((a, b) => (b.id === projekt) - (a.id === projekt)));
       if (Array.isArray(s)) setAlle(s);
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
@@ -1160,7 +1178,7 @@ function Skripte({ sprung, setSprung }) {
   function neu(vorgabe = {}) {
     setId(null); setSkriptOrdner(vorgabe.ordner_id !== undefined ? vorgabe.ordner_id : (aktOrdner || null));
     setName(vorgabe.name || ""); setHook(vorgabe.hook || ""); setBemerkung("");
-    setMatrix(vorgabe.matrix || leer9()); setTexte(leer9());
+    setMatrix(vorgabe.matrix || leer9()); setTexte(vorgabe.texte || leer9());
     setElternId(vorgabe.eltern_id || null); setElternPos(vorgabe.eltern_pos ?? null);
     setGewaehlt(null); setDirty(false); setMsg({ t: "neues skript", c: "" });
   }
@@ -1222,9 +1240,28 @@ function Skripte({ sprung, setSprung }) {
     const eltern = await speichern(true);
     if (!eltern) return;
     const m = leer9(); m[4] = matrix[i];
-    neu({ name: POS[i].k, hook, matrix: m, eltern_id: eltern, eltern_pos: i, ordner_id: skriptOrdner });
+    // die 200 wörter, die hier oben schon geschrieben wurden, wandern als übersicht mit.
+    const tx = leer9(); tx[4] = texte[i] || "";
+    neu({ name: POS[i].k, hook, matrix: m, texte: tx, eltern_id: eltern, eltern_pos: i, ordner_id: skriptOrdner });
     setView("matrix");
     setMsg({ t: "verzweigt · " + POS[i].k + " ist jetzt mainstate", c: "ok" });
+  }
+
+  // alle szenentexte am stück — für thorsten in der konsole.
+  // ohne mainstate (der hat kein textfeld) und ohne die matrix, nur der text.
+  const szenenTexte = SCHREIB_ORDER.filter((i) => i !== 4).map((i) => (texte[i] || "").trim()).filter(Boolean);
+  const szenenWoerter = szenenTexte.reduce((s, x) => s + zaehleWoerter(x), 0);
+  async function txtKopieren() {
+    if (!szenenTexte.length) { setMsg({ t: "noch nichts geschrieben", c: "err" }); return; }
+    // marker als eigener satz — dann liest thorsten sie als ansage, nicht als teil des textes
+    const s = SCHREIB_ORDER.filter((i) => i !== 4)
+      .filter((i) => (texte[i] || "").trim())
+      .map((i) => POS[i].gk + ".\n\n" + texte[i].trim())
+      .join("\n\n");
+    try {
+      await navigator.clipboard.writeText(s);
+      setMsg({ t: "kopiert · " + szenenWoerter.toLocaleString("de-DE") + " wörter · ab damit zu thorsten", c: "ok" });
+    } catch { setMsg({ t: "kopieren blockiert — text markieren und cmd+c", c: "err" }); }
   }
 
   // brotkrumen: den baum nach oben laufen
@@ -1357,7 +1394,7 @@ function Skripte({ sprung, setSprung }) {
             }}>
             {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
             <span className="zname">{p.k}</span>
-            <span className="ztext">{matrix[i] || "+"}</span>
+            <span className="ztext">{erstSatz(matrix[i]) || "+"}</span>
           </button>
         ))}
       </div>
@@ -1385,6 +1422,10 @@ function Skripte({ sprung, setSprung }) {
         <button className="btn" onClick={() => setView("matrix")}>← zurück</button>
         <span className="xfiles" style={{ color: farbe(ebene), textShadow: "0 0 8px " + farbe(ebene) + "60" }}>{name || "unbenannt"}</span>
         <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
+        <button className="btn txtbtn" onClick={txtKopieren} disabled={!szenenTexte.length}
+                title="alle szenentexte in die zwischenablage">
+          ⧉ txt{szenenWoerter ? " · " + szenenWoerter.toLocaleString("de-DE") + " w" : ""}
+        </button>
         <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
       </div>
 
@@ -1393,34 +1434,69 @@ function Skripte({ sprung, setSprung }) {
       {hook && <div className="hookzeile">🎯 {hook}</div>}
 
       <div className="mx klein">
-        {POS.map((p, i) => (
-          <div key={i} style={{ "--o": SCHREIB_ORDER.indexOf(i) }} className={"zelle" + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "")}>
-            {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
-            <span className="zname">{p.k}</span>
-            <span className="ztext">{matrix[i] || "—"}</span>
-          </div>
-        ))}
+        {POS.map((p, i) => {
+          const kids = id ? kinder(id, i) : [];
+          const kind = kids[0];
+          const zurSzene = () => {
+            const el = document.getElementById("szene-" + i);
+            if (!el) return;
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            el.classList.add("blitz"); setTimeout(() => el.classList.remove("blitz"), 1600);
+          };
+          return (
+            <button key={i} style={{ "--o": SCHREIB_ORDER.indexOf(i) }}
+              className={"zelle" + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "") + (kind ? " hatkind" : "")}
+              title={kind ? "→ " + kind.name + " (ebene " + (ebene + 1) + ")" : "→ zur szene"}
+              onClick={() => { if (kind) { oeffnen(kind); setView("schreiben"); } else zurSzene(); }}>
+              {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
+              <span className="zname">{p.k}</span>
+              <span className="ztext" title={matrix[i]}>{erstSatz(matrix[i]) || "—"}</span>
+              {kind && <span className="zkind" style={{ color: farbe(ebene + 1) }}>↳ {kids.length > 1 ? kids.length + " zweige" : kind.name}</span>}
+            </button>
+          );
+        })}
       </div>
 
       {SCHREIB_ORDER.map((i, n) => {
         const w = zaehleWoerter(texte[i]);
         const voll = w >= ZIEL_ABSATZ;
         const kids = id ? kinder(id, i) : [];
+        const mitte = i === 4;
         return (
-          <div className={"szene" + (i === 4 ? " mitte" : "")} key={i} id={"szene-" + i}>
+          <div className={"szene" + (mitte ? " mitte" : "")} key={i} id={"szene-" + i}>
             <div className="skopf">
-              <span className="snr">{i === 4 ? "00" : String(n).padStart(2, "0")}</span>
+              <span className="snr">{mitte ? "00" : String(n).padStart(2, "0")}</span>
               <span className="zname">{POS[i].k}</span>
               {POS[i].akt > 0 && <span className="akt">{AKT_ROEMISCH[POS[i].akt]}</span>}
-              <span className="smatrix">{matrix[i] || "—"}</span>
+              {!mitte && <span className="smatrix">{matrix[i] || "—"}</span>}
+              {mitte && <span className="smatrix mshinweis">worum es hier geht — nicht zu schreiben, sondern mitgebracht</span>}
             </div>
-            <textarea className="ta" value={texte[i]} onChange={(e) => setT(i, e.target.value)} placeholder="…" />
-            <div className="logfoot">
-              <div className="logbar"><i style={{ width: Math.min(100, (w / ZIEL_ABSATZ) * 100) + "%" }} className={voll ? "voll" : ""} /></div>
-              <div className={"wcount" + (voll ? " voll" : "")}>
-                {voll ? <>✓ {w} wörter</> : <>{w} <span className="wziel">/ {ZIEL_ABSATZ}</span></>}
+
+            {mitte ? (
+              <div className="msuebersicht">
+                <div className="msvoll">{matrix[4] || "— noch kein mainstate —"}</div>
+                {texte[4] && (
+                  <div className="mserbe">
+                    <div className="mserbekopf">
+                      ↳ aus <b>{elternPos != null ? POS[elternPos].k : "der ebene drüber"}</b>
+                      {krumen.length > 0 && <> · {krumen[krumen.length - 1].name}</>}
+                      <i>{zaehleWoerter(texte[4])} wörter</i>
+                    </div>
+                    <div className="mserbetext">{texte[4]}</div>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              <>
+                <textarea className="ta" value={texte[i]} onChange={(e) => setT(i, e.target.value)} placeholder="…" />
+                <div className="logfoot">
+                  <div className="logbar"><i style={{ width: Math.min(100, (w / ZIEL_ABSATZ) * 100) + "%" }} className={voll ? "voll" : ""} /></div>
+                  <div className={"wcount" + (voll ? " voll" : "")}>
+                    {voll ? <>✓ {w} wörter</> : <>{w} <span className="wziel">/ {ZIEL_ABSATZ}</span></>}
+                  </div>
+                </div>
+              </>
+            )}
             {i !== 4 && (
               <div className="zweig">
                 {kids.map((k) => <button key={k.id} className="kind" onClick={() => { oeffnen(k); setView("schreiben"); }}>↳ {k.name}</button>)}
@@ -1447,9 +1523,9 @@ const ARTEN = [
   { v: "ding", t: "dinge", ein: "ding" },
 ];
 
-function Things({ springe }) {
+function Things({ springe, projekt, setProjekt }) {
   const [ordner, setOrdner] = useState([]);
-  const [aktOrdner, setAktOrdner] = useState("");
+  const aktOrdner = projekt, setAktOrdner = setProjekt;
   const [art, setArt] = useState("person");
   const [liste, setListe] = useState([]);
   const [offen, setOffen] = useState(null);
@@ -1457,7 +1533,7 @@ function Things({ springe }) {
   const [funde, setFunde] = useState(null);
   const tRef = useRef(null);
 
-  useEffect(() => { laden(); }, []);
+  useEffect(() => { laden(); }, [projekt]);
   useEffect(() => { setFunde(null); }, [aktOrdner, art]);
 
   async function laden() {
@@ -1467,7 +1543,7 @@ function Things({ springe }) {
         fetch(`${SUPABASE_URL}/rest/v1/things?select=*&order=created_at.asc`, { headers: dbHeaders(getToken()) }),
       ]);
       const o = await oR.json(), th = await tR.json();
-      if (Array.isArray(o)) setOrdner(o);
+      if (Array.isArray(o)) setOrdner(o.slice().sort((a, b) => (b.id === projekt) - (a.id === projekt)));
       if (Array.isArray(th)) setListe(th);
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
@@ -1893,19 +1969,21 @@ function Pausenschirm() {
             {ZEILEN.map(([k, v]) => (
               <div className="pzeile" key={k}><span>{k}</span><i /><b>{v}</b></div>
             ))}
-            <div className="ptitel" style={{ marginTop: 16 }}>kontakte</div>
-            <div className="pliste">
-              {!flug.length && <div className="pleer">stille.</div>}
-              {flug.slice(0, 9).map((a) => (
-                <div className="pflug" key={a.hex}>
-                  <span className="prufz">{a.rufz}</span>
-                  <span className="ptyp">{a.typ}</span>
-                  <span className="phoehe">{a.hoehe != null ? (a.hoehe === 0 ? "boden" : a.hoehe.toLocaleString("de-DE") + " ft") : "—"}</span>
-                  <span className="pdist">{a.dist.toFixed(0)} nm</span>
-                </div>
-              ))}
-            </div>
           </div>
+        </div>
+
+        <div className="ptitel" style={{ marginTop: 22 }}>kontakte</div>
+        <div className="pliste breit">
+          {!flug.length && <div className="pleer">stille.</div>}
+          {flug.map((a) => (
+            <div className="pflug" key={a.hex}>
+              <span className="prufz">{a.rufz}</span>
+              <span className="ptyp">{a.typ}</span>
+              <span className="pspeed">{a.speed != null ? a.speed + " kt" : "—"}</span>
+              <span className="phoehe">{a.hoehe != null ? (a.hoehe === 0 ? "boden" : a.hoehe.toLocaleString("de-DE") + " ft") : "—"}</span>
+              <span className="pdist">{a.dist.toFixed(0)} nm</span>
+            </div>
+          ))}
         </div>
 
         <div className="pfuss">// niemand kann dir sagen, was die matrix ist. du musst sie selbst sehen. 🐇</div>
@@ -1937,6 +2015,9 @@ export default function StricklieselApp() {
 
   const [tab, setTab] = useState("konsole");
   const [sprung, setSprung] = useState(null);
+  // welches projekt gerade dran ist — teilen sich skripte und things
+  const [projekt, setProjekt] = useState(() => { try { return localStorage.getItem("projekt") || ""; } catch { return ""; } });
+  const setzeProjekt = (v) => { setProjekt(v); try { localStorage.setItem("projekt", v); } catch {} };
   const [progName, setProgName] = useState("");
   const [progList, setProgList] = useState([]);
   const [progSel, setProgSel] = useState("");
@@ -2269,14 +2350,14 @@ export default function StricklieselApp() {
           <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
           <button aria-pressed={tab === "skripte"} onClick={() => setTab("skripte")}>skripte</button>
           <button aria-pressed={tab === "things"} onClick={() => setTab("things")}>things</button>
-          <button aria-pressed={tab === "think"} onClick={() => setTab("think")}>think</button>
+          <button aria-pressed={tab === "think"} onClick={() => setTab("think")}>denkbrett</button>
         </div>
 
         {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "log" && <LogFiles />}
-        {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} />}
-        {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} />}
+        {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} />}
+        {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} />}
         {tab === "think" && <Pausenschirm />}
 
         {tab === "konsole" && <>
@@ -2661,6 +2742,7 @@ function Styles() {
   /* skripte */
   .seitenkopf{display:flex;align-items:center;gap:14px;margin:14px 0 14px}
   .seitenkopf .btn{padding:9px 16px;font-size:12.5px}
+  .txtbtn{padding:9px 14px;font-size:12px;flex:0 0 auto;font-variant-numeric:tabular-nums}
   .ebadge{font-family:var(--term);font-size:11px;letter-spacing:.08em;flex:0 0 auto;
     color:var(--lvl);border:1px solid var(--lvl);border-radius:3px;padding:3px 7px;opacity:.75;cursor:default}
   .xfiles{flex:1;min-width:0;text-align:center;font-family:var(--term);font-size:15px;letter-spacing:.34em;
@@ -2719,13 +2801,18 @@ function Styles() {
   .zelle.on{border-color:var(--green);box-shadow:0 0 0 1px var(--green-dim),var(--glow)}
   .zelle.mitte{background:var(--panel-2);border-color:var(--line-hot)}
   .zname{font-family:var(--term);font-size:11.5px;letter-spacing:.16em;color:var(--green);text-transform:uppercase}
-  .ztext{font-size:12px;color:var(--muted);line-height:1.5;word-break:break-word}
+  .ztext{font-size:12px;color:var(--muted);line-height:1.5;word-break:break-word;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
   .zelle:not(.voll) .ztext{color:var(--dim)}
   .akt{position:absolute;top:9px;right:10px;font-family:var(--term);font-size:9px;letter-spacing:.1em;
     color:var(--dim);opacity:.55}
-  .mx.klein .zelle{min-height:auto;padding:9px 10px 10px;cursor:default}
-  .mx.klein .zname{font-size:10px;letter-spacing:.12em}
-  .mx.klein .ztext{font-size:11px}
+  /* auf seite 3 dieselbe größe wie auf seite 2 — sonst muss man die karte
+     jedes mal neu lesen. nur nicht klickbar. */
+  .mx.klein .zelle{cursor:pointer;text-align:left}
+  .mx.klein .zelle:hover{border-color:var(--line-hot)}
+  .zkind{font-family:var(--term);font-size:10px;letter-spacing:.06em;margin-top:auto;padding-top:6px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85}
+  .zelle.hatkind{border-style:solid}
 
   .eingabe{background:var(--panel);border:1px solid var(--line-hot);border-radius:6px;padding:12px}
   .ekopf{display:flex;align-items:center;gap:12px;margin-bottom:8px}
@@ -2746,6 +2833,19 @@ function Styles() {
   .skopf .akt{position:static;opacity:.5}
   .smatrix{flex:1;font-size:12px;color:var(--ink);font-style:italic;min-width:120px}
   .szene .ta{min-height:120px}
+  .mshinweis{color:var(--dim);font-style:normal;font-size:10.5px;letter-spacing:.04em}
+  .msuebersicht{background:var(--void);border:1px solid var(--line);border-radius:6px;padding:14px}
+  .msvoll{font-size:13.5px;color:var(--ink);line-height:1.65;white-space:pre-wrap}
+  .mserbe{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+  .mserbekopf{display:flex;align-items:baseline;gap:6px;font-family:var(--term);font-size:10.5px;
+    letter-spacing:.08em;color:var(--dim);margin-bottom:8px}
+  .mserbekopf b{color:var(--green);font-weight:400}
+  .mserbekopf i{margin-left:auto;font-style:normal;color:var(--green-dim)}
+  .mserbetext{font-size:12.5px;color:var(--muted);line-height:1.7;white-space:pre-wrap;
+    max-height:260px;overflow-y:auto;padding-right:6px}
+  .mserbetext::-webkit-scrollbar{width:7px}
+  .mserbetext::-webkit-scrollbar-track{background:transparent}
+  .mserbetext::-webkit-scrollbar-thumb{background:var(--green-dim);border-radius:4px}
   .zweig{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
   .zweigbtn{padding:5px 11px;font-size:11px;color:var(--dim);border-color:var(--line);
     background:transparent;opacity:.5;transition:.15s}
@@ -2836,13 +2936,18 @@ function Styles() {
   .pzeile i{flex:1;border-bottom:1px dotted var(--line);opacity:.6;transform:translateY(-3px)}
   .pzeile b{color:var(--muted);font-weight:400;flex:0 0 auto;font-variant-numeric:tabular-nums}
   .pliste{border:1px solid var(--line);border-radius:5px;background:var(--panel-2);overflow:hidden}
+  .pliste.breit{max-height:230px;overflow-y:auto}
+  .pliste.breit::-webkit-scrollbar{width:8px}
+  .pliste.breit::-webkit-scrollbar-track{background:transparent}
+  .pliste.breit::-webkit-scrollbar-thumb{background:var(--green-dim);border-radius:4px}
+  .pspeed{color:var(--dim);flex:0 0 56px;text-align:right;font-variant-numeric:tabular-nums}
   .pleer{font-family:var(--term);font-size:11px;color:var(--dim);padding:12px;letter-spacing:.1em}
   .pflug{display:flex;align-items:baseline;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);
     font-family:var(--term);font-size:11px;letter-spacing:.05em}
   .pflug:last-child{border-bottom:0}
   .prufz{color:var(--green);flex:0 0 66px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .ptyp{color:var(--dim);flex:0 0 42px}
-  .phoehe{color:var(--muted);flex:1;text-align:right;font-variant-numeric:tabular-nums}
+  .phoehe{color:var(--muted);flex:1;text-align:right;font-variant-numeric:tabular-nums;min-width:70px}
   .pdist{color:var(--green-dim);flex:0 0 48px;text-align:right;font-variant-numeric:tabular-nums}
   .pfuss{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em;
     text-align:center;margin-top:18px;padding-top:12px;border-top:1px dashed var(--line)}
