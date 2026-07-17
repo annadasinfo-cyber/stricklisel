@@ -473,6 +473,20 @@ function encodeWav(buf) {
 // ============================================================
 // BAUTEILE
 // ============================================================
+// Wächst mit dem text mit — man soll seine 200 wörter sehen, nicht scrollen.
+function AutoTa({ value, onChange, ...rest }) {
+  const ref = useRef(null);
+  const anpassen = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + 2 + "px";
+  };
+  useEffect(anpassen, [value]);
+  useEffect(() => { const f = () => anpassen(); addEventListener("resize", f); return () => removeEventListener("resize", f); }, []);
+  return <textarea ref={ref} value={value} onChange={onChange} {...rest} />;
+}
+
 function Switch({ checked, onChange, mini }) {
   return (
     <label className={"switch" + (mini ? " mini" : "")} onClick={(e) => e.stopPropagation()}>
@@ -1090,16 +1104,27 @@ const AKT_ROEMISCH = { 1: "I", 2: "II", 3: "III" };
 const ZIEL_ABSATZ = 200;
 const leer9 = () => ["", "", "", "", "", "", "", "", ""];
 
-// Die 3x3-karte zeigt nur den ersten satz — sonst wird sie unförmig
-// und man kann sie nicht mehr auf einen blick lesen.
-const erstSatz = (s) => {
-  const x = (s || "").trim();
-  if (!x) return "";
-  // satzende = punkt/!/? — aber nicht mitten in "..." und nicht in "E0.01_E1.01"
-  const m = x.match(/^[^\n]*?[.!?](?![.!?])(?=\s|$)/);
-  const e = (m ? m[0] : x.split("\n")[0]).trim();
-  return e.length > 130 ? e.slice(0, 127) + "…" : e;
-};
+// Satzende = punkt/!/? — aber nicht mitten in "..." und nicht in "E0.01_E1.01".
+function satzTeilen(s) {
+  const out = [];
+  let rest = (s || "").trim();
+  while (rest) {
+    const m = rest.match(/^[^\n]*?[.!?](?![.!?])(?=\s|$)/);
+    if (m) { out.push(m[0].trim()); rest = rest.slice(m[0].length).trim(); }
+    else {
+      const nl = rest.indexOf("\n");
+      const zeile = (nl === -1 ? rest : rest.slice(0, nl)).trim();
+      if (zeile) out.push(zeile);
+      if (nl === -1) break;
+      rest = rest.slice(nl + 1).trim();
+    }
+  }
+  return out.filter(Boolean);
+}
+// Die 3x3-karte: nur der erste satz — sonst wird sie unförmig.
+const erstSatz = (s) => { const a = satzTeilen(s)[0] || ""; return a.length > 130 ? a.slice(0, 127) + "…" : a; };
+// Das denkbrett: die ersten paar sätze — im mainstate steht ja die ganze synopsis.
+const ersteSaetze = (s, n = 3) => { const a = satzTeilen(s); return a.slice(0, n).join(" ") + (a.length > n ? " …" : ""); };
 
 // Damit man sich nicht verläuft: jede ebene eine eigene farbe.
 //   0 wurzel = das buch        · grün
@@ -1125,12 +1150,23 @@ function Skripte({ sprung, setSprung, projekt, setProjekt }) {
   const [elternId, setElternId] = useState(null);
   const [elternPos, setElternPos] = useState(null);
   const [gewaehlt, setGewaehlt] = useState(null);
+  const [zuSzene, setZuSzene] = useState({});
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
   const [dirty, setDirty] = useState(false);
   const tRef = useRef(null);
   const idRef = useRef(null);
   const eingabeRef = useRef(null);
   useEffect(() => { idRef.current = id; }, [id]);
+  // welche szenen zugeklappt sind — pro skript, überlebt das neuladen
+  useEffect(() => {
+    if (!id) { setZuSzene({}); return; }
+    try { setZuSzene(JSON.parse(localStorage.getItem("szenen:" + id) || "{}")); } catch { setZuSzene({}); }
+  }, [id]);
+  const kippeSzene = (i) => setZuSzene((z) => {
+    const n = { ...z, [i]: !z[i] };
+    if (id) try { localStorage.setItem("szenen:" + id, JSON.stringify(n)); } catch {}
+    return n;
+  });
 
   useEffect(() => { laden(); }, [projekt]);
 
@@ -1325,6 +1361,11 @@ function Skripte({ sprung, setSprung, projekt, setProjekt }) {
   if (view === "projekte") return (
     <>
       <div className="grouphead">SKRIPTE<span className="rule" /></div>
+      <div className="seitenkopf">
+        <span className="xfiles">{name || "neues skript"}</span>
+        <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
+        <button className="btn primary" onClick={() => setView("matrix")}>weiter →</button>
+      </div>
       <Panel id="skripte-projekte" title="PROJEKTE" sub="ordner & gespeicherte skripte">
         <div className="otabs">
           <button className="otab neu" onClick={() => neu()}>+ neues skript</button>
@@ -1366,7 +1407,6 @@ function Skripte({ sprung, setSprung, projekt, setProjekt }) {
         </div>
 
         <div className="actions" style={{ marginTop: 16 }}>
-          <button className="btn primary" onClick={() => setView("matrix")}>weiter →</button>
           <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
         </div>
       </Panel>
@@ -1462,17 +1502,20 @@ function Skripte({ sprung, setSprung, projekt, setProjekt }) {
         const voll = w >= ZIEL_ABSATZ;
         const kids = id ? kinder(id, i) : [];
         const mitte = i === 4;
+        const zu = !!zuSzene[i];
         return (
-          <div className={"szene" + (mitte ? " mitte" : "")} key={i} id={"szene-" + i}>
-            <div className="skopf">
+          <div className={"szene" + (mitte ? " mitte" : "") + (zu ? " zu" : "")} key={i} id={"szene-" + i}>
+            <div className="skopf" onClick={() => kippeSzene(i)}>
               <span className="snr">{mitte ? "00" : String(n).padStart(2, "0")}</span>
               <span className="zname">{POS[i].k}</span>
               {POS[i].akt > 0 && <span className="akt">{AKT_ROEMISCH[POS[i].akt]}</span>}
               {!mitte && <span className="smatrix">{matrix[i] || "—"}</span>}
               {mitte && <span className="smatrix mshinweis">worum es hier geht — nicht zu schreiben, sondern mitgebracht</span>}
+              {zu && !mitte && <span className="szu">{w} w</span>}
+              <span className="chev">▾</span>
             </div>
 
-            {mitte ? (
+            {!zu && (mitte ? (
               <div className="msuebersicht">
                 <div className="msvoll">{matrix[4] || "— noch kein mainstate —"}</div>
                 {texte[4] && (
@@ -1488,7 +1531,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt }) {
               </div>
             ) : (
               <>
-                <textarea className="ta" value={texte[i]} onChange={(e) => setT(i, e.target.value)} placeholder="…" />
+                <AutoTa className="ta" value={texte[i]} onChange={(e) => setT(i, e.target.value)} placeholder="…" />
                 <div className="logfoot">
                   <div className="logbar"><i style={{ width: Math.min(100, (w / ZIEL_ABSATZ) * 100) + "%" }} className={voll ? "voll" : ""} /></div>
                   <div className={"wcount" + (voll ? " voll" : "")}>
@@ -1496,7 +1539,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt }) {
                   </div>
                 </div>
               </>
-            )}
+            ))}
             {i !== 4 && (
               <div className="zweig">
                 {kids.map((k) => <button key={k.id} className="kind" onClick={() => { oeffnen(k); setView("schreiben"); }}>↳ {k.name}</button>)}
@@ -1908,7 +1951,7 @@ function Pausenschirm({ springe }) {
                     title="→ zum skript, wo das herkommt">
               <div className="bknr">00 ↗</div>
               <div className="bkname">{b.name || "unbenannt"}</div>
-              <div className="bkmain">{(Array.isArray(b.matrix) ? b.matrix[4] : "") || "— noch kein mainstate —"}</div>
+              <div className="bkmain" title={Array.isArray(b.matrix) ? b.matrix[4] : ""}>{ersteSaetze(Array.isArray(b.matrix) ? b.matrix[4] : "", 3) || "— noch kein mainstate —"}</div>
               {b.hook && <div className="bkhook">🎯 {b.hook}</div>}
             </button>
           ))}
@@ -2748,6 +2791,7 @@ function Styles() {
     color:var(--lvl);border:1px solid var(--lvl);border-radius:3px;padding:3px 7px;opacity:.75;cursor:default}
   .xfiles{flex:1;min-width:0;text-align:center;font-family:var(--term);font-size:15px;letter-spacing:.34em;
     color:var(--green);text-shadow:var(--glow);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .seitenkopf > .xfiles:first-child{text-align:left;padding-left:2px}
 
   .otabs{display:flex;flex-wrap:wrap;gap:6px}
   .otab{display:inline-flex;align-items:center;background:var(--panel-2);border:1px solid var(--line);
@@ -2829,11 +2873,19 @@ function Styles() {
   .szene.blitz{border-color:var(--green);box-shadow:0 0 0 1px var(--green-dim),0 0 22px rgba(53,255,111,.3);
     animation:ankunft 1.6s ease-out}
   @keyframes ankunft{0%{box-shadow:0 0 0 3px var(--green),0 0 40px rgba(53,255,111,.7)}100%{box-shadow:0 0 0 1px var(--green-dim)}}
-  .skopf{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .skopf{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap;cursor:pointer}
   .snr{font-family:var(--term);font-size:11px;color:var(--green-dim);letter-spacing:.1em}
   .skopf .akt{position:static;opacity:.5}
   .smatrix{flex:1;font-size:12px;color:var(--ink);font-style:italic;min-width:120px}
-  .szene .ta{min-height:120px}
+  .szene.zu .smatrix{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* das feld wächst mit dem text — 200 wörter passen rein, ohne zu scrollen */
+  .szene .ta{min-height:200px;overflow:hidden;resize:none}
+  .szene .chev{color:var(--green-mid);font-size:12px;transition:transform .15s;margin-left:6px;flex:0 0 auto}
+  .szene.zu .chev{transform:rotate(-90deg)}
+  .szene.zu{padding-bottom:14px}
+  .szene.zu .skopf{margin-bottom:0}
+  .szu{font-family:var(--term);font-size:10.5px;color:var(--green-dim);flex:0 0 auto;
+    font-variant-numeric:tabular-nums;margin-left:auto}
   .mshinweis{color:var(--dim);font-style:normal;font-size:10.5px;letter-spacing:.04em}
   .msuebersicht{background:var(--void);border:1px solid var(--line);border-radius:6px;padding:14px}
   .msvoll{font-size:13.5px;color:var(--ink);line-height:1.65;white-space:pre-wrap}
@@ -2890,7 +2942,8 @@ function Styles() {
   .bknr{position:absolute;top:9px;right:11px;font-family:var(--term);font-size:10px;color:var(--green-dim);letter-spacing:.1em}
   .bkname{font-family:var(--term);font-size:12px;letter-spacing:.12em;color:var(--green);
     text-shadow:var(--glow);margin-bottom:7px;padding-right:22px}
-  .bkmain{font-size:12.5px;color:var(--ink);line-height:1.55}
+  .bkmain{font-size:12.5px;color:var(--ink);line-height:1.55;
+    display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
   .bkhook{font-size:11px;color:var(--dim);font-style:italic;margin-top:7px;
     border-left:2px solid var(--green-dim);padding-left:8px}
 
