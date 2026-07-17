@@ -1084,6 +1084,14 @@ const AKT_ROEMISCH = { 1: "I", 2: "II", 3: "III" };
 const ZIEL_ABSATZ = 200;
 const leer9 = () => ["", "", "", "", "", "", "", "", ""];
 
+// Damit man sich nicht verläuft: jede ebene eine eigene farbe.
+//   0 wurzel = das buch        · grün
+//   1 kind   = die 8 stationen · gelb
+//   2 enkel  = die 64 szenen   · rosa
+//   3 urenkel                  · violett (braucht man selten)
+const EBENE_FARBE = ["var(--green)", "var(--amber)", "#e88fc0", "#9b8cf0"];
+const farbe = (n) => EBENE_FARBE[Math.min(n, EBENE_FARBE.length - 1)];
+
 function Skripte({ sprung, setSprung }) {
   const [view, setView] = useState("projekte");
   const [ordner, setOrdner] = useState([]);
@@ -1104,6 +1112,7 @@ function Skripte({ sprung, setSprung }) {
   const [dirty, setDirty] = useState(false);
   const tRef = useRef(null);
   const idRef = useRef(null);
+  const eingabeRef = useRef(null);
   useEffect(() => { idRef.current = id; }, [id]);
 
   useEffect(() => { laden(); }, []);
@@ -1226,12 +1235,15 @@ function Skripte({ sprung, setSprung }) {
   })();
 
   // brotkrumen — auf jeder seite gleich, springen ohne die seite zu wechseln
+  const ebene = krumen.length;
   const Krumen = ({ ziel }) => krumen.length === 0 ? null : (
     <div className="krumen">
-      {krumen.map((s) => (
-        <span key={s.id}><button onClick={() => { oeffnen(s); if (ziel) setView(ziel); }}>{s.name || "unbenannt"}</button> › </span>
+      {krumen.map((s, n) => (
+        <span key={s.id}>
+          <button style={{ color: farbe(n) }} onClick={() => { oeffnen(s); if (ziel) setView(ziel); }}>{s.name || "unbenannt"}</button> ›{" "}
+        </span>
       ))}
-      <b>{name || "neu"}</b>
+      <b style={{ color: farbe(ebene) }}>{name || "neu"}</b>
     </div>
   );
 
@@ -1253,7 +1265,8 @@ function Skripte({ sprung, setSprung }) {
       const doppelt = !b || a === b || (b.length > 6 && a.includes(b.slice(0, 24))) || (a.length > 6 && b.includes(a.slice(0, 24)));
       return (
         <div key={s.id}>
-          <div className={"bzeile" + (s.id === id ? " on" : "")} style={{ paddingLeft: 8 + tiefe * 20 }}>
+          <div className={"bzeile" + (s.id === id ? " on" : "")}
+               style={{ paddingLeft: 8 + tiefe * 20, "--lvl": farbe(tiefe) }}>
             <button className="bpfeil" disabled={!enkel.length}
               onClick={() => setZu((z) => ({ ...z, [s.id]: !z[s.id] }))}>
               {enkel.length ? (offen ? "▾" : "▸") : "·"}
@@ -1329,6 +1342,7 @@ function Skripte({ sprung, setSprung }) {
       <div className="seitenkopf">
         <button className="btn" onClick={() => setView("projekte")}>← zurück</button>
         <span className="xfiles">x-files</span>
+        <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
         <button className="btn primary" onClick={() => setView("schreiben")}>weiter →</button>
       </div>
       <Krumen ziel="matrix" />
@@ -1336,7 +1350,11 @@ function Skripte({ sprung, setSprung }) {
         {POS.map((p, i) => (
           <button key={i} style={{ "--o": SCHREIB_ORDER.indexOf(i) }}
             className={"zelle" + (gewaehlt === i ? " on" : "") + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "")}
-            onClick={() => setGewaehlt(i)}>
+            onClick={() => {
+              setGewaehlt(i);
+              // portrait: das schreibfeld liegt unter neun kästchen. hinbringen.
+              if (window.innerWidth <= 640) setTimeout(() => eingabeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+            }}>
             {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
             <span className="zname">{p.k}</span>
             <span className="ztext">{matrix[i] || "+"}</span>
@@ -1344,10 +1362,11 @@ function Skripte({ sprung, setSprung }) {
         ))}
       </div>
       {gewaehlt !== null && (
-        <div className="eingabe">
+        <div className="eingabe" ref={eingabeRef}>
           <div className="ekopf">
             <span className="zname">{POS[gewaehlt].k}</span>
             <button className="btn" onClick={() => setM(gewaehlt, "")}>✕ leeren</button>
+            <button className="btn zumraster" onClick={() => { setGewaehlt(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}>↑ zurück zur matrix</button>
           </div>
           <textarea className="ta" autoFocus value={matrix[gewaehlt]} onChange={(e) => setM(gewaehlt, e.target.value)}
             placeholder="in kurzen worten: was passiert hier?" style={{ minHeight: 80 }} />
@@ -1364,7 +1383,8 @@ function Skripte({ sprung, setSprung }) {
     <>
       <div className="seitenkopf">
         <button className="btn" onClick={() => setView("matrix")}>← zurück</button>
-        <span className="xfiles">{name || "unbenannt"}</span>
+        <span className="xfiles" style={{ color: farbe(ebene), textShadow: "0 0 8px " + farbe(ebene) + "60" }}>{name || "unbenannt"}</span>
+        <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
         <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
       </div>
 
@@ -1599,6 +1619,182 @@ function Things({ springe }) {
           </div>
         )}
       </Panel>
+    </>
+  );
+}
+
+// ============================================================
+// PAUSENSCHIRM
+// Sieht nach Arbeit aus, ist aber Pause. Flugdaten von adsb.lol —
+// offen, ohne schlüssel, von freiwilligen betrieben.
+// ============================================================
+const RADAR_ORTE = [
+  { n: "dümmer", lat: 53.576, lon: 11.205 },
+  { n: "hamburg", lat: 53.5511, lon: 9.9937 },
+  { n: "berlin", lat: 52.52, lon: 13.405 },
+  { n: "london", lat: 51.5074, lon: -0.1278 },
+  { n: "chicago", lat: 41.8781, lon: -87.6298 },
+  { n: "tokio", lat: 35.6762, lon: 139.6503 },
+];
+const RADIUS_NM = 100;
+const rad = (g) => (g * Math.PI) / 180;
+
+function entfernung(la1, lo1, la2, lo2) {
+  const R = 3440.065; // erdradius in seemeilen
+  const dLa = rad(la2 - la1), dLo = rad(lo2 - lo1);
+  const a = Math.sin(dLa / 2) ** 2 + Math.cos(rad(la1)) * Math.cos(rad(la2)) * Math.sin(dLo / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+function peilung(la1, lo1, la2, lo2) {
+  const y = Math.sin(rad(lo2 - lo1)) * Math.cos(rad(la2));
+  const x = Math.cos(rad(la1)) * Math.sin(rad(la2)) - Math.sin(rad(la1)) * Math.cos(rad(la2)) * Math.cos(rad(lo2 - lo1));
+  return (Math.atan2(y, x) * 180) / Math.PI;
+}
+
+function Pausenschirm() {
+  const [ort, setOrt] = useState(RADAR_ORTE[0]);
+  const [flug, setFlug] = useState([]);
+  const [stand, setStand] = useState({ t: "verbinde …", c: "work" });
+  const [commits, setCommits] = useState(0);
+  const [uptime, setUptime] = useState(0);
+  const [jetzt, setJetzt] = useState(new Date());
+  const startRef = useRef(Date.now());
+
+  useEffect(() => {
+    const iv = setInterval(() => { setUptime(Math.floor((Date.now() - startRef.current) / 1000)); setJetzt(new Date()); }, 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  useEffect(() => {
+    fetch(`${SUPABASE_URL}/rest/v1/commits?select=id&status=eq.aktiv`, { headers: dbHeaders(getToken()) })
+      .then((r) => r.json()).then((d) => setCommits(Array.isArray(d) ? d.length : 0)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let tot = false;
+    const holen = async () => {
+      const quellen = [
+        `https://api.adsb.lol/v2/lat/${ort.lat}/lon/${ort.lon}/dist/${RADIUS_NM}`,
+        `https://opendata.adsb.fi/api/v2/lat/${ort.lat}/lon/${ort.lon}/dist/${RADIUS_NM}`,
+      ];
+      for (const u of quellen) {
+        try {
+          const r = await fetch(u);
+          if (!r.ok) continue;
+          const d = await r.json();
+          if (tot) return;
+          const ac = (d.ac || []).filter((a) => a.lat != null && a.lon != null).map((a) => ({
+            hex: a.hex, rufz: (a.flight || "").trim() || a.r || a.hex,
+            typ: a.t || "—",
+            hoehe: typeof a.alt_baro === "number" ? a.alt_baro : (a.alt_baro === "ground" ? 0 : null),
+            speed: a.gs != null ? Math.round(a.gs) : null,
+            kurs: a.track ?? 0,
+            dist: entfernung(ort.lat, ort.lon, a.lat, a.lon),
+            peil: peilung(ort.lat, ort.lon, a.lat, a.lon),
+          })).filter((a) => a.dist <= RADIUS_NM).sort((a, b) => a.dist - b.dist);
+          setFlug(ac);
+          setStand({ t: ac.length + " kontakte", c: "ok" });
+          return;
+        } catch { /* nächste quelle */ }
+      }
+      if (!tot) setStand({ t: "kein signal — quelle nicht erreichbar", c: "err" });
+    };
+    setStand({ t: "scanne …", c: "work" });
+    holen();
+    const iv = setInterval(holen, 12000);
+    return () => { tot = true; clearInterval(iv); };
+  }, [ort]);
+
+  const p2 = (n) => String(n).padStart(2, "0");
+  const up = p2(Math.floor(uptime / 3600)) + ":" + p2(Math.floor((uptime % 3600) / 60)) + ":" + p2(uptime % 60);
+  const R = 150; // radar-radius in px
+
+  const ZEILEN = [
+    ["deflektor", "aktiv"],
+    ["reaktor", "aktiv"],
+    ["am_enhancer", "1 : 3"],
+    ["golden_glow", "pulsiert"],
+    ["body_floor", "gesichert"],
+    ["modul 17b", commits + " commit" + (commits === 1 ? "" : "s") + " aktiv"],
+    ["loop", "läuft"],
+    ["uptime", up],
+  ];
+
+  return (
+    <>
+      <div className="grouphead">PAUSENSCHIRM<span className="rule" /></div>
+
+      <div className="pschirm">
+        <div className="puhr">
+          {p2(jetzt.getHours())}:{p2(jetzt.getMinutes())}<i>:{p2(jetzt.getSeconds())}</i>
+        </div>
+
+        <div className="pgrid">
+          <div className="pradar">
+            <svg viewBox={`0 0 ${R * 2 + 20} ${R * 2 + 20}`} className="rsvg">
+              <defs>
+                <radialGradient id="sweep">
+                  <stop offset="0%" stopColor="rgba(53,255,111,.35)" />
+                  <stop offset="100%" stopColor="rgba(53,255,111,0)" />
+                </radialGradient>
+              </defs>
+              <g transform={`translate(${R + 10},${R + 10})`}>
+                {[0.25, 0.5, 0.75, 1].map((f) => (
+                  <circle key={f} r={R * f} fill="none" stroke="var(--line-hot)" strokeWidth="1" opacity={f === 1 ? 0.8 : 0.35} />
+                ))}
+                <line x1={-R} y1="0" x2={R} y2="0" stroke="var(--line-hot)" strokeWidth="1" opacity=".3" />
+                <line x1="0" y1={-R} x2="0" y2={R} stroke="var(--line-hot)" strokeWidth="1" opacity=".3" />
+                <g className="sweep">
+                  <path d={`M 0 0 L 0 ${-R} A ${R} ${R} 0 0 1 ${R * 0.5} ${-R * 0.866} Z`} fill="url(#sweep)" />
+                  <line x1="0" y1="0" x2="0" y2={-R} stroke="var(--green)" strokeWidth="1.5" opacity=".9" />
+                </g>
+                <circle r="3" fill="var(--green)" className="mitte-punkt" />
+                {flug.map((a) => {
+                  const rr = (a.dist / RADIUS_NM) * R;
+                  const x = rr * Math.sin(rad(a.peil)), y = -rr * Math.cos(rad(a.peil));
+                  return (
+                    <g key={a.hex} transform={`translate(${x},${y})`}>
+                      <path d="M 0 -5 L 3.4 4 L 0 1.6 L -3.4 4 Z" fill="var(--green)" transform={`rotate(${a.kurs})`} opacity=".95" />
+                      <text x="7" y="3.5" className="rtext">{a.rufz}</text>
+                    </g>
+                  );
+                })}
+                {[["N", 0, -R - 2], ["O", R + 2, 4], ["S", 0, R + 10], ["W", -R - 8, 4]].map(([s, x, y]) => (
+                  <text key={s} x={x} y={y} className="rhimmel">{s}</text>
+                ))}
+              </g>
+            </svg>
+            <div className="rfuss">
+              <select value={ort.n} onChange={(e) => setOrt(RADAR_ORTE.find((o) => o.n === e.target.value))}>
+                {RADAR_ORTE.map((o) => <option key={o.n} value={o.n}>{o.n}</option>)}
+              </select>
+              <span className="rradius">{RADIUS_NM} nm</span>
+              <span className={"status " + stand.c}>{stand.t}</span>
+            </div>
+          </div>
+
+          <div className="ppanel">
+            <div className="ptitel">systemstatus</div>
+            {ZEILEN.map(([k, v]) => (
+              <div className="pzeile" key={k}><span>{k}</span><i /><b>{v}</b></div>
+            ))}
+            <div className="ptitel" style={{ marginTop: 16 }}>kontakte</div>
+            <div className="pliste">
+              {!flug.length && <div className="pleer">stille.</div>}
+              {flug.slice(0, 9).map((a) => (
+                <div className="pflug" key={a.hex}>
+                  <span className="prufz">{a.rufz}</span>
+                  <span className="ptyp">{a.typ}</span>
+                  <span className="phoehe">{a.hoehe != null ? (a.hoehe === 0 ? "boden" : a.hoehe.toLocaleString("de-DE") + " ft") : "—"}</span>
+                  <span className="pdist">{a.dist.toFixed(0)} nm</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="pfuss">// niemand kann dir sagen, was die matrix ist. du musst sie selbst sehen. 🐇</div>
+      </div>
     </>
   );
 }
@@ -1958,6 +2154,7 @@ export default function StricklieselApp() {
           <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
           <button aria-pressed={tab === "skripte"} onClick={() => setTab("skripte")}>skripte</button>
           <button aria-pressed={tab === "things"} onClick={() => setTab("things")}>things</button>
+          <button aria-pressed={tab === "pause"} onClick={() => setTab("pause")}>pause</button>
         </div>
 
         {tab === "handbuch" && <Handbuch />}
@@ -1965,6 +2162,7 @@ export default function StricklieselApp() {
         {tab === "log" && <LogFiles />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} />}
+        {tab === "pause" && <Pausenschirm />}
 
         {tab === "konsole" && <>
         <Panel title="PROTOKOLLE" sub="einstellungen & texte · gerätübergreifend">
@@ -2348,6 +2546,8 @@ function Styles() {
   /* skripte */
   .seitenkopf{display:flex;align-items:center;gap:14px;margin:14px 0 14px}
   .seitenkopf .btn{padding:9px 16px;font-size:12.5px}
+  .ebadge{font-family:var(--term);font-size:11px;letter-spacing:.08em;flex:0 0 auto;
+    color:var(--lvl);border:1px solid var(--lvl);border-radius:3px;padding:3px 7px;opacity:.75;cursor:default}
   .xfiles{flex:1;min-width:0;text-align:center;font-family:var(--term);font-size:15px;letter-spacing:.34em;
     color:var(--green);text-shadow:var(--glow);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -2368,8 +2568,10 @@ function Styles() {
   .krumen{font-family:var(--term);font-size:11px;letter-spacing:.06em;color:var(--dim);margin-top:12px;word-break:break-word}
   .krumen button{font-family:var(--term);font-size:11px;background:transparent;border:0;color:var(--muted);
     cursor:pointer;padding:0;letter-spacing:.06em}
-  .krumen button:hover{color:var(--green)}
-  .krumen b{color:var(--green);font-weight:400}
+
+  .krumen b{font-weight:400}
+  .krumen button{opacity:.85}
+  .krumen button:hover{opacity:1;text-shadow:0 0 7px currentColor}
 
   .baum{border:1px solid var(--line);border-radius:6px;background:var(--panel-2);margin-top:14px;
     max-height:46vh;overflow-y:auto;overflow-x:hidden;padding:4px 0}
@@ -2377,20 +2579,21 @@ function Styles() {
   .baum::-webkit-scrollbar-track{background:transparent}
   .baum::-webkit-scrollbar-thumb{background:var(--green-dim);border-radius:4px}
   .bleer{font-size:11.5px;color:var(--dim);padding:14px}
-  .bzeile{display:flex;align-items:center;gap:6px;padding-right:10px;transition:.1s;border-radius:4px}
+  .bzeile{display:flex;align-items:center;gap:6px;padding-right:10px;transition:.1s;border-radius:4px;
+    border-left:2px solid var(--lvl,var(--green))}
   .bzeile:hover{background:var(--panel)}
-  .bzeile.on{background:var(--green-dim)}
-  .bzeile.on .bname{color:var(--white)}
-  .bpfeil{font-family:var(--mono);font-size:10px;background:transparent;border:0;color:var(--green-dim);
+  .bzeile.on{background:color-mix(in srgb, var(--lvl) 22%, transparent)}
+  .bzeile.on .bname{opacity:1;text-shadow:0 0 8px var(--lvl)}
+  .bpfeil{font-family:var(--mono);font-size:10px;background:transparent;border:0;color:var(--lvl,var(--green-dim));opacity:.55;
     cursor:pointer;padding:4px 3px;flex:0 0 auto;width:18px}
-  .bpfeil:hover:not(:disabled){color:var(--green)}
+  .bpfeil:hover:not(:disabled){opacity:1}
   .bpfeil:disabled{opacity:.3;cursor:default}
   .bhaupt{flex:1;min-width:0;display:flex;align-items:baseline;gap:9px;background:transparent;border:0;
     text-align:left;cursor:pointer;padding:6px 0}
-  .bname{font-family:var(--term);font-size:12px;letter-spacing:.08em;color:var(--muted);flex:0 0 auto;transition:.1s}
-  .bhaupt:hover .bname{color:var(--green)}
+  .bname{font-family:var(--term);font-size:12px;letter-spacing:.08em;color:var(--lvl,var(--muted));flex:0 0 auto;transition:.1s;opacity:.82}
+  .bhaupt:hover .bname{opacity:1;text-shadow:0 0 7px var(--lvl)}
   .bsub{flex:1;min-width:0;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .bmeta{font-family:var(--term);font-size:10px;color:var(--green-dim);flex:0 0 auto}
+  .bmeta{font-family:var(--term);font-size:10px;color:var(--lvl,var(--green-dim));opacity:.6;flex:0 0 auto}
 
   .mx{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
   .zelle{position:relative;text-align:left;background:var(--panel);border:1px solid var(--line);
@@ -2412,6 +2615,8 @@ function Styles() {
   .eingabe{background:var(--panel);border:1px solid var(--line-hot);border-radius:6px;padding:12px}
   .ekopf{display:flex;align-items:center;gap:12px;margin-bottom:8px}
   .ekopf .btn{margin-left:auto;padding:5px 11px;font-size:11.5px}
+  .ekopf .zumraster{margin-left:6px}
+  @media(min-width:641px){.ekopf .zumraster{display:none}}
 
   .hookzeile{font-size:13px;color:var(--muted);border-left:2px solid var(--green-dim);
     padding:4px 0 4px 12px;margin-bottom:14px;font-style:italic}
@@ -2456,6 +2661,48 @@ function Styles() {
   .thing:not(.on) .chev{transform:rotate(-90deg)}
   .thbody{padding:2px 12px 14px;border-top:1px dashed var(--line);margin-top:2px}
   .ta.klein{min-height:56px;font-size:12.5px}
+
+  /* pausenschirm */
+  .pschirm{background:linear-gradient(180deg,#08120c,#050b07);border:1px solid var(--line);
+    border-radius:6px;padding:20px 18px 16px}
+  .puhr{font-family:var(--term);font-size:clamp(44px,9vw,86px);letter-spacing:.1em;line-height:1;
+    color:var(--green);text-shadow:0 0 14px rgba(53,255,111,.5);text-align:center;
+    font-variant-numeric:tabular-nums;margin-bottom:18px}
+  .puhr i{font-style:normal;opacity:.35;font-size:.46em}
+  .pgrid{display:flex;flex-wrap:wrap;gap:22px}
+  .pradar{flex:0 0 auto;width:min(340px,100%);margin:0 auto}
+  .rsvg{width:100%;display:block;filter:drop-shadow(0 0 6px rgba(53,255,111,.18))}
+  .sweep{transform-origin:0 0;animation:dreh 4s linear infinite}
+  @keyframes dreh{to{transform:rotate(360deg)}}
+  .mitte-punkt{animation:blink 1.4s ease-in-out infinite}
+  .rtext{font-family:var(--term);font-size:8px;fill:var(--muted);letter-spacing:.06em}
+  .rhimmel{font-family:var(--term);font-size:9px;fill:var(--dim);text-anchor:middle;letter-spacing:.1em}
+  .rfuss{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+  .rfuss select{background:var(--panel-2);border:1px solid var(--line);border-radius:4px;color:var(--green);
+    font-family:var(--term);font-size:12px;letter-spacing:.1em;padding:5px 8px;cursor:pointer}
+  .rfuss select:focus{outline:none;border-color:var(--line-hot)}
+  .rradius{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em}
+  .rfuss .status{font-size:10.5px}
+
+  .ppanel{flex:1 1 260px;min-width:0}
+  .ptitel{font-family:var(--term);font-size:11px;letter-spacing:.24em;color:var(--green);
+    text-shadow:var(--glow);margin-bottom:9px;text-transform:uppercase}
+  .pzeile{display:flex;align-items:baseline;gap:6px;font-family:var(--term);font-size:12px;
+    letter-spacing:.06em;padding:3px 0}
+  .pzeile span{color:var(--dim);flex:0 0 auto}
+  .pzeile i{flex:1;border-bottom:1px dotted var(--line);opacity:.6;transform:translateY(-3px)}
+  .pzeile b{color:var(--muted);font-weight:400;flex:0 0 auto;font-variant-numeric:tabular-nums}
+  .pliste{border:1px solid var(--line);border-radius:5px;background:var(--panel-2);overflow:hidden}
+  .pleer{font-family:var(--term);font-size:11px;color:var(--dim);padding:12px;letter-spacing:.1em}
+  .pflug{display:flex;align-items:baseline;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);
+    font-family:var(--term);font-size:11px;letter-spacing:.05em}
+  .pflug:last-child{border-bottom:0}
+  .prufz{color:var(--green);flex:0 0 66px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ptyp{color:var(--dim);flex:0 0 42px}
+  .phoehe{color:var(--muted);flex:1;text-align:right;font-variant-numeric:tabular-nums}
+  .pdist{color:var(--green-dim);flex:0 0 48px;text-align:right;font-variant-numeric:tabular-nums}
+  .pfuss{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em;
+    text-align:center;margin-top:18px;padding-top:12px;border-top:1px dashed var(--line)}
 
   /* handbuch */
   .handbuch{margin:14px 0 0;padding:16px;background:var(--panel-2);border:1px solid var(--line);
@@ -2684,6 +2931,15 @@ function Styles() {
 
   @media(prefers-reduced-motion:reduce){#rain{display:none}.cursor{animation:none}}
   @media(max-width:560px){.uhr{display:none}.subline{font-size:11px;gap:8px}.phead .psub{display:none}.phead .chev{margin-left:auto}.val{min-width:54px}}
+
+  /* iOS zoomt beim antippen rein, wenn die schrift kleiner als 16px ist —
+     und zoomt nie wieder raus. also: auf touch-geräten alle eingabefelder auf 16px. */
+  @media(max-width:820px){
+    .ta,.ti,.gatebox input,.rezrow input,.rezrow select,
+    input[type=text],input[type=email],input[type=password],input[type=date],
+    textarea,select{font-size:16px}
+    .ta.klein,.ta.log{font-size:16px}
+  }
     `}</style>
   );
 }
