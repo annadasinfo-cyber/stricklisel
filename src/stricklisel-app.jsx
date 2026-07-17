@@ -1084,7 +1084,7 @@ const AKT_ROEMISCH = { 1: "I", 2: "II", 3: "III" };
 const ZIEL_ABSATZ = 200;
 const leer9 = () => ["", "", "", "", "", "", "", "", ""];
 
-function Skripte() {
+function Skripte({ sprung, setSprung }) {
   const [view, setView] = useState("projekte");
   const [ordner, setOrdner] = useState([]);
   const [alle, setAlle] = useState([]);
@@ -1107,6 +1107,24 @@ function Skripte() {
   useEffect(() => { idRef.current = id; }, [id]);
 
   useEffect(() => { laden(); }, []);
+
+  // sprung aus THINGS: skript öffnen, auf die schreibseite, zur position scrollen
+  useEffect(() => {
+    if (!sprung || !alle.length) return;
+    const s = alle.find((x) => x.id === sprung.id);
+    if (!s) return;
+    oeffnen(s); setView("schreiben");
+    const pos = sprung.i;
+    setSprung(null);
+    setTimeout(() => {
+      const el = document.getElementById("szene-" + pos);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("blitz");
+      setTimeout(() => el.classList.remove("blitz"), 1600);
+    }, 120);
+  }, [sprung, alle]);
+
   useEffect(() => {
     if (!dirty) return;
     if (tRef.current) clearTimeout(tRef.current);
@@ -1369,7 +1387,7 @@ function Skripte() {
         const voll = w >= ZIEL_ABSATZ;
         const kids = id ? kinder(id, i) : [];
         return (
-          <div className={"szene" + (i === 4 ? " mitte" : "")} key={i}>
+          <div className={"szene" + (i === 4 ? " mitte" : "")} key={i} id={"szene-" + i}>
             <div className="skopf">
               <span className="snr">{i === 4 ? "00" : String(n).padStart(2, "0")}</span>
               <span className="zname">{POS[i].k}</span>
@@ -1409,7 +1427,7 @@ const ARTEN = [
   { v: "ding", t: "dinge", ein: "ding" },
 ];
 
-function Things() {
+function Things({ springe }) {
   const [ordner, setOrdner] = useState([]);
   const [aktOrdner, setAktOrdner] = useState("");
   const [art, setArt] = useState("person");
@@ -1485,7 +1503,7 @@ function Things() {
           const wo = (x.toLowerCase().includes(low) ? x : m.toLowerCase().includes(low) ? m : null);
           if (!wo) continue;
           const p = wo.toLowerCase().indexOf(low), a = p > 50 ? p - 50 : 0;
-          tr.push({ skript: s.name || "unbenannt", pos: POS[i].k,
+          tr.push({ id: s.id, i, skript: s.name || "unbenannt", pos: POS[i].k,
             schnipsel: (a ? "… " : "") + wo.slice(a, a + 150).replace(/\n+/g, " ") + (wo.length > a + 150 ? " …" : "") });
         }
       });
@@ -1571,11 +1589,11 @@ function Things() {
           <div className="treffer">
             <div className="tkopf">{funde.tr.length} fundstelle{funde.tr.length === 1 ? "" : "n"} für <b>{funde.q}</b></div>
             {funde.tr.map((f, n) => (
-              <div className="tzeile" key={n} style={{ cursor: "default" }}>
+              <button className="tzeile" key={n} onClick={() => springe(f.id, f.i)} title="zur szene springen">
                 <span className="tdatum">{f.skript}</span>
                 <span className="twoerter" style={{ color: "var(--green)" }}>{f.pos}</span>
                 <span className="tschnipsel">{f.schnipsel}</span>
-              </div>
+              </button>
             ))}
             {!funde.tr.length && <div className="tkopf">nirgends. noch nicht.</div>}
           </div>
@@ -1607,6 +1625,7 @@ export default function StricklieselApp() {
   const [gen, setGen] = useState(null);
 
   const [tab, setTab] = useState("konsole");
+  const [sprung, setSprung] = useState(null);
   const [progName, setProgName] = useState("");
   const [progList, setProgList] = useState([]);
   const [progSel, setProgSel] = useState("");
@@ -1944,8 +1963,8 @@ export default function StricklieselApp() {
         {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "log" && <LogFiles />}
-        {tab === "skripte" && <Skripte />}
-        {tab === "things" && <Things />}
+        {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} />}
+        {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} />}
 
         {tab === "konsole" && <>
         <Panel title="PROTOKOLLE" sub="einstellungen & texte · gerätübergreifend">
@@ -2399,6 +2418,9 @@ function Styles() {
 
   .szene{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:10px}
   .szene.mitte{border-color:var(--line-hot);background:var(--panel-2)}
+  .szene.blitz{border-color:var(--green);box-shadow:0 0 0 1px var(--green-dim),0 0 22px rgba(53,255,111,.3);
+    animation:ankunft 1.6s ease-out}
+  @keyframes ankunft{0%{box-shadow:0 0 0 3px var(--green),0 0 40px rgba(53,255,111,.7)}100%{box-shadow:0 0 0 1px var(--green-dim)}}
   .skopf{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap}
   .snr{font-family:var(--term);font-size:11px;color:var(--green-dim);letter-spacing:.1em}
   .skopf .akt{position:static;opacity:.5}
