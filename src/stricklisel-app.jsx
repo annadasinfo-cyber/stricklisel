@@ -702,6 +702,8 @@ function Abteilung17b({ say }) {
   const [ziel, setZiel] = useState("");
   const [sig, setSig] = useState("");
   const [msg, setMsg] = useState({ t: "", c: "" });
+  const [offen, setOffen] = useState(null);
+  const fbRef = useRef(null);
 
   const aktiv = liste.filter((c) => c.status === "aktiv").length;
   const frei = 3 - aktiv;
@@ -730,6 +732,22 @@ function Abteilung17b({ say }) {
       setProjekt(""); setSig(""); setZiel(""); setParam(PARAM_STD); setStart(heute());
       laden();
     } catch (e) { setMsg({ t: "» " + (e?.message || e), c: "err" }); }
+  }
+
+  // priorität und feedback ändern — still gespeichert
+  function feld(c, k, v) {
+    setListe((l) => l.map((x) => (x.id === c.id ? { ...x, [k]: v } : x)));
+    if (fbRef.current) clearTimeout(fbRef.current);
+    fbRef.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/commits?id=eq.${c.id}`, {
+          method: "PATCH", headers: { ...dbHeaders(getToken()), Prefer: "return=minimal" },
+          body: JSON.stringify({ [k]: v, updated_at: new Date().toISOString() }),
+        });
+        if (!r.ok) throw new Error(await r.text());
+        setMsg({ t: "» gespeichert", c: "ok" });
+      } catch (e) { setMsg({ t: "» " + (e?.message || e), c: "err" }); }
+    }, 900);
   }
 
   async function setzeStatus(c, status, wort) {
@@ -811,12 +829,13 @@ function Abteilung17b({ say }) {
       {!liste.length && <p className="hint" style={{ marginLeft: 4 }}>noch kein commit. aura3 definiert keine ziele.</p>}
 
       {liste.map((c) => (
-        <div className={"commit " + c.status} key={c.id}>
-          <div className="chead">
+        <div className={"commit " + c.status + (offen === c.id ? " auf" : "")} key={c.id}>
+          <div className="chead" onClick={() => setOffen(offen === c.id ? null : c.id)}>
             <span className={"cdot " + c.status} />
             <span className="cprio">P{c.prioritaet}</span>
             <span className="cprojekt">{c.projekt}</span>
             <span className="cstatus">{c.status}</span>
+            <span className="chev">▾</span>
           </div>
           <div className="cmeta">
             {(c.parameter || []).join(" · ")}
@@ -824,6 +843,24 @@ function Abteilung17b({ say }) {
             {c.ziel_datum && <> &nbsp;|&nbsp; ziel {c.ziel_datum} <b>({tage(c)})</b></>}
           </div>
           <div className="csig">{c.signatur}</div>
+
+          {c.feedback && offen !== c.id && <div className="cfb">{c.feedback}</div>}
+
+          {offen === c.id && (
+            <div className="cedit">
+              <div className="field">
+                <label className="cap">priorität</label>
+                <Seg value={c.prioritaet} onChange={(v) => feld(c, "prioritaet", Number(v))}
+                     options={[{ v: 1, t: "1" }, { v: 2, t: "2" }, { v: 3, t: "3" }]} />
+                <p className="hint">gewichtung ändern — der commit bleibt, was er ist. alle drei dürfen auf 1 stehen.</p>
+              </div>
+              <div className="field" style={{ marginTop: 12 }}>
+                <label className="cap">feedback</label>
+                <AutoTa className="ta klein" value={c.feedback || ""} onChange={(e) => feld(c, "feedback", e.target.value)}
+                        placeholder="🥳 hat sich erfüllt am …" />
+              </div>
+            </div>
+          )}
           <div className="crec">
             <button title="resume" disabled={c.status === "aktiv"} onClick={() => setzeStatus(c, "aktiv", "resume")}>▶</button>
             <button title="pause" disabled={c.status !== "aktiv"} onClick={() => setzeStatus(c, "pausiert", "pause")}>❚❚</button>
@@ -902,6 +939,8 @@ function LogFiles() {
   const [monat, setMonat] = useState(() => heute().slice(0, 7));
   const [text, setText] = useState("");
   const [tagText, setTagText] = useState("");
+  const [tagVorschlag, setTagVorschlag] = useState([]);
+  const [tagFokus, setTagFokus] = useState(false);
   const [liste, setListe] = useState([]);
   const [suche, setSuche] = useState("");
   const [tagFilter, setTagFilter] = useState("");
@@ -979,6 +1018,21 @@ function LogFiles() {
     return Object.keys(z).sort((a, b) => z[b] - z[a]);
   })();
 
+  // was gerade getippt wird — das letzte wort im feld
+  const letzterTag = (v) => (v || "").split(/[\s,]+/).pop().replace(/^#+/, "").toLowerCase();
+
+  function tagTippen(v) {
+    setTagText(v); setDirty(true);
+    const l = letzterTag(v);
+    const schon = tagsLesen(v);
+    const treffer = alleTags.filter((x) => x !== l && !schon.includes(x) && (l ? x.startsWith(l) : true));
+    setTagVorschlag(l || tagFokus ? treffer.slice(0, 8) : []);
+  }
+  function tagUebernehmen(tg) {
+    setTagText((v) => v.replace(/[^\s,]*$/, "") + "#" + tg + " ");
+    setDirty(true); setTagVorschlag([]);
+  }
+
   const schnipsel = (s, q) => {
     if (!s) return "";
     const i = q ? s.toLowerCase().indexOf(q.toLowerCase()) : -1;
@@ -1022,8 +1076,25 @@ function LogFiles() {
              sub={WOCHENTAG[d.getDay()] + " · " + d.toLocaleDateString("de-DE")}>
         <div className="rezrow" style={{ marginBottom: 12 }}>
           <input className="ti" type="date" value={datum} max={heute()} onChange={(e) => setDatum(e.target.value)} style={{ flex: "0 0 auto", minWidth: 150 }} />
-          <input className="ti tags" value={tagText} placeholder="#hashtags"
-            onChange={(e) => { setTagText(e.target.value); setDirty(true); }} />
+          <div className="tagfeld">
+            <input className="ti tags" value={tagText} placeholder="#hashtags"
+              onChange={(e) => tagTippen(e.target.value)}
+              onFocus={() => { setTagFokus(true); tagTippen(tagText); }}
+              onBlur={() => setTimeout(() => { setTagFokus(false); setTagVorschlag([]); }, 160)}
+              onKeyDown={(e) => {
+                if (e.key === "Tab" && tagVorschlag.length) { e.preventDefault(); tagUebernehmen(tagVorschlag[0]); }
+                if (e.key === "Escape") setTagVorschlag([]);
+              }} />
+            {tagVorschlag.length > 0 && (
+              <div className="tagliste">
+                <div className="taghinweis">{letzterTag(tagText) ? "gibt es schon — tab nimmt den ersten" : "schon vergeben"}</div>
+                {tagVorschlag.map((tg, n) => (
+                  <button key={tg} className={"tagvor" + (n === 0 && letzterTag(tagText) ? " erst" : "")}
+                          onMouseDown={(e) => { e.preventDefault(); tagUebernehmen(tg); }}>#{tg}</button>
+                ))}
+              </div>
+            )}
+          </div>
           {datum !== heute() && <button className="btn" onClick={() => setDatum(heute())}>↺ heute</button>}
         </div>
 
@@ -1159,7 +1230,7 @@ const ersteSaetze = (s, n = 3) => { const a = satzTeilen(s); return a.slice(0, n
 const EBENE_FARBE = ["var(--green)", "var(--amber)", "#e88fc0", "#9b8cf0"];
 const farbe = (n) => EBENE_FARBE[Math.min(n, EBENE_FARBE.length - 1)];
 
-function Skripte({ sprung, setSprung, projekt, setProjekt }) {
+function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) {
   const [view, setView] = useState("projekte");
   const [ordner, setOrdner] = useState([]);
   const [alle, setAlle] = useState([]);
@@ -1322,16 +1393,27 @@ function Skripte({ sprung, setSprung, projekt, setProjekt }) {
   // ohne mainstate (der hat kein textfeld) und ohne die matrix, nur der text.
   const szenenTexte = SCHREIB_ORDER.filter((i) => i !== 4).map((i) => (texte[i] || "").trim()).filter(Boolean);
   const szenenWoerter = szenenTexte.reduce((s, x) => s + zaehleWoerter(x), 0);
+  // marker als eigener satz — dann liest thorsten sie als ansage, nicht als teil des textes
+  const szenenText = () => SCHREIB_ORDER.filter((i) => i !== 4)
+    .filter((i) => (texte[i] || "").trim())
+    .map((i) => POS[i].gk + ".\n\n" + texte[i].trim())
+    .join("\n\n");
+
+  function anDieKonsole() {
+    if (!szenenTexte.length) { setMsg({ t: "noch nichts geschrieben", c: "err" }); return; }
+    const s = szenenText();
+    // in der konsole steht schon was anderes drin? nicht einfach drüberbügeln.
+    if (kette && kette.trim() && kette.trim() !== s.trim()) {
+      const w = zaehleWoerter(kette);
+      if (!confirm(`in der konsole liegen schon ${w.toLocaleString("de-DE")} wörter.\n\nüberschreiben?`)) return;
+    }
+    zurKonsole(s);
+  }
   async function txtKopieren() {
     if (!szenenTexte.length) { setMsg({ t: "noch nichts geschrieben", c: "err" }); return; }
-    // marker als eigener satz — dann liest thorsten sie als ansage, nicht als teil des textes
-    const s = SCHREIB_ORDER.filter((i) => i !== 4)
-      .filter((i) => (texte[i] || "").trim())
-      .map((i) => POS[i].gk + ".\n\n" + texte[i].trim())
-      .join("\n\n");
     try {
-      await navigator.clipboard.writeText(s);
-      setMsg({ t: "kopiert · " + szenenWoerter.toLocaleString("de-DE") + " wörter · ab damit zu thorsten", c: "ok" });
+      await navigator.clipboard.writeText(szenenText());
+      setMsg({ t: "kopiert · " + szenenWoerter.toLocaleString("de-DE") + " wörter", c: "ok" });
     } catch { setMsg({ t: "kopieren blockiert — text markieren und cmd+c", c: "err" }); }
   }
 
@@ -1497,10 +1579,12 @@ function Skripte({ sprung, setSprung, projekt, setProjekt }) {
         <button className="btn" onClick={() => setView("matrix")}>← zurück</button>
         <span className="xfiles" style={{ color: farbe(ebene), textShadow: "0 0 8px " + farbe(ebene) + "60" }}>{name || "unbenannt"}</span>
         <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
-        <button className="btn txtbtn" onClick={txtKopieren} disabled={!szenenTexte.length}
-                title="alle szenentexte in die zwischenablage">
-          ⧉ txt{szenenWoerter ? " · " + szenenWoerter.toLocaleString("de-DE") + " w" : ""}
+        <button className="btn txtbtn" onClick={anDieKonsole} disabled={!szenenTexte.length}
+                title="alle szenentexte ins textfeld der konsole — thorsten liest vor">
+          ▶ konsole{szenenWoerter ? " · " + szenenWoerter.toLocaleString("de-DE") + " w" : ""}
         </button>
+        <button className="btn txtbtn klein" onClick={txtKopieren} disabled={!szenenTexte.length}
+                title="stattdessen in die zwischenablage">⧉</button>
         <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
       </div>
 
@@ -1600,6 +1684,63 @@ const ARTEN = [
   { v: "ort", t: "orte", ein: "ort" },
   { v: "ding", t: "dinge", ein: "ding" },
 ];
+
+// ---- Zwei achsen. Eine figur kann hauptfigur SEIN (rolle) und verführerin (archetyp). ----
+
+// Was die figur TUT. Kern aus der Hollywood Story Matrix, Rest aus Annis Blatt.
+const ROLLEN = [
+  { g: "kern", r: [
+    ["held", "protagonist · #2"],
+    ["bösewicht", "der drachen · #11"],
+    ["potentielles opfer", "das gesicht aller gefährdeten"],
+    ["deflektor des helden", "hermes: dreht dem helden die hufe um, damit er rückwärts läuft ohne es zu merken"],
+    ["deflektor des bösewichts", "lenkt den bösewicht ab"],
+  ]},
+  { g: "verbündete", r: [
+    ["mentor", "#20 · prof. dumbledore, nur tiefer"],
+    ["sidekick", "#1"],
+    ["freund · begleiter", "des helden"],
+    ["sterbender freund", "rettet den helden"],
+    ["heilender charakter", "#37"],
+    ["das orakel", "in der matrix"],
+    ["lazarus-joker", "gibt neuen mut, wenn alles verloren scheint"],
+  ]},
+  { g: "gegner", r: [
+    ["schurke · schatten", ""],
+    ["handlanger des schurken", ""],
+    ["torwächter · schwellenhüter", "schlüsselwächter in der matrix"],
+    ["gestaltwandler", ""],
+    ["endboss", "#11 · #57 · antagonist"],
+  ]},
+  { g: "funktion", r: [
+    ["herold · bote", "#5 · treibt die story voran"],
+    ["angebetete", "(zukunft) · manchmal = p.o."],
+    ["flirty character", "für mehr infos"],
+    ["autoritätsperson", "dominanter charakter"],
+    ["major character", ""],
+    ["minor character", ""],
+    ["statist", ""],
+  ]},
+];
+const ROLLE_INFO = Object.fromEntries(ROLLEN.flatMap((g) => g.r));
+
+// Wie die figur IST.
+const ARCHETYPEN = [
+  ["krieger", "strahlt kontrollierte kraft und stärke aus"],
+  ["hofnarr", "energetisch und fröhlich, überraschend in auftritt und zicken"],
+  ["entdecker", "fordert auf, mit ihm neue abenteuer zu erleben"],
+  ["liebhaber", "märchenhafte eigenschaften, die es leicht machen sich zu verlieben"],
+  ["verführerin", "genussorientiert, mit hang zur ungezogenheit"],
+  ["mädchen", "verspricht unschuld durch reinheit, natürlichkeit und sanftheit"],
+  ["begleiter", "verspricht einen hohen nutzen"],
+  ["begleiter II", "verspricht einen hohen nutzen"],
+  ["mutter erde", "vertrauenswürdig und respektiert"],
+  ["patriarch", "leader, der die regeln bestimmt"],
+  ["beschützer", "hohes vertrauen, weiß rat und hat technisches können"],
+  ["weiser", "bedacht und in einzelnen standpunkten unabhängig"],
+  ["zauberer", "verändert die welt und entwickelt durch kreativität lust und freude"],
+];
+const ARCHETYP_INFO = Object.fromEntries(ARCHETYPEN);
 
 function Things({ springe, projekt, setProjekt }) {
   const [ordner, setOrdner] = useState([]);
@@ -1712,11 +1853,42 @@ function Things({ springe, projekt, setProjekt }) {
 
         {!meine.length && <p className="hint" style={{ marginTop: 12 }}>noch nichts. jede gute geschichte braucht personal.</p>}
 
+        {art === "person" && meine.some((x) => x.rolle) && (
+          <div className="besetzung">
+            <div className="ptitel">besetzung</div>
+            {ROLLEN.flatMap((g) => g.r).map(([r]) => {
+              const wer = meine.filter((x) => x.rolle === r);
+              if (!wer.length) return null;
+              return (
+                <div className="bz" key={r}>
+                  <span className="bzrolle">{r}</span><i />
+                  {wer.map((x) => (
+                    <button key={x.id} className="bzname" onClick={() => setOffen(x.id)}>
+                      {x.name || "unbenannt"}
+                      {x.archetyp && <em>{x.archetyp}</em>}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+            {meine.filter((x) => !x.rolle).length > 0 && (
+              <div className="bz frei">
+                <span className="bzrolle">ohne rolle</span><i />
+                {meine.filter((x) => !x.rolle).map((x) => (
+                  <button key={x.id} className="bzname" onClick={() => setOffen(x.id)}>{x.name || "unbenannt"}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div style={{ marginTop: 12 }}>
           {meine.map((th) => (
             <div className={"thing" + (offen === th.id ? " on" : "")} key={th.id}>
               <div className="thkopf" onClick={() => setOffen(offen === th.id ? null : th.id)}>
                 <span className="thname">{th.name || "unbenannt"}</span>
+                {th.rolle && <span className="throlle">{th.rolle}</span>}
+                {th.archetyp && <span className="tharch">{th.archetyp}</span>}
                 <span className="thsub">{th.steckbrief || "—"}</span>
                 <span className="chev">▾</span>
               </div>
@@ -1732,6 +1904,29 @@ function Things({ springe, projekt, setProjekt }) {
                       placeholder="kurz. wer oder was ist das?" />
                   </div>
                   {art === "person" && (
+                    <>
+                    <div className="row" style={{ marginTop: 12 }}>
+                      <div className="field">
+                        <label className="cap">rolle · was sie tut</label>
+                        <select className="ti" value={th.rolle || ""} onChange={(e) => feld(th, "rolle", e.target.value)}>
+                          <option value="">— keine rolle —</option>
+                          {ROLLEN.map((g) => (
+                            <optgroup key={g.g} label={g.g}>
+                              {g.r.map(([r]) => <option key={r} value={r}>{r}</option>)}
+                            </optgroup>
+                          ))}
+                        </select>
+                        {th.rolle && ROLLE_INFO[th.rolle] && <p className="hint">{ROLLE_INFO[th.rolle]}</p>}
+                      </div>
+                      <div className="field">
+                        <label className="cap">archetyp · wie sie ist</label>
+                        <select className="ti" value={th.archetyp || ""} onChange={(e) => feld(th, "archetyp", e.target.value)}>
+                          <option value="">— kein archetyp —</option>
+                          {ARCHETYPEN.map(([a]) => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                        {th.archetyp && <p className="hint">{ARCHETYP_INFO[th.archetyp]}</p>}
+                      </div>
+                    </div>
                     <div className="row" style={{ marginTop: 12 }}>
                       <div className="field">
                         <label className="cap">wants</label>
@@ -1744,6 +1939,7 @@ function Things({ springe, projekt, setProjekt }) {
                           placeholder="was sie braucht — und noch nicht weiß" />
                       </div>
                     </div>
+                    </>
                   )}
                   <div className="field" style={{ marginTop: 12 }}>
                     <label className="cap">notizen</label>
@@ -2045,6 +2241,9 @@ function Pausenschirm({ springe }) {
           </div>
 
           <div className="ppanel">
+            <div className="puhr">
+              {p2(jetzt.getHours())}:{p2(jetzt.getMinutes())}<i>:{p2(jetzt.getSeconds())}</i>
+            </div>
             <div className="ptitel">systemstatus</div>
             {ZEILEN.map(([k, v, warn]) => (
               <div className="pzeile" key={k}>
@@ -2052,9 +2251,6 @@ function Pausenschirm({ springe }) {
                 <span>{k}</span><i /><b className={warn || ""}>{v}</b>
               </div>
             ))}
-            <div className="puhr">
-              {p2(jetzt.getHours())}:{p2(jetzt.getMinutes())}<i>:{p2(jetzt.getSeconds())}</i>
-            </div>
           </div>
         </div>
 
@@ -2106,6 +2302,14 @@ export default function StricklieselApp() {
   // welches projekt gerade dran ist — teilen sich skripte und things
   const [projekt, setProjekt] = useState(() => { try { return localStorage.getItem("projekt") || ""; } catch { return ""; } });
   const setzeProjekt = (v) => { setProjekt(v); try { localStorage.setItem("projekt", v); } catch {} };
+
+  // text aus den skripten direkt ins textfeld der konsole
+  const zurKonsole = (txt) => {
+    setCfg((c) => ({ ...c, mode: "kette", ketteText: txt }));
+    A.current.kette = null; A.current.dur.kette = 0; // alte stimme passt nicht mehr
+    setTab("konsole");
+    setStatus({ t: "text aus den skripten übernommen — jetzt auf stimme erzeugen", c: "ok" });
+  };
   const [progName, setProgName] = useState("");
   const [progList, setProgList] = useState([]);
   const [progSel, setProgSel] = useState("");
@@ -2445,7 +2649,7 @@ export default function StricklieselApp() {
         {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "log" && <LogFiles />}
-        {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} />}
+        {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} kette={cfg.ketteText} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} />}
         {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} />}
         </Fehlerfang>
@@ -2834,6 +3038,7 @@ function Styles() {
   .seitenkopf{display:flex;align-items:center;gap:14px;margin:14px 0 14px}
   .seitenkopf .btn{padding:9px 16px;font-size:12.5px}
   .txtbtn{padding:9px 14px;font-size:12px;flex:0 0 auto;font-variant-numeric:tabular-nums}
+  .txtbtn.klein{padding:9px 11px}
   .ebadge{font-family:var(--term);font-size:11px;letter-spacing:.08em;flex:0 0 auto;
     color:var(--lvl);border:1px solid var(--lvl);border-radius:3px;padding:3px 7px;opacity:.75;cursor:default}
   .xfiles{flex:1;min-width:0;text-align:center;font-family:var(--term);font-size:15px;letter-spacing:.34em;
@@ -3016,20 +3221,20 @@ function Styles() {
     border-left:2px solid var(--line);padding:5px 0 5px 12px;margin-top:6px;transition:.2s}
   .kfrage.an{color:var(--muted);border-color:var(--green)}
   .kfrage b{color:var(--green);font-weight:400;padding-right:5px}
-  .pgrid{display:flex;flex-wrap:wrap;gap:22px}
-  .pradar{flex:0 0 auto;width:min(340px,100%);margin:0 auto}
+  .pgrid{display:flex;flex-wrap:wrap;gap:22px;align-items:stretch}
+  .pradar{flex:0 0 auto;width:min(340px,100%);margin:0 auto;display:flex;flex-direction:column}
   .rsvg{width:100%;display:block;filter:drop-shadow(0 0 6px rgba(53,255,111,.18))}
   .mitte-punkt{animation:blink 1.4s ease-in-out infinite}
   .rtext{font-family:var(--term);font-size:8px;fill:var(--muted);letter-spacing:.06em}
   .rhimmel{font-family:var(--term);font-size:9px;fill:var(--dim);text-anchor:middle;letter-spacing:.1em}
-  .rfuss{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+  .rfuss{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:8px;flex-wrap:wrap}
   .rfuss select{flex:0 0 auto;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;color:var(--green);
     font-family:var(--term);font-size:12px;letter-spacing:.1em;padding:5px 8px;cursor:pointer}
   .rfuss select:focus{outline:none;border-color:var(--line-hot)}
   .rradius{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em}
   .rfuss .status{font-size:10.5px}
 
-  .ppanel{flex:1 1 260px;min-width:0}
+  .ppanel{flex:1 1 260px;min-width:0;display:flex;flex-direction:column}
   .ptitel{font-family:var(--term);font-size:11px;letter-spacing:.24em;color:var(--green);
     text-shadow:var(--glow);margin-bottom:9px;text-transform:uppercase}
   .pzeile{display:flex;align-items:baseline;gap:7px;font-family:var(--term);font-size:12px;
@@ -3066,6 +3271,20 @@ function Styles() {
     border-radius:5px;padding:10px;margin-top:12px;overflow-x:auto;white-space:pre;line-height:1.5}
   .azeile{display:flex;gap:8px;margin-top:14px}
 
+  /* besetzung */
+  .besetzung{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:14px;margin-top:14px}
+  .bz{display:flex;align-items:baseline;gap:8px;padding:4px 0;flex-wrap:wrap}
+  .bzrolle{font-family:var(--term);font-size:11.5px;letter-spacing:.08em;color:var(--green);flex:0 0 auto}
+  .bz i{flex:1;border-bottom:1px dotted var(--line);opacity:.5;transform:translateY(-3px);min-width:20px}
+  .bzname{font-family:var(--mono);font-size:12.5px;background:transparent;border:0;color:var(--ink);
+    cursor:pointer;padding:0;flex:0 0 auto}
+  .bzname:hover{color:var(--green);text-shadow:var(--glow)}
+  .bzname em{font-style:normal;font-size:10.5px;color:var(--dim);padding-left:7px}
+  .bz.frei .bzrolle{color:var(--dim)}
+  .throlle{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--green);
+    border:1px solid var(--line-hot);border-radius:3px;padding:1px 6px;flex:0 0 auto}
+  .tharch{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--dim);flex:0 0 auto}
+
   /* handbuch */
   .handbuch{margin:14px 0 0;padding:16px;background:var(--panel-2);border:1px solid var(--line);
     border-radius:6px;max-height:66vh;overflow:auto;white-space:pre-wrap;word-break:break-word;
@@ -3097,7 +3316,17 @@ function Styles() {
   /* suche + tags */
   .suchzeile{display:flex;gap:8px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
   .suchzeile .btn{padding:9px 14px;font-size:12.5px;flex:0 0 auto}
-  .ti.tags{font-family:var(--term);letter-spacing:.06em;color:var(--green);flex:1 1 180px}
+  .ti.tags{font-family:var(--term);letter-spacing:.06em;color:var(--green);width:100%}
+  .tagfeld{position:relative;flex:1 1 180px;min-width:140px}
+  .tagliste{position:absolute;z-index:5;top:calc(100% + 5px);left:0;right:0;min-width:220px;
+    background:var(--panel);border:1px solid var(--line-hot);border-radius:5px;padding:7px;
+    box-shadow:0 8px 22px rgba(0,0,0,.6);display:flex;flex-wrap:wrap;gap:5px}
+  .taghinweis{flex:1 1 100%;font-family:var(--term);font-size:9.5px;letter-spacing:.1em;color:var(--dim);
+    margin-bottom:2px}
+  .tagvor{font-family:var(--term);font-size:11px;letter-spacing:.08em;background:var(--panel-2);
+    border:1px solid var(--line);color:var(--muted);border-radius:11px;padding:3px 10px;cursor:pointer;transition:.12s}
+  .tagvor:hover{border-color:var(--line-hot);color:var(--green)}
+  .tagvor.erst{border-color:var(--green-dim);color:var(--green)}
   .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
   .chip{font-family:var(--term);font-size:11px;letter-spacing:.08em;background:transparent;
     border:1px solid var(--line);color:var(--dim);border-radius:11px;padding:3px 10px;cursor:pointer;transition:.12s}
@@ -3141,10 +3370,16 @@ function Styles() {
   .cprio{font-family:var(--term);font-size:12px;color:var(--green);letter-spacing:.1em;
     border:1px solid var(--line-hot);border-radius:3px;padding:1px 6px}
   .cprojekt{flex:1;font-size:14px;color:var(--ink);min-width:120px}
+  .commit .chead{cursor:pointer}
+  .commit .chev{color:var(--green-mid);font-size:12px;transition:transform .15s;flex:0 0 auto}
+  .commit:not(.auf) .chev{transform:rotate(-90deg)}
   .cstatus{font-family:var(--term);font-size:10.5px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
   .cmeta{font-size:11.5px;color:var(--dim);margin-top:8px;line-height:1.6}
   .cmeta b{color:var(--muted);font-weight:400}
   .csig{font-family:var(--term);font-size:11px;letter-spacing:.14em;color:var(--green-dim);margin-top:6px}
+  .cfb{font-size:12.5px;color:var(--muted);line-height:1.6;margin-top:10px;white-space:pre-wrap;
+    border-left:2px solid var(--green-dim);padding-left:10px}
+  .cedit{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
   .crec{display:flex;gap:6px;margin-top:12px}
   .crec button{font-family:var(--mono);font-size:13px;background:var(--panel-2);border:1px solid var(--line);
     color:var(--muted);border-radius:4px;padding:6px 14px;cursor:pointer;transition:.12s;min-width:44px}
