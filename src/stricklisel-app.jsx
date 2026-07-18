@@ -1394,6 +1394,37 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
     laden();
   }
 
+  // ganzen zweig (skript + alle nachkommen) einem anderen projekt zuordnen
+  async function zweigVerschieben(s, zielOrdnerId) {
+    const ids = [s.id, ...nachkommen(s.id).map((x) => x.id)];
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/skripte?id=in.(${ids.join(",")})`, {
+        method: "PATCH", headers: { ...dbHeaders(getToken()), Prefer: "return=minimal" },
+        body: JSON.stringify({ ordner_id: zielOrdnerId || null }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setMsg({ t: "» " + ids.length + " szene" + (ids.length === 1 ? "" : "n") + " verschoben", c: "ok" });
+      laden();
+    } catch (e) { setMsg({ t: "» " + (e?.message || e), c: "err" }); }
+  }
+
+  // einzelnes skript duplizieren — kopie wird eigenständige wurzel, hängt an keinem baum
+  async function kopieren(s) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/skripte`, {
+        method: "POST", headers: { ...dbHeaders(getToken()), Prefer: "return=representation" },
+        body: JSON.stringify({
+          user_id: getUserId(), ordner_id: s.ordner_id || null, name: (s.name || "unbenannt") + " (kopie)",
+          hook: s.hook || "", bemerkung: s.bemerkung || "", matrix: s.matrix || leer9(), texte: s.texte || leer9(),
+          eltern_id: null, eltern_pos: null,
+        }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setMsg({ t: "» kopiert · als eigenes skript im selben projekt", c: "ok" });
+      laden();
+    } catch (e) { setMsg({ t: "» " + (e?.message || e), c: "err" }); }
+  }
+
   // aus einer position ein eigenes skript machen — der baum
   async function verzweigen(i) {
     if (!matrix[i].trim()) { setMsg({ t: "erst beschreiben, was an der position passiert", c: "err" }); return; }
@@ -1484,6 +1515,13 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
               {!doppelt && <span className="bsub">{sub}</span>}
             </button>
             <span className="bmeta">{gefuellt(s)}/8</span>
+            {tiefe === 0 && (
+              <select className="bmove" value="" onChange={(e) => { if (e.target.value) zweigVerschieben(s, e.target.value); e.target.value = ""; }}
+                title="ganzen zweig in ein anderes projekt verschieben">
+                <option value="" disabled>→ projekt</option>
+                {ordner.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+            )}
           </div>
           {offen && <Baum eltern={s.id} tiefe={tiefe + 1} />}
         </div>
@@ -1520,6 +1558,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
         </div>
         {id && (
           <div className="rezrow" style={{ marginTop: 8 }}>
+            <button className="btn" onClick={() => kopieren(alle.find((x) => x.id === id) || { id, name, hook, bemerkung, matrix, texte, ordner_id: skriptOrdner })}>⧉ kopieren</button>
             <button className="btn stop" onClick={() => loeschen(alle.find((x) => x.id === id) || { id, name })}>■ dieses skript löschen</button>
           </div>
         )}
@@ -3129,6 +3168,9 @@ function Styles() {
   .bhaupt:hover .bname{opacity:1;text-shadow:0 0 7px var(--lvl)}
   .bsub{flex:1;min-width:0;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .bmeta{font-family:var(--term);font-size:10px;color:var(--lvl,var(--green-dim));opacity:.6;flex:0 0 auto}
+  .bmove{font-family:var(--term);font-size:10px;letter-spacing:.05em;background:transparent;color:var(--dim);
+    border:1px solid var(--line);border-radius:4px;padding:2px 4px;flex:0 0 auto;cursor:pointer;max-width:96px}
+  .bmove:hover{color:var(--green);border-color:var(--line-hot)}
 
   .mx{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
   .zelle{position:relative;text-align:left;background:var(--panel);border:1px solid var(--line);
