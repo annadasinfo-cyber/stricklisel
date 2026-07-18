@@ -502,8 +502,10 @@ function AutoTa({ value, onChange, ...rest }) {
   const anpassen = () => {
     const el = ref.current;
     if (!el) return;
+    const y = window.scrollY;
     el.style.height = "auto";
     el.style.height = el.scrollHeight + 2 + "px";
+    window.scrollTo(0, y);
   };
   useEffect(anpassen, [value]);
   useEffect(() => { const f = () => anpassen(); addEventListener("resize", f); return () => removeEventListener("resize", f); }, []);
@@ -777,6 +779,8 @@ function Abteilung17b({ say }) {
     return d < 0 ? "ziel überschritten" : d === 0 ? "ziel heute" : "noch " + d + " tage";
   };
 
+  const sortiert = [...liste].sort((a, b) => a.prioritaet - b.prioritaet);
+
   return (
     <>
       <div className="grouphead">NEUER COMMIT<span className="rule" /></div>
@@ -828,7 +832,7 @@ function Abteilung17b({ say }) {
 
       {!liste.length && <p className="hint" style={{ marginLeft: 4 }}>noch kein commit. aura3 definiert keine ziele.</p>}
 
-      {liste.map((c) => (
+      {sortiert.map((c) => (
         <div className={"commit " + c.status + (offen === c.id ? " auf" : "")} key={c.id}>
           <div className="chead" onClick={() => setOffen(offen === c.id ? null : c.id)}>
             <span className={"cdot " + c.status} />
@@ -3029,9 +3033,9 @@ function Styles() {
 
   /* tabs unterm skope */
   .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
-  .tabs button{flex:1 1 0;min-width:0;font-family:var(--term);font-size:13px;letter-spacing:.1em;background:transparent;
+  .tabs button{flex:0 1 auto;min-width:0;font-family:var(--term);font-size:13px;letter-spacing:.1em;background:transparent;
     border:1px solid var(--line);border-bottom:0;border-radius:5px 5px 0 0;color:var(--dim);
-    padding:9px 8px;cursor:pointer;transition:.12s;position:relative;top:1px;
+    padding:9px 12px;cursor:pointer;transition:.12s;position:relative;top:1px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tabs button:hover{color:var(--green)}
   .tabs button[aria-pressed="true"]{background:var(--panel);color:var(--green);
