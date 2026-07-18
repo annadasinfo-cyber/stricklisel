@@ -1850,21 +1850,17 @@ function Things({ springe, projekt, setProjekt }) {
 
         {art === "besetzung" ? (
           <div className="besetzung" style={{ marginTop: 14 }}>
-            {!alleBesetzung.some((x) => x.rolle) && (
-              <p className="hint">noch keine rolle vergeben — bei den personen zuteilen.</p>
-            )}
             {ROLLEN.flatMap((g) => g.r).map(([r]) => {
               const wer = alleBesetzung.filter((x) => x.rolle === r);
-              if (!wer.length) return null;
               return (
-                <div className="bz" key={r}>
+                <div className={"bz" + (wer.length ? "" : " frei")} key={r}>
                   <span className="bzrolle">{r}</span><i />
-                  {wer.map((x) => (
+                  {wer.length ? wer.map((x) => (
                     <button key={x.id} className="bzname" onClick={() => { setArt("person"); setOffen(x.id); }}>
                       {x.name || "unbenannt"}
                       {x.archetyp && <em>{x.archetyp}</em>}
                     </button>
-                  ))}
+                  )) : <span className="bzname bzfrei">nicht besetzt</span>}
                 </div>
               );
             })}
@@ -3290,6 +3286,8 @@ function Styles() {
   .bzname:hover{color:var(--green);text-shadow:var(--glow)}
   .bzname em{font-style:normal;font-size:10.5px;color:var(--dim);padding-left:7px}
   .bz.frei .bzrolle{color:var(--dim)}
+  .bzname.bzfrei{color:var(--dim);cursor:default;font-style:italic}
+  .bzname.bzfrei:hover{color:var(--dim);text-shadow:none}
   .throlle{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--green);
     border:1px solid var(--line-hot);border-radius:3px;padding:1px 6px;flex:0 0 auto}
   .tharch{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--dim);flex:0 0 auto}
