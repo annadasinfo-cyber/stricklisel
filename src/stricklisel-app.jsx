@@ -1680,6 +1680,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
 // THINGS · personen, orte, dinge
 // ============================================================
 const ARTEN = [
+  { v: "besetzung", t: "besetzung", ein: "" },
   { v: "person", t: "personen", ein: "person" },
   { v: "ort", t: "orte", ein: "ort" },
   { v: "ding", t: "dinge", ein: "ding" },
@@ -1827,6 +1828,7 @@ function Things({ springe, projekt, setProjekt }) {
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
 
+  const alleBesetzung = liste.filter((x) => x.art === "person" && (aktOrdner ? x.ordner_id === aktOrdner : true));
   const meine = liste.filter((x) => x.art === art && (aktOrdner ? x.ordner_id === aktOrdner : true));
   const einzahl = ARTEN.find((a) => a.v === art)?.ein || "ding";
 
@@ -1846,24 +1848,19 @@ function Things({ springe, projekt, setProjekt }) {
           <Seg value={art} onChange={setArt} options={ARTEN.map((a) => ({ v: a.v, t: a.t }))} />
         </div>
 
-        <div className="actions" style={{ marginTop: 14 }}>
-          <button className="btn primary" onClick={neu}>+ {einzahl}</button>
-          <span className={"status " + msg.c}>{msg.t}</span>
-        </div>
-
-        {!meine.length && <p className="hint" style={{ marginTop: 12 }}>noch nichts. jede gute geschichte braucht personal.</p>}
-
-        {art === "person" && meine.some((x) => x.rolle) && (
-          <div className="besetzung">
-            <div className="ptitel">besetzung</div>
+        {art === "besetzung" ? (
+          <div className="besetzung" style={{ marginTop: 14 }}>
+            {!alleBesetzung.some((x) => x.rolle) && (
+              <p className="hint">noch keine rolle vergeben — bei den personen zuteilen.</p>
+            )}
             {ROLLEN.flatMap((g) => g.r).map(([r]) => {
-              const wer = meine.filter((x) => x.rolle === r);
+              const wer = alleBesetzung.filter((x) => x.rolle === r);
               if (!wer.length) return null;
               return (
                 <div className="bz" key={r}>
                   <span className="bzrolle">{r}</span><i />
                   {wer.map((x) => (
-                    <button key={x.id} className="bzname" onClick={() => setOffen(x.id)}>
+                    <button key={x.id} className="bzname" onClick={() => { setArt("person"); setOffen(x.id); }}>
                       {x.name || "unbenannt"}
                       {x.archetyp && <em>{x.archetyp}</em>}
                     </button>
@@ -1871,19 +1868,28 @@ function Things({ springe, projekt, setProjekt }) {
                 </div>
               );
             })}
-            {meine.filter((x) => !x.rolle).length > 0 && (
+            {alleBesetzung.filter((x) => !x.rolle).length > 0 && (
               <div className="bz frei">
                 <span className="bzrolle">ohne rolle</span><i />
-                {meine.filter((x) => !x.rolle).map((x) => (
-                  <button key={x.id} className="bzname" onClick={() => setOffen(x.id)}>{x.name || "unbenannt"}</button>
+                {alleBesetzung.filter((x) => !x.rolle).map((x) => (
+                  <button key={x.id} className="bzname" onClick={() => { setArt("person"); setOffen(x.id); }}>{x.name || "unbenannt"}</button>
                 ))}
               </div>
             )}
           </div>
+        ) : (
+          <>
+            <div className="actions" style={{ marginTop: 14 }}>
+              <button className="btn primary" onClick={neu}>+ {einzahl}</button>
+              <span className={"status " + msg.c}>{msg.t}</span>
+            </div>
+
+            {!meine.length && <p className="hint" style={{ marginTop: 12 }}>noch nichts. jede gute geschichte braucht personal.</p>}
+          </>
         )}
 
         <div style={{ marginTop: 12 }}>
-          {meine.map((th) => (
+          {art !== "besetzung" && meine.map((th) => (
             <div className={"thing" + (offen === th.id ? " on" : "")} key={th.id}>
               <div className="thkopf" onClick={() => setOffen(offen === th.id ? null : th.id)}>
                 <span className="thname">{th.name || "unbenannt"}</span>
@@ -3235,6 +3241,9 @@ function Styles() {
   .rfuss .status{font-size:10.5px}
 
   .ppanel{flex:1 1 260px;min-width:0;display:flex;flex-direction:column}
+  .puhr{font-family:var(--term);color:var(--green);text-shadow:var(--glow);letter-spacing:.08em;
+    font-variant-numeric:tabular-nums;line-height:1;font-size:clamp(30px,4.4vw,46px);margin-bottom:16px}
+  .puhr i{font-style:normal;opacity:.42;font-size:.68em}
   .ptitel{font-family:var(--term);font-size:11px;letter-spacing:.24em;color:var(--green);
     text-shadow:var(--glow);margin-bottom:9px;text-transform:uppercase}
   .pzeile{display:flex;align-items:baseline;gap:7px;font-family:var(--term);font-size:12px;
