@@ -3016,9 +3016,9 @@ function Styles() {
   }
   *{box-sizing:border-box}
   html,body{margin:0}
-  html{overflow-x:hidden}
+  html{overflow-x:clip}
   body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:14px;
-    line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden;max-width:100vw}
+    line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:clip;max-width:100vw}
   #rain{position:fixed;inset:0;z-index:0;opacity:.38;pointer-events:none}
   .wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:26px 18px 90px}
 
