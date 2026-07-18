@@ -636,7 +636,12 @@ function Rain() {
       }
     };
     timer = setInterval(draw, 70);
-    return () => { clearInterval(timer); removeEventListener("resize", rs); };
+    const onVis = () => {
+      if (document.hidden) { clearInterval(timer); timer = null; }
+      else if (!timer) { timer = setInterval(draw, 70); }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { clearInterval(timer); removeEventListener("resize", rs); document.removeEventListener("visibilitychange", onVis); };
   }, []);
   return <canvas id="rain" ref={ref} />;
 }
@@ -645,12 +650,11 @@ function Scope({ analyser, ctxRef }) {
   const ref = useRef(null);
   useEffect(() => {
     const cv = ref.current, cx = cv.getContext("2d");
-    let raf;
+    let raf, sichtbar = true;
     const size = () => { const r = cv.getBoundingClientRect(), dpr = devicePixelRatio || 1; cv.width = r.width * dpr; cv.height = r.height * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0); };
     size(); addEventListener("resize", size);
     const idle = () => { const w = cv.clientWidth, h = cv.clientHeight; cx.clearRect(0, 0, w, h); cx.strokeStyle = "rgba(53,255,111,.12)"; cx.beginPath(); cx.moveTo(0, h - 1); cx.lineTo(w, h - 1); cx.stroke(); };
-    const loop = () => {
-      raf = requestAnimationFrame(loop);
+    const zeichnen = () => {
       const an = analyser.current;
       if (!an || !ctxRef.current) { idle(); return; }
       const n = an.frequencyBinCount, data = new Uint8Array(n);
@@ -667,8 +671,18 @@ function Scope({ analyser, ctxRef }) {
       cx.strokeStyle = "rgba(180,255,205,.3)"; cx.setLineDash([3, 4]);
       cx.beginPath(); cx.moveTo(mx, 0); cx.lineTo(mx, h); cx.stroke(); cx.setLineDash([]);
     };
-    loop();
-    return () => { cancelAnimationFrame(raf); removeEventListener("resize", size); };
+    const loop = () => {
+      if (!sichtbar || document.hidden) { raf = null; return; }
+      zeichnen();
+      raf = requestAnimationFrame(loop);
+    };
+    const starten = () => { if (!raf) raf = requestAnimationFrame(loop); };
+    const obs = new IntersectionObserver(([entry]) => { sichtbar = entry.isIntersecting; if (sichtbar) starten(); else idle(); }, { threshold: 0 });
+    obs.observe(cv);
+    const onVis = () => { if (!document.hidden) starten(); };
+    document.addEventListener("visibilitychange", onVis);
+    starten();
+    return () => { if (raf) cancelAnimationFrame(raf); obs.disconnect(); removeEventListener("resize", size); document.removeEventListener("visibilitychange", onVis); };
   }, [analyser, ctxRef]);
   return (
     <div className="scope">
@@ -3006,7 +3020,7 @@ function Styles() {
   body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:14px;
     line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden;max-width:100vw}
   #rain{position:fixed;inset:0;z-index:0;opacity:.38;pointer-events:none}
-  .wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:26px 18px 90px;overflow-x:hidden}
+  .wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:26px 18px 90px}
 
   .wordmark{font-family:var(--term);font-size:clamp(30px,6.2vw,52px);letter-spacing:.14em;
     color:var(--green);text-shadow:var(--glow);line-height:1;display:flex;align-items:center;flex-wrap:wrap}
@@ -3027,6 +3041,9 @@ function Styles() {
 
   .scope{margin:16px 0 6px;border:1px solid var(--line);border-radius:6px;
     background:linear-gradient(180deg,#07130c,#050b07);overflow:hidden;position:relative}
+  @media(min-width:641px){
+    .scope{position:sticky;top:0;z-index:5;box-shadow:0 8px 18px -6px rgba(0,0,0,.55)}
+  }
   #spectrum{display:block;width:100%;height:118px}
   .scope-lbl{position:absolute;top:8px;left:12px;font-family:var(--term);font-size:11px;letter-spacing:.14em;color:var(--dim)}
   .scope-ultra{position:absolute;bottom:7px;right:12px;font-family:var(--term);font-size:10.5px;color:var(--green);letter-spacing:.06em}
