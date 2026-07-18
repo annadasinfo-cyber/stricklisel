@@ -473,6 +473,29 @@ function encodeWav(buf) {
 // ============================================================
 // BAUTEILE
 // ============================================================
+
+// Stürzt ein reiter ab, wird die seite sonst einfach weiß und sagt nichts.
+class Fehlerfang extends React.Component {
+  constructor(p) { super(p); this.state = { fehler: null }; }
+  static getDerivedStateFromError(e) { return { fehler: e }; }
+  componentDidCatch(e, info) { console.error("[stricklisel]", e, info); }
+  render() {
+    if (!this.state.fehler) return this.props.children;
+    const f = this.state.fehler;
+    return (
+      <div className="absturz">
+        <div className="atitel">▲ hier ist was gekippt</div>
+        <div className="atext">{String(f?.message || f)}</div>
+        {f?.stack && <pre className="astack">{String(f.stack).split("\n").slice(0, 6).join("\n")}</pre>}
+        <div className="azeile">
+          <button className="btn" onClick={() => this.setState({ fehler: null })}>↺ nochmal</button>
+          <button className="btn" onClick={() => location.reload()}>↻ seite neu laden</button>
+        </div>
+        <p className="hint">schick anni@claude den text hier oben — dann weiß ich, wo's klemmt.</p>
+      </div>
+    );
+  }
+}
 // Wächst mit dem text mit — man soll seine 200 wörter sehen, nicht scrollen.
 function AutoTa({ value, onChange, ...rest }) {
   const ref = useRef(null);
@@ -817,6 +840,7 @@ function Abteilung17b({ say }) {
 // LOG-FILES · Operator-Logbuch
 // ============================================================
 const ZIEL_WOERTER = 750;
+const HALB_WOERTER = 500; // zwei drittel — ab hier hat der tag geliefert
 const zaehleWoerter = (t) => (t.trim() ? t.trim().split(/\s+/).filter(Boolean).length : 0);
 const WOCHENTAG = ["sonntag", "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag"];
 // "#idee, reaktor #glow" -> ["idee","reaktor","glow"]
@@ -856,6 +880,7 @@ function MonatsGitter({ liste, datum, setDatum, monat, setMonat, children }) {
           const zukunft = d > heuteS;
           const cls = ["kasten"];
           if (w >= ZIEL_WOERTER) cls.push("voll");
+          else if (w >= HALB_WOERTER) cls.push("halb");
           else if (w > 0) cls.push("teil");
           if (d === datum) cls.push("gewaehlt");
           if (d === heuteS) cls.push("heute");
@@ -1002,12 +1027,12 @@ function LogFiles() {
           {datum !== heute() && <button className="btn" onClick={() => setDatum(heute())}>↺ heute</button>}
         </div>
 
-        <textarea className="ta log" value={text}
+        <AutoTa className="ta log" value={text}
           onChange={(e) => { setText(e.target.value); setDirty(true); }}
           placeholder={"> operator log\n> " + d.toLocaleDateString("de-DE") + "\n> was heute durch den reaktor ging …"} />
 
         <div className="logfoot">
-          <div className="logbar"><i style={{ width: Math.min(100, (w / ZIEL_WOERTER) * 100) + "%" }} className={voll ? "voll" : ""} /></div>
+          <div className="logbar"><i style={{ width: Math.min(100, (w / ZIEL_WOERTER) * 100) + "%" }} className={voll ? "voll" : w >= HALB_WOERTER ? "halb" : ""} /></div>
           <div className={"wcount" + (voll ? " voll" : "")}>
             {voll ? <>✓ {w} wörter · mission completed</> : <>{w} <span className="wziel">/ {ZIEL_WOERTER} wörter</span></>}
           </div>
@@ -1250,8 +1275,18 @@ function Skripte({ sprung, setSprung, projekt, setProjekt }) {
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); return null; }
   }
 
+  // wie viele hängen dran? (kinder, enkel, urenkel …)
+  function nachkommen(pid, tiefe = 0) {
+    if (tiefe > 12) return [];
+    const k = alle.filter((x) => x.eltern_id === pid);
+    return k.concat(...k.map((x) => nachkommen(x.id, tiefe + 1)));
+  }
   async function loeschen(s) {
-    if (!confirm(`skript „${s.name}" löschen?`)) return;
+    const n = nachkommen(s.id).length;
+    const frage = n
+      ? `skript „${s.name}" löschen?\n\nachtung: ${n} zweig${n === 1 ? "" : "e"} darunter ${n === 1 ? "wird" : "werden"} mitgelöscht.`
+      : `skript „${s.name}" löschen?`;
+    if (!confirm(frage)) return;
     await fetch(`${SUPABASE_URL}/rest/v1/skripte?id=eq.${s.id}`, { method: "DELETE", headers: dbHeaders(getToken()) });
     if (s.id === id) neu();
     laden();
@@ -1849,10 +1884,11 @@ function Pausenschirm({ springe }) {
   const [commits, setCommits] = useState(0);
   const [uptime, setUptime] = useState(0);
   const [buecher, setBuecher] = useState([]);
+  const [jetzt, setJetzt] = useState(new Date());
   const startRef = useRef(Date.now());
 
   useEffect(() => {
-    const iv = setInterval(() => setUptime(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
+    const iv = setInterval(() => { setUptime(Math.floor((Date.now() - startRef.current) / 1000)); setJetzt(new Date()); }, 1000);
     return () => clearInterval(iv);
   }, []);
 
@@ -1927,13 +1963,15 @@ function Pausenschirm({ springe }) {
   const up = p2(Math.floor(uptime / 3600)) + ":" + p2(Math.floor((uptime % 3600) / 60)) + ":" + p2(uptime % 60);
   const R = 150; // radar-radius in px
 
+  // jede zeile hat einen grün pulsierenden punkt. nur 17b kann kippen:
+  // alle drei prioritätsplätze belegt = grün, sonst gelb.
   const ZEILEN = [
     ["deflektor", "aktiv"],
     ["reaktor", "aktiv"],
     ["am_enhancer", "1 : 3"],
     ["golden_glow", "pulsiert"],
     ["body_floor", "gesichert"],
-    ["modul 17b", commits + " commit" + (commits === 1 ? "" : "s") + " aktiv"],
+    ["modul 17b", commits + " von 3 aktiv", commits >= 3 ? "" : "gelb"],
     ["loop", "läuft"],
     ["uptime", up],
   ];
@@ -2008,9 +2046,15 @@ function Pausenschirm({ springe }) {
 
           <div className="ppanel">
             <div className="ptitel">systemstatus</div>
-            {ZEILEN.map(([k, v]) => (
-              <div className="pzeile" key={k}><span>{k}</span><i /><b>{v}</b></div>
+            {ZEILEN.map(([k, v, warn]) => (
+              <div className="pzeile" key={k}>
+                <span className={"ppunkt " + (warn || "")} />
+                <span>{k}</span><i /><b className={warn || ""}>{v}</b>
+              </div>
             ))}
+            <div className="puhr">
+              {p2(jetzt.getHours())}:{p2(jetzt.getMinutes())}<i>:{p2(jetzt.getSeconds())}</i>
+            </div>
           </div>
         </div>
 
@@ -2391,18 +2435,20 @@ export default function StricklieselApp() {
           <button aria-pressed={tab === "handbuch"} onClick={() => setTab("handbuch")}>handbuch</button>
           <button aria-pressed={tab === "konsole"} onClick={() => setTab("konsole")}>konsole</button>
           <button aria-pressed={tab === "17b"} onClick={() => setTab("17b")}>abteilung 17b</button>
+          <button aria-pressed={tab === "think"} onClick={() => setTab("think")}>denkbrett</button>
           <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
           <button aria-pressed={tab === "skripte"} onClick={() => setTab("skripte")}>skripte</button>
           <button aria-pressed={tab === "things"} onClick={() => setTab("things")}>things</button>
-          <button aria-pressed={tab === "think"} onClick={() => setTab("think")}>denkbrett</button>
         </div>
 
+        <Fehlerfang key={tab}>
         {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "log" && <LogFiles />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} />}
         {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} />}
+        </Fehlerfang>
 
         {tab === "konsole" && <>
         <Panel title="PROTOKOLLE" sub="einstellungen & texte · gerätübergreifend">
@@ -2759,9 +2805,10 @@ function Styles() {
 
   /* tabs unterm skope */
   .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
-  .tabs button{font-family:var(--term);font-size:13px;letter-spacing:.14em;background:transparent;
+  .tabs button{flex:1 1 0;min-width:0;font-family:var(--term);font-size:13px;letter-spacing:.1em;background:transparent;
     border:1px solid var(--line);border-bottom:0;border-radius:5px 5px 0 0;color:var(--dim);
-    padding:9px 18px;cursor:pointer;transition:.12s;position:relative;top:1px}
+    padding:9px 8px;cursor:pointer;transition:.12s;position:relative;top:1px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tabs button:hover{color:var(--green)}
   .tabs button[aria-pressed="true"]{background:var(--panel);color:var(--green);
     border-color:var(--line-hot);text-shadow:var(--glow)}
@@ -2942,7 +2989,7 @@ function Styles() {
   .bknr{position:absolute;top:9px;right:11px;font-family:var(--term);font-size:10px;color:var(--green-dim);letter-spacing:.1em}
   .bkname{font-family:var(--term);font-size:12px;letter-spacing:.12em;color:var(--green);
     text-shadow:var(--glow);margin-bottom:7px;padding-right:22px}
-  .bkmain{font-size:12.5px;color:var(--ink);line-height:1.55;
+  .bkmain{font-size:12.5px;color:var(--muted);line-height:1.55;
     display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
   .bkhook{font-size:11px;color:var(--dim);font-style:italic;margin-top:7px;
     border-left:2px solid var(--green-dim);padding-left:8px}
@@ -2985,8 +3032,12 @@ function Styles() {
   .ppanel{flex:1 1 260px;min-width:0}
   .ptitel{font-family:var(--term);font-size:11px;letter-spacing:.24em;color:var(--green);
     text-shadow:var(--glow);margin-bottom:9px;text-transform:uppercase}
-  .pzeile{display:flex;align-items:baseline;gap:6px;font-family:var(--term);font-size:12px;
+  .pzeile{display:flex;align-items:baseline;gap:7px;font-family:var(--term);font-size:12px;
     letter-spacing:.06em;padding:3px 0}
+  .ppunkt{width:6px;height:6px;border-radius:50%;flex:0 0 auto;background:var(--green);
+    box-shadow:0 0 6px rgba(53,255,111,.7);animation:puls 2s ease-in-out infinite;transform:translateY(-1px)}
+  .ppunkt.gelb{background:var(--amber);box-shadow:0 0 6px rgba(224,178,106,.7)}
+  .pzeile b.gelb{color:var(--amber)}
   .pzeile span{color:var(--dim);flex:0 0 auto}
   .pzeile i{flex:1;border-bottom:1px dotted var(--line);opacity:.6;transform:translateY(-3px)}
   .pzeile b{color:var(--muted);font-weight:400;flex:0 0 auto;font-variant-numeric:tabular-nums}
@@ -3006,6 +3057,14 @@ function Styles() {
   .pdist{color:var(--green-dim);flex:0 0 48px;text-align:right;font-variant-numeric:tabular-nums}
   .pfuss{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em;
     text-align:center;margin-top:18px;padding-top:12px;border-top:1px dashed var(--line)}
+
+  /* fehlerfang */
+  .absturz{background:var(--panel);border:1px solid var(--danger);border-radius:6px;padding:20px;margin-top:14px}
+  .atitel{font-family:var(--term);font-size:14px;letter-spacing:.16em;color:var(--danger);margin-bottom:10px}
+  .atext{font-size:13px;color:var(--ink);line-height:1.6;word-break:break-word}
+  .astack{font-size:10.5px;color:var(--dim);background:var(--void);border:1px solid var(--line);
+    border-radius:5px;padding:10px;margin-top:12px;overflow-x:auto;white-space:pre;line-height:1.5}
+  .azeile{display:flex;gap:8px;margin-top:14px}
 
   /* handbuch */
   .handbuch{margin:14px 0 0;padding:16px;background:var(--panel-2);border:1px solid var(--line);
@@ -3029,6 +3088,7 @@ function Styles() {
     border:1px solid var(--line);background:transparent}
   .kasten:hover:not(:disabled){border-color:var(--line-hot)}
   .kasten.teil{border-color:var(--green-mid);box-shadow:inset 0 0 8px rgba(53,255,111,.4),0 0 5px rgba(53,255,111,.25)}
+  .kasten.halb{background:var(--amber);border-color:var(--amber);box-shadow:0 0 8px rgba(224,178,106,.55)}
   .kasten.voll{background:var(--green);border-color:var(--green);box-shadow:var(--glow)}
   .kasten.heute{outline:1px dotted var(--green-mid);outline-offset:2px}
   .kasten.gewaehlt{outline:1px solid var(--green);outline-offset:3px}
@@ -3055,10 +3115,11 @@ function Styles() {
   .twoerter{font-family:var(--term);font-size:10.5px;color:var(--green-dim);flex:0 0 auto}
 
   /* log-files */
-  .ta.log{min-height:340px;font-size:13.5px;line-height:1.65}
+  .ta.log{min-height:340px;font-size:13.5px;line-height:1.65;overflow:hidden;resize:none}
   .logfoot{display:flex;align-items:center;gap:14px;margin-top:8px}
   .logbar{flex:1;height:2px;background:var(--line);overflow:hidden}
   .logbar i{display:block;height:100%;background:var(--green-mid);transition:width .3s}
+  .logbar i.halb{background:var(--amber);box-shadow:0 0 8px rgba(224,178,106,.5)}
   .logbar i.voll{background:var(--white);box-shadow:0 0 10px var(--green)}
   .wcount{font-family:var(--term);font-size:12.5px;color:var(--muted);letter-spacing:.08em;
     white-space:nowrap;font-variant-numeric:tabular-nums;transition:.3s}
