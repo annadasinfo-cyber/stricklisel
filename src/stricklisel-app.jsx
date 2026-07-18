@@ -1850,27 +1850,45 @@ function Things({ springe, projekt, setProjekt }) {
 
         {art === "besetzung" ? (
           <div className="besetzung" style={{ marginTop: 14 }}>
-            {ROLLEN.flatMap((g) => g.r).map(([r]) => {
-              const wer = alleBesetzung.filter((x) => x.rolle === r);
-              return (
-                <div className={"bz" + (wer.length ? "" : " frei")} key={r}>
-                  <span className="bzrolle">{r}</span><i />
-                  {wer.length ? wer.map((x) => (
-                    <button key={x.id} className="bzname" onClick={() => { setArt("person"); setOffen(x.id); }}>
-                      {x.name || "unbenannt"}
-                      {x.archetyp && <em>{x.archetyp}</em>}
-                    </button>
-                  )) : <span className="bzname bzfrei">nicht besetzt</span>}
+            {ROLLEN.map((g) => (
+              <div key={g.g}>
+                <div className="divider">{g.g}</div>
+                <div className="bzgrid">
+                  {g.r.map(([r, info]) => {
+                    const wer = alleBesetzung.filter((x) => x.rolle === r);
+                    return (
+                      <div className={"bzkarte" + (wer.length ? "" : " frei")} key={r}>
+                        <div className="bzkopf">
+                          <span className="bzrolle">{r}</span>
+                          {wer.length
+                            ? wer.map((x) => (
+                                <button key={x.id} className="bzname" onClick={() => { setArt("person"); setOffen(x.id); }}>
+                                  {x.name || "unbenannt"}
+                                  {x.archetyp && <em>{x.archetyp}</em>}
+                                </button>
+                              ))
+                            : <span className="bzname bzfrei">nicht besetzt</span>}
+                        </div>
+                        {info && <p className="bzinfo">{info}</p>}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-            {alleBesetzung.filter((x) => !x.rolle).length > 0 && (
-              <div className="bz frei">
-                <span className="bzrolle">ohne rolle</span><i />
-                {alleBesetzung.filter((x) => !x.rolle).map((x) => (
-                  <button key={x.id} className="bzname" onClick={() => { setArt("person"); setOffen(x.id); }}>{x.name || "unbenannt"}</button>
-                ))}
               </div>
+            ))}
+            {alleBesetzung.filter((x) => !x.rolle).length > 0 && (
+              <>
+                <div className="divider">ohne rolle</div>
+                <div className="bzgrid">
+                  <div className="bzkarte frei">
+                    <div className="bzkopf">
+                      {alleBesetzung.filter((x) => !x.rolle).map((x) => (
+                        <button key={x.id} className="bzname" onClick={() => { setArt("person"); setOffen(x.id); }}>{x.name || "unbenannt"}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         ) : (
@@ -3288,6 +3306,13 @@ function Styles() {
   .bz.frei .bzrolle{color:var(--dim)}
   .bzname.bzfrei{color:var(--dim);cursor:default;font-style:italic}
   .bzname.bzfrei:hover{color:var(--dim);text-shadow:none}
+  .bzgrid{display:flex;flex-direction:column;gap:10px;margin-bottom:6px}
+  .bzkarte{border:1px solid var(--line);border-radius:7px;background:var(--panel-2);padding:13px 15px;transition:.15s}
+  .bzkarte:not(.frei):hover{border-color:var(--line-hot)}
+  .bzkarte.frei{border-style:dashed}
+  .bzkopf{display:flex;align-items:center;flex-wrap:wrap;gap:11px}
+  .bzkarte .bzrolle{font-size:13px}
+  .bzinfo{font-size:12px;color:var(--muted);line-height:1.55;margin-top:9px;padding-top:9px;border-top:1px dotted var(--line)}
   .throlle{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--green);
     border:1px solid var(--line-hot);border-radius:3px;padding:1px 6px;flex:0 0 auto}
   .tharch{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--dim);flex:0 0 auto}
