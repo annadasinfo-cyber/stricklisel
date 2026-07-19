@@ -26,7 +26,9 @@ const supabase = (() => {
           const s = JSON.parse(localStorage.getItem("sb_session") || "null");
           if (!s || !s.access_token) return null;
           const payload = JSON.parse(atob(s.access_token.split(".")[1]));
-          if (payload.exp && payload.exp < Date.now() / 1000) return null;
+          // offline lässt sich eh nicht verifizieren — lieber reinlassen als aussperren,
+          // ohne netz kann man sich sowieso nicht neu einloggen.
+          if (payload.exp && payload.exp < Date.now() / 1000 && navigator.onLine) return null;
           return s;
         } catch { localStorage.removeItem("sb_session"); return null; }
       },
@@ -61,10 +63,19 @@ const offQueue = () => { try { return JSON.parse(localStorage.getItem("off:queue
 const offQueueSetzen = (q) => { try { localStorage.setItem("off:queue", JSON.stringify(q)); } catch {} };
 const offAusstehend = () => offQueue().length;
 
+// fetch mit zeitgrenze — navigator.onLine lügt manchmal ("online" trotz totem netz),
+// ohne das hier würde ein hängender request die app minutenlang blockieren.
+async function fetchZeit(url, options = {}, ms = 5000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { ...options, signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
+
 // liest per netz, cached lokal · bei fehler (offline) letzten bekannten stand liefern
 async function dbGet(cacheKey, url) {
   try {
-    const r = await fetch(url, { headers: dbHeaders(getToken()) });
+    const r = await fetchZeit(url, { headers: dbHeaders(getToken()) });
     if (!r.ok) throw new Error(await r.text());
     const d = await r.json();
     offSchreibenCache(cacheKey, d);
@@ -84,7 +95,7 @@ async function dbSchreiben(methode, url, body, opts = {}) {
   const op = { methode, url, body: body || null, prefer, t: Date.now() };
   if (navigator.onLine) {
     try {
-      const r = await fetch(url, { method: methode, headers: { ...dbHeaders(getToken()), Prefer: prefer }, body: body ? JSON.stringify(body) : undefined });
+      const r = await fetchZeit(url, { method: methode, headers: { ...dbHeaders(getToken()), Prefer: prefer }, body: body ? JSON.stringify(body) : undefined });
       if (!r.ok) throw new Error(await r.text());
       if (prefer.includes("representation")) { try { return { ok: true, data: await r.json() }; } catch { return { ok: true, data: null }; } }
       return { ok: true, data: null };
@@ -103,7 +114,7 @@ async function offSyncJetzt() {
   const rest = [];
   for (const op of q) {
     try {
-      const r = await fetch(op.url, { method: op.methode, headers: { ...dbHeaders(getToken()), Prefer: op.prefer || "return=minimal" }, body: op.body ? JSON.stringify(op.body) : undefined });
+      const r = await fetchZeit(op.url, { method: op.methode, headers: { ...dbHeaders(getToken()), Prefer: op.prefer || "return=minimal" }, body: op.body ? JSON.stringify(op.body) : undefined });
       if (!r.ok) rest.push(op);
     } catch { rest.push(op); }
   }
@@ -825,7 +836,7 @@ function Abteilung17b({ say }) {
     const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/commits`, neuC);
     setMsg({ t: ok ? "» command accepted · commit aktiv · priorität " + prio : "» offline — wird nachgesendet, sobald wieder netz da ist", c: ok ? "ok" : "work" });
     setProjekt(""); setSig(""); setZiel(""); setParam(PARAM_STD); setStart(heute());
-    laden();
+    if (ok) laden();
   }
 
   // priorität und feedback ändern — still gespeichert
@@ -843,14 +854,14 @@ function Abteilung17b({ say }) {
     setListe((l) => l.map((x) => (x.id === c.id ? { ...x, status } : x)));
     const { ok } = await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/commits?id=eq.${c.id}`, { status, updated_at: new Date().toISOString() });
     setMsg({ t: "» " + (ok ? wort : wort + " · offline, folgt noch") + " · " + c.projekt, c: ok ? "ok" : "work" });
-    laden();
+    if (ok) laden();
   }
 
   async function loeschen(c) {
     if (!confirm(`„${c.projekt}" aus dem archiv löschen?`)) return;
     setListe((l) => l.filter((x) => x.id !== c.id));
-    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/commits?id=eq.${c.id}`);
-    laden();
+    const { ok } = await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/commits?id=eq.${c.id}`);
+    if (ok) laden();
   }
 
   const tage = (c) => {
@@ -1072,7 +1083,7 @@ function LogFiles() {
       { prefer: "resolution=merge-duplicates,return=minimal" });
     setDirty(false);
     setMsg({ t: ok ? "transmission saved · " + w + " wörter" : "offline gespeichert · " + w + " wörter — sync folgt", c: ok ? "ok" : "work" });
-    laden();
+    if (ok) laden();
   }
 
   async function suchen(q, tag) {
@@ -1416,7 +1427,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
     if (!cur) setId(eigeneId);
     setDirty(false);
     setMsg({ t: ok ? "gespeichert · " + nm : "offline gespeichert · " + nm + " — sync folgt", c: ok ? "ok" : "work" });
-    laden();
+    if (ok) laden();
     return eigeneId;
   }
 
@@ -1432,22 +1443,22 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
       ? `skript „${s.name}" löschen?\n\nachtung: ${n} zweig${n === 1 ? "" : "e"} darunter ${n === 1 ? "wird" : "werden"} mitgelöscht.`
       : `skript „${s.name}" löschen?`;
     if (!confirm(frage)) return;
-    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/skripte?id=eq.${s.id}`);
+    const { ok } = await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/skripte?id=eq.${s.id}`);
     if (s.id === id) neu();
-    laden();
+    if (ok) laden();
   }
 
   async function ordnerNeu() {
     const n = prompt("name des projekts?");
     if (!n?.trim()) return;
-    await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/skript_ordner`, { id: neueId(), user_id: getUserId(), name: n.trim() });
-    laden();
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/skript_ordner`, { id: neueId(), user_id: getUserId(), name: n.trim() });
+    if (ok) laden();
   }
   async function ordnerWeg(o) {
     if (!confirm(`projekt „${o.name}" löschen? die skripte darin bleiben.`)) return;
-    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/skript_ordner?id=eq.${o.id}`);
+    const { ok } = await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/skript_ordner?id=eq.${o.id}`);
     if (aktOrdner === o.id) setAktOrdner("");
-    laden();
+    if (ok) laden();
   }
 
   // ganzen zweig (skript + alle nachkommen) einem anderen projekt zuordnen
@@ -1455,7 +1466,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
     const ids = [s.id, ...nachkommen(s.id).map((x) => x.id)];
     const { ok } = await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/skripte?id=in.(${ids.join(",")})`, { ordner_id: zielOrdnerId || null });
     setMsg({ t: "» " + ids.length + " szene" + (ids.length === 1 ? "" : "n") + (ok ? " verschoben" : " verschoben · offline, sync folgt"), c: ok ? "ok" : "work" });
-    laden();
+    if (ok) laden();
   }
 
   // einzelnes skript duplizieren — kopie wird eigenständige wurzel, hängt an keinem baum
@@ -1466,7 +1477,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
       eltern_id: null, eltern_pos: null,
     });
     setMsg({ t: ok ? "» kopiert · als eigenes skript im selben projekt" : "» offline kopiert — sync folgt", c: ok ? "ok" : "work" });
-    laden();
+    if (ok) laden();
   }
 
   // aus einer position ein eigenes skript machen — der baum
@@ -2209,9 +2220,20 @@ function Pausenschirm({ springe }) {
   }, []);
 
   // gedanken-fang — lose gedanken, noch ohne commit-signatur
+  const gedankenAusQueue = () => {
+    try {
+      return offQueue()
+        .filter((op) => op.methode === "POST" && op.url.includes("/rest/v1/gedanken") && op.body)
+        .map((op) => ({ id: op.body.id, text: op.body.text, created_at: new Date(op.t).toISOString() }));
+    } catch { return []; }
+  };
   const gedankenLaden = () => {
     dbGet("gedanken", `${SUPABASE_URL}/rest/v1/gedanken?select=*&order=created_at.desc&limit=12`)
-      .then((d) => setGedanken(Array.isArray(d) ? d : [])).catch(() => {});
+      .then((d) => {
+        const echte = Array.isArray(d) ? d : [];
+        const wartend = gedankenAusQueue().filter((w) => !echte.some((e) => e.id === w.id));
+        setGedanken([...wartend, ...echte]);
+      }).catch(() => {});
   };
   useEffect(gedankenLaden, []);
 
@@ -2221,8 +2243,8 @@ function Pausenschirm({ springe }) {
     setNeuerGedanke("");
     const eigeneId = neueId();
     setGedanken((l) => [{ id: eigeneId, text: t, created_at: new Date().toISOString() }, ...l]);
-    await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/gedanken`, { id: eigeneId, user_id: getUserId(), text: t });
-    gedankenLaden();
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/gedanken`, { id: eigeneId, user_id: getUserId(), text: t });
+    if (ok) gedankenLaden();
   }
   async function gedankeLoeschen(g) {
     setGedanken((l) => l.filter((x) => x.id !== g.id));
@@ -2582,7 +2604,7 @@ export default function StricklieselApp() {
       { user_id: getUserId(), name, settings: cfg, updated_at: new Date().toISOString() },
       { prefer: "resolution=merge-duplicates,return=minimal" });
     say(ok ? "protokoll gespeichert: " + name : "offline gespeichert: " + name + " — sync folgt", ok ? "ok" : "work");
-    loadProgList();
+    if (ok) loadProgList();
   }
   async function loadProg() {
     if (!progSel) { say("kein protokoll gewählt", "err"); return; }
