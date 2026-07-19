@@ -834,7 +834,7 @@ function Abteilung17b({ say }) {
     const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/commits`, neuC);
     setMsg({ t: ok ? "» command accepted · commit aktiv · priorität " + prio : "» offline — wird nachgesendet, sobald wieder netz da ist", c: ok ? "ok" : "work" });
     setProjekt(""); setSig(""); setZiel(""); setParam(PARAM_STD); setStart(heute());
-    laden();
+    if (ok) laden();
   }
 
   // priorität und feedback ändern — still gespeichert
@@ -852,14 +852,14 @@ function Abteilung17b({ say }) {
     setListe((l) => l.map((x) => (x.id === c.id ? { ...x, status } : x)));
     const { ok } = await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/commits?id=eq.${c.id}`, { status, updated_at: new Date().toISOString() });
     setMsg({ t: "» " + (ok ? wort : wort + " · offline, folgt noch") + " · " + c.projekt, c: ok ? "ok" : "work" });
-    laden();
+    if (ok) laden();
   }
 
   async function loeschen(c) {
     if (!confirm(`„${c.projekt}" aus dem archiv löschen?`)) return;
     setListe((l) => l.filter((x) => x.id !== c.id));
-    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/commits?id=eq.${c.id}`);
-    laden();
+    const { ok } = await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/commits?id=eq.${c.id}`);
+    if (ok) laden();
   }
 
   const tage = (c) => {
@@ -1081,7 +1081,7 @@ function LogFiles() {
       { prefer: "resolution=merge-duplicates,return=minimal" });
     setDirty(false);
     setMsg({ t: ok ? "transmission saved · " + w + " wörter" : "offline gespeichert · " + w + " wörter — sync folgt", c: ok ? "ok" : "work" });
-    laden();
+    if (ok) laden();
   }
 
   async function suchen(q, tag) {
@@ -1425,7 +1425,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
     if (!cur) setId(eigeneId);
     setDirty(false);
     setMsg({ t: ok ? "gespeichert · " + nm : "offline gespeichert · " + nm + " — sync folgt", c: ok ? "ok" : "work" });
-    laden();
+    if (ok) laden();
     return eigeneId;
   }
 
@@ -1441,22 +1441,22 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
       ? `skript „${s.name}" löschen?\n\nachtung: ${n} zweig${n === 1 ? "" : "e"} darunter ${n === 1 ? "wird" : "werden"} mitgelöscht.`
       : `skript „${s.name}" löschen?`;
     if (!confirm(frage)) return;
-    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/skripte?id=eq.${s.id}`);
+    const { ok } = await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/skripte?id=eq.${s.id}`);
     if (s.id === id) neu();
-    laden();
+    if (ok) laden();
   }
 
   async function ordnerNeu() {
     const n = prompt("name des projekts?");
     if (!n?.trim()) return;
-    await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/skript_ordner`, { id: neueId(), user_id: getUserId(), name: n.trim() });
-    laden();
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/skript_ordner`, { id: neueId(), user_id: getUserId(), name: n.trim() });
+    if (ok) laden();
   }
   async function ordnerWeg(o) {
     if (!confirm(`projekt „${o.name}" löschen? die skripte darin bleiben.`)) return;
-    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/skript_ordner?id=eq.${o.id}`);
+    const { ok } = await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/skript_ordner?id=eq.${o.id}`);
     if (aktOrdner === o.id) setAktOrdner("");
-    laden();
+    if (ok) laden();
   }
 
   // ganzen zweig (skript + alle nachkommen) einem anderen projekt zuordnen
@@ -1464,7 +1464,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
     const ids = [s.id, ...nachkommen(s.id).map((x) => x.id)];
     const { ok } = await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/skripte?id=in.(${ids.join(",")})`, { ordner_id: zielOrdnerId || null });
     setMsg({ t: "» " + ids.length + " szene" + (ids.length === 1 ? "" : "n") + (ok ? " verschoben" : " verschoben · offline, sync folgt"), c: ok ? "ok" : "work" });
-    laden();
+    if (ok) laden();
   }
 
   // einzelnes skript duplizieren — kopie wird eigenständige wurzel, hängt an keinem baum
@@ -1475,7 +1475,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
       eltern_id: null, eltern_pos: null,
     });
     setMsg({ t: ok ? "» kopiert · als eigenes skript im selben projekt" : "» offline kopiert — sync folgt", c: ok ? "ok" : "work" });
-    laden();
+    if (ok) laden();
   }
 
   // aus einer position ein eigenes skript machen — der baum
@@ -2230,8 +2230,8 @@ function Pausenschirm({ springe }) {
     setNeuerGedanke("");
     const eigeneId = neueId();
     setGedanken((l) => [{ id: eigeneId, text: t, created_at: new Date().toISOString() }, ...l]);
-    await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/gedanken`, { id: eigeneId, user_id: getUserId(), text: t });
-    gedankenLaden();
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/gedanken`, { id: eigeneId, user_id: getUserId(), text: t });
+    if (ok) gedankenLaden();
   }
   async function gedankeLoeschen(g) {
     setGedanken((l) => l.filter((x) => x.id !== g.id));
@@ -2591,7 +2591,7 @@ export default function StricklieselApp() {
       { user_id: getUserId(), name, settings: cfg, updated_at: new Date().toISOString() },
       { prefer: "resolution=merge-duplicates,return=minimal" });
     say(ok ? "protokoll gespeichert: " + name : "offline gespeichert: " + name + " — sync folgt", ok ? "ok" : "work");
-    loadProgList();
+    if (ok) loadProgList();
   }
   async function loadProg() {
     if (!progSel) { say("kein protokoll gewählt", "err"); return; }
