@@ -2353,9 +2353,19 @@ function Pausenschirm({ springe, zuM42 }) {
   }, []);
 
   // die 00-mainstates der laufenden projekte — worum geht es gerade?
+  // nur skripte mit echter arbeit: mainstate + mindestens ein weiteres kästchen —
+  // sonst landen die zitat-parkplätze fürs orakel hier drin, doppelt zum orakel oben.
   useEffect(() => {
-    dbGet("buecher", `${SUPABASE_URL}/rest/v1/skripte?select=id,name,matrix,hook&eltern_id=is.null&order=updated_at.desc&limit=3`)
-      .then((d) => setBuecher(Array.isArray(d) ? d : [])).catch(() => {});
+    dbGet("buecher", `${SUPABASE_URL}/rest/v1/skripte?select=id,name,matrix,hook&eltern_id=is.null&order=updated_at.desc&limit=30`)
+      .then((d) => {
+        const echte = (Array.isArray(d) ? d : []).filter((x) => {
+          const m = Array.isArray(x.matrix) ? x.matrix : [];
+          const hatMainstate = (m[4] || "").trim();
+          const hatSonstWas = m.some((z, i) => i !== 4 && (z || "").trim());
+          return hatMainstate && hatSonstWas;
+        });
+        setBuecher(echte.slice(0, 3));
+      }).catch(() => {});
   }, []);
 
   // gedanken-fang — lose gedanken, noch ohne commit-signatur
@@ -2400,7 +2410,12 @@ function Pausenschirm({ springe, zuM42 }) {
     ]).then(([c, s, p, f]) => {
       setFaeden({
         commits: Array.isArray(c) ? c : [],
-        skripte: (Array.isArray(s) ? s : []).filter((x) => !((Array.isArray(x.matrix) ? x.matrix[4] : "") || "").trim()),
+        skripte: (Array.isArray(s) ? s : []).filter((x) => {
+          const m = Array.isArray(x.matrix) ? x.matrix : [];
+          const hatMainstate = (m[4] || "").trim();
+          const hatSonstWas = m.some((z, i) => i !== 4 && (z || "").trim());
+          return !hatMainstate && hatSonstWas;
+        }),
         personen: (Array.isArray(p) ? p : []).filter((x) => !x.rolle),
         fragen: Array.isArray(f) ? f : [],
       });
