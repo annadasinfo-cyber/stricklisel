@@ -661,6 +661,19 @@ const WMO = {
   95: ["⚡︎", "gewitter"], 96: ["⚡︎", "gewitter mit hagel"], 99: ["⚡︎", "gewitter mit hagel"],
 };
 
+function ScrollTop() {
+  const [sichtbar, setSichtbar] = useState(false);
+  useEffect(() => {
+    const f = () => setSichtbar(window.scrollY > 400);
+    addEventListener("scroll", f, { passive: true });
+    return () => removeEventListener("scroll", f);
+  }, []);
+  if (!sichtbar) return null;
+  return (
+    <button className="hoch" onClick={() => scrollTo({ top: 0, behavior: "smooth" })} title="nach oben" aria-label="nach oben">▲</button>
+  );
+}
+
 function SyncStatus() {
   const [n, setN] = useState(0);
   const [on, setOn] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
@@ -3008,6 +3021,7 @@ export default function StricklieselApp() {
     <>
       <Styles />
       <Rain />
+      <ScrollTop />
       <div className="wrap">
         <header>
           <div className="wordmark">SUB<span className="slash">//</span>CONSTRUCTOR<span className="cursor" /><Uhr /></div>
@@ -3365,6 +3379,12 @@ function Styles() {
   body{background:var(--void);color:var(--ink);font-family:var(--mono);font-size:14px;
     line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:clip;max-width:100vw}
   #rain{position:fixed;inset:0;z-index:0;opacity:.38;pointer-events:none}
+  .hoch{position:fixed;right:18px;bottom:18px;z-index:20;width:38px;height:38px;border-radius:50%;
+    background:var(--panel-2);border:1px solid var(--line-hot);color:var(--green);font-size:13px;
+    cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.4);text-shadow:var(--glow);
+    display:flex;align-items:center;justify-content:center;animation:ankunft .3s ease-out}
+  .hoch:hover{background:var(--panel);border-color:var(--green)}
+  @media(max-width:640px){.hoch{right:14px;bottom:14px}}
   .wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:26px 18px 90px}
 
   .wordmark{font-family:var(--term);font-size:clamp(30px,6.2vw,52px);letter-spacing:.14em;
