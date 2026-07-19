@@ -1946,17 +1946,23 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
 
 // avatar-silhouetten — feine umrisse, unten offen, im terminal-look
 const AVATARE = ["mann", "frau", "monster", "kreatur", "magier"];
+const GRUPPEN = ["gruppe", "gruppe_evil"];
 function Avatar({ typ, size = 44 }) {
+  const mann1 = (t, s) => <g transform={`translate(${t},${s.y}) scale(${s.k})`}><circle className="avfill" cx="0" cy="18" r="21" /><path className="avfill" d={`M-31 ${s.b+1} Q-31 44 0 44 Q31 44 31 ${s.b+1} Z`} /><circle className="avf" cx="0" cy="18" r="20" /><circle className="avl" cx="0" cy="18" r="20" /><path className="avf" d={`M-30 ${s.b} Q-30 44 0 44 Q30 44 30 ${s.b} Z`} /><path className="avl" d={`M-30 ${s.b} Q-30 44 0 44 Q30 44 30 ${s.b}`} /></g>;
+  const monst1 = (t, s) => <g transform={`translate(${t},${s.y}) scale(${s.k})`}><path className="avfill" d={`M-29 ${s.b} Q-31 34 0 30 Q31 34 29 ${s.b} Z`} /><path className="avf" d={`M-28 ${s.b} Q-30 34 0 30 Q30 34 28 ${s.b} Z`} /><path className="avl" d={`M-28 ${s.b} Q-30 34 0 30 Q30 34 28 ${s.b}`} /><path className="avl" d="M-28 40 Q-30 20 -20 16 Q-18 30 -12 34" /><path className="avl" d="M28 40 Q30 20 20 16 Q18 30 12 34" /><circle className="aveye" cx="-9" cy="54" r="3.2" /><circle className="aveye" cx="9" cy="54" r="3.2" /></g>;
   const inner = {
     mann: <><circle className="avf" cx="0" cy="18" r="20" /><path className="avf" d="M-30 94 Q-30 44 0 44 Q30 44 30 94 Z" /><circle className="avl" cx="0" cy="18" r="20" /><path className="avl" d="M-30 94 Q-30 44 0 44 Q30 44 30 94" /></>,
     frau: <><circle className="avf" cx="0" cy="12" r="15" /><path className="avf" d="M-15 32 L15 32 L0 52 Z" /><path className="avf" d="M0 40 Q-30 44 -28 94 Q0 94 28 94 Q30 44 0 40 Z" /><circle className="avl" cx="0" cy="12" r="15" /><path className="avl" d="M-15 32 L15 32 L0 52 Z" /><path className="avl" d="M0 40 Q-30 44 -28 94 M0 40 Q30 44 28 94" /></>,
     monster: <><path className="avf" d="M-28 96 Q-30 34 0 30 Q30 34 28 96 Z" /><path className="avl" d="M-28 96 Q-30 34 0 30 Q30 34 28 96" /><path className="avl" d="M-28 40 Q-30 20 -20 16 Q-18 30 -12 34" /><path className="avl" d="M28 40 Q30 20 20 16 Q18 30 12 34" /><circle className="aveye" cx="-9" cy="54" r="3.2" /><circle className="aveye" cx="9" cy="54" r="3.2" /></>,
     kreatur: <><path className="avf" d="M-10 56 Q-40 46 -34 18 Q-14 30 -8 54 Z" /><path className="avl" d="M-10 56 Q-40 46 -34 18 Q-14 30 -8 54 Z" /><path className="avf" d="M10 56 Q40 46 34 18 Q14 30 8 54 Z" /><path className="avl" d="M10 56 Q40 46 34 18 Q14 30 8 54 Z" /><path className="avf" d="M-22 96 Q-16 52 0 48 Q16 52 22 96 Q0 104 -22 96 Z" /><path className="avl" d="M-22 96 Q-16 52 0 48 Q16 52 22 96" /><circle className="avf" cx="0" cy="24" r="16" /><circle className="avl" cx="0" cy="24" r="16" /><circle className="aveye" cx="-6" cy="24" r="2.4" /><circle className="aveye" cx="6" cy="24" r="2.4" /></>,
     magier: <><line className="avl" x1="28" y1="58" x2="28" y2="98" /><circle className="avf" cx="28" cy="53" r="3.5" /><circle className="avl" cx="28" cy="53" r="3.5" /><path className="avf" d="M0 -16 L14 20 Q0 25 -14 20 Z" /><path className="avl" d="M0 -16 L14 20 Q0 25 -14 20 Z" /><ellipse className="avl" cx="0" cy="20" rx="16" ry="3.5" /><circle className="avf" cx="0" cy="32" r="12" /><circle className="avl" cx="0" cy="32" r="12" /><path className="avf" d="M-25 96 L-14 54 Q0 50 14 54 L25 96 Q0 104 -25 96 Z" /><path className="avl" d="M-25 96 L-14 54 Q0 50 14 54 L25 96" /></>,
+    gruppe: <>{mann1(-26, { y: 4, k: 0.62, b: 78 })}{mann1(26, { y: 4, k: 0.62, b: 78 })}{mann1(0, { y: 30, k: 0.72, b: 74 })}</>,
+    gruppe_evil: <>{monst1(-26, { y: 4, k: 0.62, b: 78 })}{monst1(26, { y: 4, k: 0.62, b: 78 })}{monst1(0, { y: 30, k: 0.72, b: 74 })}</>,
   }[typ];
   if (!inner) return null;
+  const vb = (typ === "gruppe" || typ === "gruppe_evil") ? "-54 -14 108 128" : "-46 -20 92 128";
   return (
-    <svg className="avatar" width={size} height={size} viewBox="-46 -20 92 128">{inner}</svg>
+    <svg className="avatar" width={size} height={size} viewBox={vb}>{inner}</svg>
   );
 }
 
@@ -2067,6 +2073,14 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
     await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/things`, d0);
   }
 
+  // aus der besetzung heraus: neue person direkt mit dieser rolle anlegen
+  async function neuMitRolle(rolle) {
+    const d0 = { id: neueId(), user_id: getUserId(), ordner_id: aktOrdner || null, art: "person", name: "", rolle, created_at: new Date().toISOString() };
+    setListe((l) => [...l, d0]);
+    setArt("person"); setOffen(d0.id);
+    await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/things`, d0);
+  }
+
   function feld(th, k, v) {
     setListe((l) => l.map((x) => (x.id === th.id ? { ...x, [k]: v } : x)));
     setMsg({ t: "◉ rec", c: "work" });
@@ -2138,21 +2152,27 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
                 <div className="bzgrid">
                   {g.r.map(([r, info]) => {
                     const wer = alleBesetzung.filter((x) => x.rolle === r);
+                    if (wer.length) {
+                      return wer.map((x) => (
+                        <button className="bzkarte klick" key={x.id} onClick={() => { setArt("person"); setOffen(x.id); }} title="→ zur akte">
+                          <div className="bzkopf">
+                            <span className="bzav"><Avatar typ={x.avatar || "mann"} size={30} /></span>
+                            <span className="bzrolle">{r}</span>
+                            <span className="bzname">{x.name || "unbenannt"}{x.archetyp && <em>{x.archetyp}</em>}</span>
+                          </div>
+                          {info && <p className="bzinfo">{info}</p>}
+                        </button>
+                      ));
+                    }
                     return (
-                      <div className={"bzkarte" + (wer.length ? "" : " frei")} key={r}>
+                      <button className="bzkarte frei klick" key={r} onClick={() => neuMitRolle(r)} title="→ person für diese rolle anlegen">
                         <div className="bzkopf">
+                          <span className="bzav leer"><Avatar typ="mann" size={30} /></span>
                           <span className="bzrolle">{r}</span>
-                          {wer.length
-                            ? wer.map((x) => (
-                                <button key={x.id} className="bzname" onClick={() => { setArt("person"); setOffen(x.id); }}>
-                                  {x.name || "unbenannt"}
-                                  {x.archetyp && <em>{x.archetyp}</em>}
-                                </button>
-                              ))
-                            : <span className="bzname bzfrei">nicht besetzt</span>}
+                          <span className="bzname bzfrei">nicht besetzt</span>
                         </div>
                         {info && <p className="bzinfo">{info}</p>}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -2162,13 +2182,14 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
               <>
                 <div className="divider">ohne rolle</div>
                 <div className="bzgrid">
-                  <div className="bzkarte frei">
-                    <div className="bzkopf">
-                      {alleBesetzung.filter((x) => !x.rolle).map((x) => (
-                        <button key={x.id} className="bzname" onClick={() => { setArt("person"); setOffen(x.id); }}>{x.name || "unbenannt"}</button>
-                      ))}
-                    </div>
-                  </div>
+                  {alleBesetzung.filter((x) => !x.rolle).map((x) => (
+                    <button className="bzkarte klick" key={x.id} onClick={() => { setArt("person"); setOffen(x.id); }} title="→ zur akte">
+                      <div className="bzkopf">
+                        <span className="bzav"><Avatar typ={x.avatar || "mann"} size={30} /></span>
+                        <span className="bzname">{x.name || "unbenannt"}</span>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </>
             )}
@@ -2214,6 +2235,12 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
                         <button className={"avopt" + (!th.avatar ? " on" : "")} onClick={() => feld(th, "avatar", "")} title="keiner">–</button>
                         {AVATARE.map((a) => (
                           <button key={a} className={"avopt" + (th.avatar === a ? " on" : "")} onClick={() => feld(th, "avatar", a)} title={a}>
+                            <Avatar typ={a} size={34} />
+                          </button>
+                        ))}
+                        <span className="avtrenn" />
+                        {GRUPPEN.map((a) => (
+                          <button key={a} className={"avopt" + (th.avatar === a ? " on" : "")} onClick={() => feld(th, "avatar", a)} title={a.replace("_", " ")}>
                             <Avatar typ={a} size={34} />
                           </button>
                         ))}
@@ -3835,11 +3862,16 @@ function Styles() {
   .bzname.bzfrei:hover{color:var(--dim);text-shadow:none}
   .bzgrid{display:flex;flex-direction:column;gap:10px;margin-bottom:6px}
   .bzkarte{border:1px solid var(--line);border-radius:7px;background:var(--panel-2);padding:13px 15px;transition:.15s}
+  .bzkarte.klick{cursor:pointer;text-align:left;font-family:inherit;width:100%;display:block}
   .bzkarte:not(.frei):hover{border-color:var(--line-hot)}
   .bzkarte.frei{border-style:dashed}
+  .bzkarte.frei.klick:hover{border-color:var(--line-hot);border-style:solid}
   .bzkopf{display:flex;align-items:center;flex-wrap:wrap;gap:11px}
+  .bzav{flex:0 0 auto;display:inline-flex}
+  .bzav.leer{opacity:.4}
   .bzkarte .bzrolle{font-size:13px}
   .bzinfo{font-size:12px;color:var(--muted);line-height:1.55;margin-top:9px;padding-top:9px;border-top:1px dotted var(--line)}
+  .avtrenn{width:1px;align-self:stretch;background:var(--line);margin:0 3px}
   .throlle{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--green);
     border:1px solid var(--line-hot);border-radius:3px;padding:1px 6px;flex:0 0 auto}
   .tharch{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--dim);flex:0 0 auto}
