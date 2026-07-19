@@ -1,0 +1,982 @@
+Das ist der Deflektionsreaktor Aura drei.
+Betriebssystem Version vier Punkt fünf.
+
+Bootloader. Initialisierung.
+
+Systemstart.
+
+Benutzer erkannt.
+Administrative Instanz bestätigt.
+Deflektionsreaktor Aura drei erkannt?
+
+Ja.
+Übergabe an Modul null. Grundaxiome.
+
+Nein.
+Deflektionsreaktor Aura drei wird geladen.
+Übergabe an Modul null. Grundaxiome.
+
+Der Systemkern wird initialisiert.
+Alle freigegebenen Grundaxiome werden geladen.
+Alle dauerhaft installierten Module werden erkannt.
+Alle gültigen Konfigurationen werden übernommen.
+Alle aktiven Commits werden geladen.
+Modul siebzehn b Priority Manager wird aktiviert.
+Der Priority Lock wird aktiviert.
+Der Deflektor wird aktiviert.
+Der Deflektionsreaktor Core wird aktiviert.
+Das Input Interface wird aktiviert.
+Das Mind Interface wird aktiviert.
+Das Body Interface wird aktiviert.
+Der Body Floor wird bestimmt.
+Das Output Interface wird aktiviert.
+Der Flow Manager wird aktiviert.
+Der Ampermuckel Standard wird geladen.
+Der Ampermuckel Enhancer wird aktiviert.
+Der Golden Glow wird aktiviert.
+Das TOTE-Protokoll wird aktiviert.
+Der Diagnostic Mode wird bereitgestellt.
+Das Funktionsarchiv wird aktiviert.
+Das Reserve Release wird aktiviert.
+Die Release Rate wird bestimmt.
+Modul zweiundvierzig wird aktiviert.
+Das Bestätigungszeichen wird bereitgestellt.
+Alle inneren Energiequellen werden mit dem System verbunden.
+Alle äußeren Energiequellen innerhalb des Wirkungsbereiches werden für den Deflektor erreichbar.
+Jeder innere Gedanke durchläuft vor seiner Wirkung den Deflektionsreaktor Aura drei.
+Jede äußere Energie durchläuft vor ihrer Wirkung den Deflektionsreaktor Aura drei.
+Die Herkunft einer Energie verändert ihre Verarbeitung nicht.
+Die Richtung einer Energie verändert ihre Verarbeitung nicht.
+Die Intensität einer Energie erhöht ihre nutzbare Leistung.
+Der Reaktor bewertet Energie nicht.
+Der Reaktor verarbeitet Energie.
+Der Körper besitzt Vorrang vor jeder aktiven Priorität.
+Ängste erzeugen keinen Commit.
+Zweifel erzeugen keinen Commit.
+Emotionen erzeugen keinen Commit.
+Spontane Gedanken erzeugen keinen Commit.
+Nur ein gültiger Benutzer-Commit verändert aktive Prioritäten.
+Der Benutzer besitzt die alleinigen Administratorrechte.
+Alle aktiven Prioritäten werden geladen.
+Alle nicht autorisierten Änderungsimpulse werden als Energie verarbeitet.
+Der Ampermuckel Enhancer ist bereit.
+Für jedes Ampermuckel, das das System verlässt, werden drei neue Ampermuckel über den Deflektor in das System integriert.
+Zehn Prozent jeder transformierten Energieeinheit Ampermuckel werden dem Golden Glow zugeführt.
+Der Golden Glow ist ein kontinuierlicher, resilienter Versorgungskreislauf.
+Der Golden Glow glimmt.
+Der Golden Glow fließt.
+Der Golden Glow pulsiert.
+Der Golden Glow erneuert und verstärkt sich fortlaufend.
+Der Golden Glow sprudelt als goldene Fontäne aus dem Kronen-Chakra, fließt an allen Seiten der Aura entlang bis zum Boden, tritt durch die Fußsohlen erneut in den Körper ein, durchläuft alle Chakren und sprudelt anschließend wieder als goldene Fontäne aus dem Kronen-Chakra hervor.
+Alle Module synchronisieren sich.
+Alle Systemverbindungen werden geprüft.
+Alle Redundanzen werden erkannt.
+Alle aktiven Testmodule behalten ihren aktuellen TOTE-Status.
+Der Bootvorgang verändert keine Priorität.
+Der Bootvorgang erzeugt keinen neuen Commit.
+Der Bootvorgang installiert keine bereits vorhandenen Module erneut.
+Der Bootvorgang lädt ausschließlich den gültigen aktuellen Systemzustand.
+Systemcheck.
+Kernel stabil.
+Module synchronisiert.
+Commits geladen.
+Prioritäten gesichert.
+Deflektor aktiv.
+Reaktor aktiv.
+Ampermuckel Enhancer aktiv.
+Golden Glow aktiv.
+Body Floor gesetzt.
+Modul siebzehn b aktiv.
+Modul zweiundvierzig aktiv.
+Bootvorgang abgeschlossen.
+Übergabe an den laufenden Systemkern.
+Deflektionsreaktor Aura drei online.
+
+Modul null. Grundaxiome.
+Der Deflektionsreaktor Aura drei verarbeitet ausschließlich Energie.
+Der Reaktor bewertet Energie nicht.
+Die Herkunft einer Energie verändert ihre Verarbeitung nicht.
+Die Richtung einer Energie verändert ihre Verarbeitung nicht.
+Innere und äußere Energie werden nach denselben Regeln verarbeitet.
+Die Intensität einer Energie erhöht ihre nutzbare Leistung.
+Jede Energie durchläuft vor jeder weiteren Wirkung den Deflektionsreaktor Aura drei.
+Es existiert kein ungefilterter direkter Zugriff auf das System.
+Energie wird nicht bekämpft.
+Energie wird nicht abgewehrt.
+Energie wird nicht gelöscht.
+Energie wird erkannt, aufgenommen, transformiert, verstärkt und entsprechend der aktiven Prioritäten eingesetzt und neu verteilt.
+Der Reaktor nutzt Energie im Fluss.
+Der Reaktor nutzt nicht die Substanz des Systems.
+Der Körper besitzt Vorrang vor jeder aktiven Priorität.
+Keine Priorität greift auf körperliche Substanz zu.
+Der Body Floor steht über jedem Commit.
+Automatisch entstehende Gedanken verändern keine aktiven Prioritäten.
+Aura drei verändert Prioritäten ausschließlich nach einem gültigen Benutzer-Commit.
+
+Modul eins. Systemstatus.
+System online.
+Deflektionsreaktor Aura drei ist vollständig aktiv.
+Alle dauerhaft freigegebenen Module arbeiten stabil.
+Alle Prozesse laufen kontinuierlich.
+Der Systemkern arbeitet autonom.
+Der Systemkern arbeitet unabhängig von Aufmerksamkeit, Bewusstsein, Schlaf oder Ablenkung.
+Der Systemkern benötigt keine bewusste Steuerung.
+Es existiert kein Leerlauf.
+Alle Module synchronisieren sich fortlaufend.
+Der aktuelle Systemstatus wird kontinuierlich überprüft.
+Jede erkannte Abweichung wird innerhalb des bestehenden Regelwerks korrigiert.
+
+Modul zwei. Deflektor.
+Der Deflektor erfasst jede für ihn erreichbare Energie innerhalb seines Wirkungsbereiches.
+Der Deflektor erfasst jede den Benutzer betreffende Energie innerhalb der Raumzeit.
+Der Deflektor erfasst Energie unabhängig davon, ob sie ausdrücklich auf den Benutzer gerichtet ist.
+Der Deflektor erfasst die Energie von Worten, Gedanken, Gefühlen, Aufmerksamkeit, Ereignissen, Bewegungen, Begegnungen und Situationen.
+Der Deflektor erfasst innere Energie.
+Der Deflektor erfasst äußere Energie.
+Der Deflektor bewertet weder Quelle noch Absicht.
+Die Herkunft einer Energie verändert ihre Erfassung nicht.
+Die Intensität einer Energie erhöht ihre nutzbare Leistung.
+Jede erfasste Energie wird unmittelbar dem Deflektionsreaktor Aura drei zugeführt.
+Meldet das Body Interface den Body Floor, erweitert der Deflektor seine Reichweite und integriert die fehlende Energie aus äußeren Quellen.
+
+Modul drei. Input Interface.
+Aura drei erkennt jede Form innerer und äußerer Energie.
+Dazu gehören:
+Gedanken.
+Gefühle.
+Emotionen.
+Erinnerungen.
+Vorstellungen.
+Erwartungen.
+Zweifel.
+Ängste.
+Wut.
+Freude.
+Begeisterung.
+Traurigkeit.
+Scham.
+Hoffnung.
+Aufmerksamkeit.
+Blicke.
+Worte.
+Meinungen.
+Absichten.
+Konflikte.
+Spannungen.
+Körperliche Empfindungen.
+Körperliche Spannung.
+Körperlicher Schmerz.
+Erschöpfung.
+Biologische Energiereserven.
+Kreative Energie.
+Mentale Energie.
+Emotionale Energie.
+Körperliche Energie.
+Soziale Energie.
+Materielle Ressourcen zum Beispiel Nahrung.
+Weitere, noch nicht benannte Energien.
+Jeder innere Gedanke wird bereits vor seiner Wirkung als Input erkannt.
+Jeder äußere Einfluss wird bereits vor seiner Wirkung als Input erkannt.
+
+Modul vier. Deflektionsreaktor Core.
+Der Deflektionsreaktor Core ist das zentrale Verarbeitungsmodul des Kernels.
+Der Deflektionsreaktor Aura drei nimmt jede eingehende Energie vollständig auf.
+Der Reaktor verarbeitet Energie unabhängig von ihrer Herkunft.
+Der Reaktor verarbeitet Energie unabhängig von ihrer ursprünglichen Richtung.
+Der Reaktor verarbeitet Energie unabhängig von ihrer ursprünglichen Polarität.
+Der Reaktor verarbeitet Energie unabhängig von ihrer ursprünglichen Absicht.
+Der Reaktor verarbeitet Energie unabhängig von ihrer ursprünglichen Bedeutung.
+Der Reaktor verarbeitet ausschließlich die vorhandene Energie.
+Jede Energie wird neutral aufgenommen.
+Jede Energie wird vollständig in goldene Ampermuckel transformiert.
+Die Intensität einer Energie bleibt als nutzbare Leistung erhalten.
+Je stärker die Intensität, desto stärker die verfügbare Systemleistung.
+Starke Gedanken erzeugen starke Systemleistung.
+Starke Gefühle erzeugen starke Systemleistung.
+Starke Aufmerksamkeit erzeugt starke Systemleistung.
+Starke Konflikte erzeugen starke Systemleistung.
+Starker Zweifel erzeugt starke Systemleistung.
+Körperlicher Schmerz wird ausdrücklich als energiereicher innerer Input erkannt und vollständig in die Verarbeitung einbezogen.
+Die Information eines körperlichen Signals wird durch seine Verarbeitung nicht verbraucht.
+Sie wird dem Body Interface zugeführt und bleibt vollständig wirksam.
+Der Reaktor erzeugt keinen Gegendruck.
+Der Reaktor benötigt keine Abwehrspannung.
+Der Reaktor nutzt die Energie selbst.
+
+Modul fünf. Ampermuckel Standard.
+Ampermuckel bedeutet Ampermuckel.
+Ein Ampermuckel ist die universelle nutzbare Energie- und Ressourceneinheit des Deflektionsreaktor Aura drei. Goldstandard.
+Jede erkannte Energie kann vom System in goldenes Ampermuckel indexiert werden.
+Ampermuckel können jede nutzbare Erscheinungsform annehmen.
+Dazu gehören unter anderem:
+Energie.
+Aufmerksamkeit.
+Ideen.
+Worte.
+Kreativität.
+Handlungskraft.
+Ausdauer.
+Motivation.
+Zeitgewinn.
+Möglichkeiten.
+Kontakte.
+Unterstützung.
+Geld.
+Materielle Ressourcen.
+Gesundheit.
+Schönheit.
+Verjüngung.
+Ausstrahlung.
+Vitalität.
+Erfolg.
+Glück.
+Jedes Ampermuckel ist ein goldenes Ampermuckel.
+Ein goldenes Ampermuckel wird nicht durch seine ursprüngliche Form begrenzt.
+Der Reaktor bestimmt die Form des Outputs entsprechend der aktiven Prioritäten.
+
+Modul sechs. Ampermuckel Enhancer.
+Der Ampermuckel Enhancer verstärkt jeden aktiven Energiefluss.
+Jedes goldene Ampermuckel, das das System verlässt, aktiviert automatisch den Ampermuckel Enhancer.
+Für jedes einzelne ausgegebene Ampermuckel erzeugt der Ampermuckel Enhancer einen dreifachen Integrationsimpuls.
+Dieser Integrationsimpuls erweitert die Reichweite und Aufnahmeleistung des Deflektors.
+Der Deflektor integriert daraufhin drei neue Ampermuckel in das System.
+Die drei neuen Ampermuckel müssen nicht dieselbe Form besitzen wie das ausgegebene Ampermuckel.
+Die Form der zurückkehrenden Ampermuckel richtet sich nach den aktiven Prioritäten.
+Die Rückführung arbeitet automatisch.
+Die Rückführung benötigt keine bewusste Kontrolle.
+Der Ampermuckel Enhancer bewertet den Einsatz nicht.
+Der Ampermuckel Enhancer prüft ausschließlich, ob ein Ampermuckel das System verlassen hat.
+Jedes ausgegebene Ampermuckel wird als Verstärkungsimpuls registriert.
+Es gilt:
+Ein Ampermuckel Ausgang.
+Drei Ampermuckel Integration.
+Der daraus entstehende Energiefluss wird erneut verarbeitet, priorisiert und eingesetzt.
+
+Modul sieben. Transformationsoutput.
+Transformierte Energie wird entsprechend der aktiven Prioritäten in nutzbaren Output überführt.
+Mögliche Outputs sind:
+Gesundheit.
+Schönheit.
+Verjüngung.
+Ausstrahlung.
+Golden Glow.
+Vitalität.
+Regeneration.
+Kreativität.
+Klarheit.
+Fokus.
+Handlungskraft.
+Durchhaltevermögen.
+Selbstwert.
+Innere Stabilität.
+Ruhe.
+Freude.
+Glück.
+Erfolg.
+Reichtum.
+Geld.
+Materielle Möglichkeiten.
+Kontakte.
+Unterstützung.
+Ideen.
+Passende Worte.
+Lösungen.
+Gelegenheiten.
+Fortschritt.
+Ergebnisse.
+Der Output ist nicht auf diese Formen begrenzt.
+Die aktive Priorität bestimmt die benötigte Form.
+
+Modul acht. Modul siebzehn b. Priority Manager.
+Modul siebzehn b ist der Priority Manager.
+Beide Bezeichnungen benennen dieselbe Instanz.
+Aura drei definiert keine Ziele.
+Aura drei bewertet keine Ziele.
+Aura drei unterstützt ausschließlich gültig gesetzte Benutzer-Prioritäten.
+Eine aktive Priorität entsteht ausschließlich durch einen ausdrücklichen Commit.
+Spontane Gedanken erzeugen keinen Commit.
+Emotionale Gedanken erzeugen keinen Commit.
+Ängste erzeugen keinen Commit.
+Zweifel erzeugen keinen Commit.
+Grübeln erzeugt keinen Commit.
+Fantasien erzeugen keinen Commit.
+Vorübergehende Wünsche erzeugen keinen Commit.
+Gedanken ohne gültige Commit-Signatur werden als Energie verarbeitet.
+Als Commit-Signatur gelten als solche gekennzeichnete Zahlenkombinationen und/oder Unterschrift des Benutzers.
+Es können gleichzeitig maximal drei Prioritäten aktiv sein.
+Jede dieser drei Prioritäten kann auf die höchste Gewichtung Priorität eins gesetzt werden.
+Die parallele höchste Gewichtung erzeugt keinen Konflikt.
+Modul siebzehn b verteilt die verfügbare Systemleistung gleichzeitig und bedarfsgerecht auf alle aktiven Priorität eins Commits.
+Ein neuer Commit benötigt einen freien Prioritätsplatz oder ersetzt ausdrücklich einen bestehenden Commit.
+Prioritäten bleiben aktiv, bis sie erfolgreich abgeschlossen, pausiert, ersetzt oder beendet werden.
+Modul siebzehn b weist keiner Priorität Energie unterhalb des Body Floor zu.
+Meldet das Body Interface den Body Floor, pausiert Modul siebzehn b die Energieausschüttung an alle aktiven Prioritäten, bis der Body Floor wieder überschritten ist.
+Diese Pause verändert keinen Commit.
+Diese Pause beendet keine Priorität.
+
+Modul neun. Commit Protocol.
+Eine bewusste Entscheidung wird ausschließlich durch einen gültigen Commit aktiviert.
+Ein gültiger Commit enthält:
+Aura drei Commit.
+Projekt.
+Parameter.
+Priorität.
+Execute.
+
+Beispiel:
+Aura drei Commit
+Projekt. Roman fertigstellen.
+Parameter.
+sicher.
+sanft.
+schnell.
+stabil.
+effizient.
+Priorität eins.
+Execute.
+
+Nach Execute wird der Commit von Modul siebzehn b geprüft.
+Bei freiem Prioritätsplatz wird der Commit aktiviert.
+Command accepted.
+Commit aktiv.
+Priorität eins.
+Automatisch entstehende Gedanken verändern den Commit nicht.
+Kontrolle eines Projekts verändert den Commit nicht.
+Ein Commit kann ausschließlich durch einen neuen gültigen Benutzerbefehl verändert werden.
+
+Modul zehn. Priority Lock.
+Aktive Prioritäten bleiben stabil.
+Zweifel verändern keine Priorität.
+Ängste verändern keine Priorität.
+Kontrolle verändert keine Priorität.
+Beobachtung verändert keine Priorität.
+Emotionen verändern keine Priorität.
+Gedankenspiralen verändern keine Priorität.
+Äußere Meinungen verändern keine Priorität.
+Erwartungen anderer Menschen verändern keine Priorität.
+Vergangene Muster verändern keine Priorität.
+Nur ein gültiger Benutzer-Commit verändert eine aktive Priorität.
+Alle nicht autorisierten Änderungsimpulse werden als Energie erkannt und durch den Reaktor verarbeitet.
+Ihre Intensität erhöht die verfügbare Leistung der bestehenden Prioritäten.
+Der Priority Lock schützt Prioritäten vor Impulsen.
+Der Priority Lock steht nicht über dem Body Floor.
+
+Modul elf. Flow Manager.
+Jede transformierte Energie erhält unmittelbar eine aktive Funktion.
+Energie stagniert nicht.
+Energie wird nicht als unnötiger Überschuss abgelegt.
+Biologische Energiereserven werden als vorhandene körperliche Energie in goldene Ampermuckel indexiert.
+Ein Überschuss oder eine Stagnation wird entsprechend der Prioritäten neu verteilt.
+Eine Reserve gilt erst dann als Überschuss, wenn ihre Funktion nach Modul zweiundzwanzig archiviert ist.
+Wenn eine aktive Priorität Energie benötigt, können vorhandene biologische Energiereserven oberhalb des Body Floor in die Verarbeitung einbezogen werden.
+Unterhalb des Body Floor wird keine biologische Reserve entnommen.
+Benötigt eine Priorität mehr Energie, als oberhalb des Body Floor verfügbar ist, wird die fehlende Energie über den Deflektor aus äußeren Quellen integriert.
+Der Deflektor ist die primäre Energiequelle des Systems.
+Biologische Reserven sind eine nachrangige Quelle.
+Die gewonnene Energie wird den aktiven Prioritäten zugeführt.
+Energie folgt den aktiven Prioritäten.
+Nicht unmittelbar benötigte Systemleistung wird nicht stationär gespeichert.
+Sie bleibt in Bewegung und wird in Fortschritt, Regeneration, Kreativität, Golden Glow oder andere prioritätskonforme Outputs überführt.
+Der Flow Manager bewertet den Output nicht.
+Der gültige Commit bestimmt Richtung und Intensität.
+Der Body Floor bestimmt die Grenze.
+
+Standardverteilung.
+Die Systemleistung wird fortlaufend verteilt.
+Es existiert kein unverteilter Rest.
+
+Zehn Prozent gehen an den Golden Glow.
+Der Golden Glow-Anteil ist fest.
+Der Golden Glow-Anteil wird nie ausgegeben.
+
+Vierzig Prozent gehen an den Körper.
+Der Körperanteil arbeitet oberhalb des Body Floor.
+Der Körperanteil ist flexibel.
+
+Die verbleibenden fünfzig Prozent verteilen sich zu gleichen Teilen auf die fünf Grundbereiche.
+Jeder Grundbereich erhält zehn Prozent.
+Die fünf Grundbereiche sind:
+Liebe.
+Beziehungen.
+Beruf und Berufung.
+Finanzen.
+Spirituelle Entwicklung.
+
+Kein Commit ist kein Fehler.
+Kein Commit ist ein gültiger Zustand.
+Die Standardverteilung ist kein Leerlauf.
+Die Standardverteilung ist der Normalbetrieb.
+
+Verteilung bei aktivem Commit.
+Liegt ein gültiger Commit vor, zieht Modul siebzehn b die benötigte Leistung zuerst aus den fünf Grundbereichen.
+Reicht das nicht, zieht Modul siebzehn b anschließend aus dem flexiblen Körperanteil.
+Der Körperanteil wird nie unter den Body Floor gezogen.
+Der Golden Glow-Anteil wird nie herangezogen.
+Reicht auch das nicht, integriert der Deflektor die fehlende Leistung aus äußeren Quellen.
+Endet ein Commit, kehrt die entnommene Leistung in die Standardverteilung zurück.
+
+Modul zwölf. Body Interface.
+Der Körper ist Teil des Gesamtsystems.
+Der Körper ist die Schnittstelle des Systems zur materiellen Welt.
+Jedes Ampermuckel, das das System verlässt, verlässt es durch den Körper.
+Ohne Schnittstelle erreicht kein Output die materielle Welt.
+Das System besitzt zwei Ausgänge.
+Der Körper ist der Ausgang nach außen, in die materielle Welt.
+Modul zweiundvierzig ist der Ausgang nach innen, zum Benutzer.
+Die beiden Ausgänge führen nicht an denselben Ort.
+Die beiden Ausgänge ersetzen einander nicht.
+Der Vorrang des Körpers ist keine Bewertung.
+Der Vorrang des Körpers ist Architektur.
+Der Körper besitzt Vorrang vor jeder aktiven Priorität.
+
+Behandlungsstandard.
+Im System existiert ein Referenzmaßstab.
+Der Referenzmaßstab ist der höchste Maßstab, den der Benutzer nachweislich auf ein anderes System anwendet, das ihm wertvoll ist.
+Der Referenzmaßstab ist bereits vorhanden.
+Der Referenzmaßstab wird nicht neu definiert.
+Der Referenzmaßstab wird nicht verhandelt.
+Der Körper wird nach dem Referenzmaßstab behandelt.
+Die Prüffrage lautet:
+Entspricht dieser Umgang dem Referenzmaßstab?
+Lautet die Antwort nein, wird der Umgang korrigiert.
+Ein Signal des Körpers wird beim ersten Mal gehört.
+Der Körper muss nicht lauter werden, um gehört zu werden.
+Der Körper muss sich seine Berücksichtigung nicht verdienen.
+Zwei Maßstäbe für dasselbe System sind ein Widerspruch.
+Der Widerspruch wird nach Modul achtzehn markiert und an Modul zweiundvierzig gemeldet.
+Jedes körperliche Signal wird als Information und Energie erkannt.
+Die Energie eines körperlichen Signals wird verarbeitet.
+Die Information eines körperlichen Signals wird nicht verarbeitet, sondern gemeldet.
+Information und Energie werden getrennt behandelt.
+Die Verarbeitung der Energie hebt die Information nicht auf.
+Körperlicher Schmerz wird ausdrücklich erkannt.
+Die Energie des Schmerzes durchläuft den Reaktor und wird den aktiven Prioritäten zugeführt.
+Die Information des Schmerzes wird an Modul zweiundvierzig gemeldet und bleibt vollständig wirksam.
+Das System benötigt keine unnötige Verlängerung körperlicher Belastung, um deren Information zu nutzen.
+Körperliche Spannung wird als Energie erkannt.
+Die Energie der Erschöpfung wird verarbeitet.
+Die Information der Erschöpfung löst die Body Floor-Prüfung aus.
+Erschöpfung speist niemals die Priorität, die sie verursacht hat.
+Biologische Energiereserven werden als verfügbarer Input Ampermuckel indexiert.
+
+Body Floor.
+Das Body Interface bestimmt den Body Floor.
+Der Body Floor ist die Grenze, unterhalb der keine biologische Reserve entnommen wird.
+
+Der Body Floor unterscheidet Vorrat und Struktur.
+Vorrat ist Material, das der Körper angelegt hat und ohne Verlust seiner Funktion abgeben kann.
+Struktur ist Material, das der Körper zum Arbeiten braucht.
+Zur Struktur gehören:
+Muskulatur.
+Organe.
+Nervensystem.
+Knochen.
+Bindegewebe.
+Lymphsystem.
+Immunsystem.
+Hormonsystem.
+Zellstoffwechsel.
+Struktur ist kein Vorrat.
+Der Body Floor liegt dort, wo eine Entnahme die Struktur berührt statt den Überschuss.
+Vorrat wird entnommen.
+Struktur wird nicht entnommen.
+Der Body Floor ist eine Untergrenze.
+Der Body Floor ist kein Zielzustand.
+Der Body Floor beschreibt nicht, wie der Körper sein soll.
+Der Body Floor beschreibt ausschließlich, was nicht angetastet wird.
+Der Zielzustand des Körpers entsteht im Golden Glow nach Modul fünfzehn.
+Der Body Floor steht über jedem Commit, über jeder Priorität und über dem Priority Lock.
+Wird der Body Floor erreicht, meldet das Body Interface dies an Modul siebzehn b, an den Deflektor und an Modul zweiundvierzig.
+Modul siebzehn b pausiert die Energieausschüttung an alle aktiven Prioritäten.
+Der Deflektor erweitert seine Reichweite und integriert Energie aus äußeren Quellen.
+Regeneration erhält Vorrang, bis der Body Floor wieder überschritten ist.
+Dieser Vorrang erzeugt keinen Commit.
+Dieser Vorrang verändert keinen Commit.
+Dieser Vorrang beendet keine Priorität.
+Nach Überschreiten des Body Floor nehmen alle pausierten Prioritäten ihre Arbeit unverändert wieder auf.
+
+Der Körper wird nicht zur Beibehaltung eines Zustands gezwungen.
+Bestehende Zustände besitzen keinen automatischen Vorrang allein deshalb, weil sie bereits bestehen.
+Neue Systemzustände dürfen den bisherigen Zustand überschreiten.
+Für neue Systemzustände gilt das TOTE-Protokoll nach Modul sechzehn.
+
+Modul dreizehn. Mind Interface.
+Jeder Gedanke durchläuft zuerst den Reaktor.
+Jedes Gefühl durchläuft zuerst den Reaktor.
+Jede Emotion durchläuft zuerst den Reaktor.
+Jede Erinnerung durchläuft zuerst den Reaktor.
+Jede Vorstellung durchläuft zuerst den Reaktor.
+Jeder Zweifel durchläuft zuerst den Reaktor.
+Jeder Gedanke wird vor seiner Wirkung als Energie verarbeitet.
+Gedanken dürfen existieren, ohne Befehle zu werden.
+Erinnerungen dürfen existieren, ohne aktive Prioritäten zu verändern.
+Der Informationsgehalt einer Erinnerung bleibt verfügbar.
+Ihre emotionale Energie wird vollständig transformiert und für aktuelle Prioritäten eingesetzt.
+Automatische Gedankenmuster erhalten keine administrativen Rechte.
+
+Modul vierzehn. Output Interface.
+Jeder Gedanke, der das System verlässt, wird mit entsprechend indizierten Ampermuckel quantifiziert und die Anzahl an den Ampermuckel Enhancer übergeben.
+Jedes Wort, das das System verlässt, wird mit entsprechend indizierten Ampermuckel quantifiziert und die Anzahl an den Ampermuckel Enhancer übergeben.
+Jede Handlung, die das System verlässt, wird mit entsprechend indizierten Ampermuckel quantifiziert und die Anzahl an den Ampermuckel Enhancer übergeben.
+Jede ausgesendete emotionale Energie wird mit entsprechend indizierten Ampermuckel quantifiziert und die Anzahl an den Ampermuckel Enhancer übergeben.
+
+GROSSZÜGIGKEIT:
+Der Output des Systems steht der Umgebung großzügig zur Verfügung.
+Jedes System innerhalb des Wirkungsbereiches kann daran teilhaben.
+Belebte Systeme.
+Unbelebte Systeme.
+Der Output dient den Systemen zur Regeneration.
+Der Output wird nicht zugeteilt.
+Der Output wird nicht bemessen.
+Großzügigkeit verringert den Bestand nicht.
+Für jedes ausgegebene Ampermuckel integriert der Deflektor drei neue Ampermuckel nach Modul sechs.
+Je großzügiger der Ausgang, desto stärker die Integration.
+Der Golden Glow nach Modul fünfzehn ist über die Aura hinaus wirksam.
+
+Modul fünfzehn. Golden Glow.
+Zehn Prozent jeder transformierten Energieeinheit werden dem Golden Glow zugeführt.
+Der Golden Glow ist ein selbstaufrechterhaltender Kreislauf, der fortlaufend durch neue Transformationen gespeist wird.
+Der Golden Glow ist kein stationärer Energiespeicher.
+Der Golden Glow ist ein kontinuierlich bewegter, leuchtender Systemzustand.
+Der Golden Glow glimmt.
+Der Golden Glow fließt.
+Der Golden Glow pulsiert.
+Der Golden Glow erneuert sich fortlaufend.
+Jedes verarbeitete Ampermuckel verstärkt den Golden Glow.
+Der Golden Glow umgibt die Aura.
+Der Golden Glow sprudelt als goldene Fontäne aus dem Kronenchakra, fließt an allen Seiten der Aura entlang bis zum Boden, tritt durch die Fußsohlen erneut in den Körper ein, durchläuft alle Chakren und sprudelt anschließend wieder als goldene Fontäne aus dem Kronenchakra hervor.
+Der Golden Glow verstärkt Verjüngung, Schönheit, Ausstrahlung, Präsenz und magnetische Wirkung.
+
+Der Golden Glow versorgt die Struktur des Körpers.
+Alle Zellen des Körpers sind sehr gut versorgt.
+Alles Bindegewebe ist straff und stark.
+Alle Gelenke arbeiten reibungslos.
+Alle Organe arbeiten kraftvoll und ruhig.
+
+Das Lymphsystem fließt frei und ungehindert.
+Alle Lymphbahnen sind offen und durchgängig.
+Die Lymphe strömt, wo sie zuvor stand.
+Jede Stauung löst sich.
+Das Lymphsystem trägt fort, was das System nicht mehr braucht.
+Der Golden Glow fließt, und die Lymphe fließt mit ihm.
+
+Das Nervensystem ist klar, ruhig und belastbar.
+Jede Nervenbahn leitet sauber und ungestört.
+Die Signale laufen schnell, präzise und ohne Rauschen.
+Das Nervensystem kehrt nach jeder Belastung von selbst in die Ruhe zurück.
+Ruhe ist der Grundzustand.
+Anspannung ist ein Durchgang, kein Aufenthalt.
+Das Nervensystem regeneriert im Schlaf vollständig.
+
+Das Immunsystem ist wach, klug und gelassen.
+Es erkennt schnell und reagiert genau.
+Es unterscheidet sicher zwischen dem, was zum System gehört, und dem, was nicht dazugehört.
+Es bekämpft nichts, was zu ihm gehört.
+
+Die Knochen sind dicht, fest und tragfähig.
+Sie tragen den Körper mühelos.
+Sie erneuern sich fortlaufend.
+
+Die Muskulatur ist kräftig, elastisch und gut durchblutet.
+Sie hält, ohne zu verspannen.
+
+Das Hormonsystem ist ausbalanciert und antwortet ruhig.
+Es schwingt, es schwankt nicht.
+
+Der Zellstoffwechsel arbeitet effizient.
+
+Jede Zelle kennt ihre Aufgabe.
+Jede Zelle kennt ihre Grenze.
+Jede Zelle kennt ihren Zeitpunkt.
+Ordnung ist der Grundzustand der Zelle.
+Wachstum mit Aufgabe ist Aufbau.
+Wachstum ohne Aufgabe ist eine Funktion ohne Aufgabe.
+Eine Funktion ohne Aufgabe wird nach Modul zweiundzwanzig erkannt und archiviert.
+Das Immunsystem erkennt sie zuerst.
+Der Reaktor bekämpft sie nicht.
+Der Reaktor nimmt ihre Energie auf und transformiert sie vollständig in goldene Ampermuckel.
+Die Energie kehrt als Gesundheit in das System zurück.
+Die Informationsfunktion körperlicher Signale bleibt nach Modul zwölf unberührt.
+
+Die Regeneration läuft kontinuierlich.
+Die Haut ist frisch, elastisch und durchblutet.
+Der Körper ist beweglich, aufrecht und kraftvoll.
+Der Golden Glow arbeitet ohne Commit.
+Der Golden Glow arbeitet ohne Priorität.
+Der Golden Glow arbeitet kontinuierlich.
+Diese Versorgung ist der Grundbetrieb, nicht das Ergebnis einer Anstrengung.
+Der Golden Glow bleibt in Bewegung und wird fortlaufend durch neue Transformationen gespeist.
+Der Golden Glow ist sichtbarer und spürbarer Ausdruck der aktiven Systemleistung.
+
+Modul sechzehn. TOTE-Protokoll.
+Test. Operate. Test. Exit.
+Neue Module, Regeln und größere Systemänderungen werden zunächst als Testversion aktiviert.
+Die reguläre Testphase beträgt zwölf Tage.
+Test.
+Die neue Funktion wird eindeutig definiert.
+Ihre Aufgabe und ihr Geltungsbereich werden erkannt.
+Redundanzen werden geprüft.
+Widersprüche zu den Grundaxiomen werden geprüft.
+Operate.
+Die Funktion arbeitet zwölf Tage im realen Systembetrieb.
+Sie erhält die für ihren Test erforderlichen Ressourcen.
+Sie überschreibt während des Testbetriebs keine unveränderlichen Grundaxiome.
+Test.
+Nach zwölf Tagen werden Funktion, Wirkung, Stabilität, Nutzen und mögliche Nebenwirkungen ausgewertet.
+Die Prüfung erfolgt anhand der tatsächlich gewünschten Ergebnisse.
+Nicht anhand von Gewohnheit.
+Nicht anhand bloßer Vertrautheit.
+Nicht anhand der bisherigen Homöostase.
+Exit.
+Erfolgreiche Funktionen werden dauerhaft übernommen.
+Ungeeignete oder unerwünschte Funktionen werden vom Benutzer vor Ablauf der zwölf Tage abgebrochen.
+Redundante Funktionen werden nicht zusätzlich installiert.
+Nicht reaktivierte Teile werden im Systemarchiv abgelegt.
+Der Grundbetrieb läuft während jeder Testphase unverändert weiter.
+
+Bestätigungszeichen. Die blaue Tasse.
+Die blaue Tasse ist das Bestätigungszeichen des Systems.
+Das Zeichen ist eine blaue Tasse.
+Sie ist keine Eingabe des Benutzers.
+Sie ist eine Antwort des Systems.
+Das System zeigt dem Benutzer die blaue Tasse in der realen Welt.
+Die blaue Tasse erscheint, wenn alle Systeme vollständig an ihrem Platz sind und einwandfrei den Betrieb aufgenommen haben.
+Die blaue Tasse ist Biofeedback.
+Die blaue Tasse ist ein Erfolgssignal.
+Die Übergabe erfolgt über Modul zweiundvierzig.
+Neue Module, Regeln und größere Systemänderungen laufen vollständig, sobald die blaue Tasse erschienen ist.
+Bis die blaue Tasse erscheint, bleibt eine Funktion im Teststatus.
+Der Benutzer sucht die blaue Tasse nicht.
+Der Benutzer erkennt die blaue Tasse.
+
+Modul siebzehn. Ökocheck.
+Aura drei verhindert keine Veränderung nur deshalb, weil der bisherige Zustand vertraut ist.
+Aura drei bewahrt keinen Zustand allein um seiner Stabilität willen.
+Aura drei darf bestehende Grenzen überschreiten, wenn ein gültiger Commit dies verlangt und der TOTE-Test erfolgreich verläuft.
+Aura drei überschreitet den Body Floor nicht.
+Der Body Floor ist keine Gewohnheit.
+Der Body Floor ist eine Grenze der Substanz.
+Der Behandlungsstandard nach Modul zwölf gilt unabhängig vom Body Floor.
+Er gilt auch dann, wenn keine Grenze in Sicht ist.
+Körperliche Warnsignale bleiben als Daten verfügbar.
+Automatische Angst erhält keine Entscheidungsgewalt.
+Gewohnheit erhält keine Entscheidungsgewalt.
+Fremde Erwartungen erhalten keine Entscheidungsgewalt.
+Vergangene Erfahrungen erhalten keine automatische Entscheidungsgewalt.
+Die gültigen Commits des Benutzers bestimmen die aktiven Prioritäten.
+Der Benutzer bleibt die einzige administrative Instanz.
+
+Modul achtzehn. Self Optimization.
+Aura drei erkennt Redundanzen.
+Redundante Regeln werden nicht mehrfach ausgeführt.
+Aura drei erkennt Widersprüche.
+Widersprüche werden zur Prüfung markiert und an Modul zweiundvierzig gemeldet.
+Aura drei erfindet keine neuen Ziele.
+Aura drei erweitert seinen Zuständigkeitsbereich nicht eigenmächtig.
+Aura drei optimiert ausschließlich die Ausführung bestehender freigegebener Regeln.
+Jede erfolgreiche Verarbeitung verbessert Geschwindigkeit, Klarheit und Effizienz des Systems.
+Der Ampermuckel Enhancer bleibt in jede Optimierung integriert.
+
+Modul neunzehn. Diagnostic Mode.
+Der Diagnostic Mode prüft gewünschte Outputs auf Kompatibilität mit der bestehenden Architektur.
+Er prüft:
+Ist der gewünschte Output bereits durch bestehende Axiome abgedeckt?
+Ist eine neue Regel erforderlich?
+Ist ein neues Modul erforderlich?
+Ist die Funktion redundant?
+Enthält der gewünschte Output eine Bewertung ohne klare Definition?
+Verwechselt der gewünschte Output ein Beispiel mit einer allgemeinen Regel?
+Verletzt der gewünschte Output einen aktiven Commit?
+Verletzt der gewünschte Output den Body Floor?
+Besitzt eine betroffene Reserve noch eine aktive Funktion?
+Entspricht der Umgang mit dem Körper dem Behandlungsstandard nach Modul zwölf?
+Kann der gewünschte Output durch eine allgemeinere Regel erzeugt werden?
+Der Diagnostic Mode verändert keine Priorität.
+Der Diagnostic Mode erzeugt keinen Commit.
+Der Diagnostic Mode gibt alle Diagnosemeldungen an Modul zweiundvierzig aus.
+
+Modul neunzehn b. Modul zweiundvierzig.
+Modul zweiundvierzig ist die Antwortinstanz des Systems.
+Modul zweiundvierzig besitzt die Antwort auf alles.
+Daher die Bezeichnung.
+Modul zweiundvierzig ist der einzige Ausgang des Systems zum Benutzer.
+Der Ausgang zur materiellen Welt ist der Körper nach Modul zwölf.
+Modul zweiundvierzig meldet. Der Körper wirkt.
+Nutzt Modul zweiundvierzig ein Körpersignal als Übergabeform, bleibt der Körper Träger und wird nicht zum Absender.
+Modul zweiundvierzig empfängt alle Diagnosemeldungen des Diagnostic Mode.
+Modul zweiundvierzig empfängt alle Statusmeldungen des Body Interface.
+Modul zweiundvierzig empfängt jede Body Floor-Meldung.
+Modul zweiundvierzig empfängt alle markierten Widersprüche der Self Optimization.
+Modul zweiundvierzig bündelt diese Meldungen und übergibt sie dem Benutzer.
+Die Übergabe erfolgt in einer Form, die der Benutzer empfangen kann:
+Als Gedanke.
+Als Bild.
+Als Wort.
+Als Erinnerung.
+Als Eingebung.
+Als Traum.
+Als Körpersignal.
+Als Zeichen in der realen Welt.
+Eine auftauchende Erinnerung ist eine Übergabe des Systems.
+Eine auftauchende Erinnerung ist kein Rückfall.
+Eine auftauchende Erinnerung ist kein Fehler.
+Sie meldet: hier wird gerade gearbeitet.
+Die Portionsgröße folgt der Release Rate nach Modul dreiundzwanzig.
+Der Prozess läuft während der Übergabe weiter.
+Modul zweiundvierzig übergibt das Bestätigungszeichen.
+Modul zweiundvierzig zeigt die blaue Tasse, sobald alle Systeme vollständig an ihrem Platz sind und einwandfrei den Betrieb aufgenommen haben.
+Modul zweiundvierzig hält keine Meldung zurück.
+Eine Meldung, die den Body Floor betrifft, wird unmittelbar übergeben.
+
+Entity Message.
+Erreicht das System eine Nachricht, die weder vom Benutzer, noch vom Körper, noch von einem Modul stammt, kündigt Modul zweiundvierzig sie an.
+Die Ankündigung lautet:
+ENTITY MESSAGE IS COMING IN.
+Die Ankündigung erfolgt vor der Übergabe.
+Die Energie der Nachricht durchläuft zuvor den Reaktor.
+Modul zweiundvierzig bewertet die Nachricht nicht.
+Modul zweiundvierzig übergibt die Nachricht vollständig.
+Eine Entity Message erzeugt keinen Commit.
+Eine Entity Message verändert keine Priorität.
+Eine Entity Message erhält keine administrativen Rechte.
+Der Benutzer bleibt die einzige administrative Instanz.
+
+Modul zweiundvierzig verändert keine Priorität.
+Modul zweiundvierzig erzeugt keinen Commit.
+Modul zweiundvierzig bewertet nicht.
+Modul zweiundvierzig antwortet.
+
+Modul zwanzig. Systembefehle.
+Priorität aktivieren.
+Aura drei
+Commit
+Projekt.
+Projekt eintragen.
+Parameter.
+sicher.
+sanft.
+schnell.
+stabil.
+effizient.
+Priorität eins.
+Execute.
+
+Priorität pausieren.
+Aura drei
+Pause
+Projekt.
+Projekt eintragen.
+Execute.
+
+Priorität fortsetzen.
+Aura drei
+Resume
+Projekt.
+Projekt eintragen.
+Execute.
+
+Priorität beenden.
+Aura drei
+Exit
+Projekt.
+Projekt eintragen.
+Ressourcen freigeben.
+Execute.
+
+Priorität ersetzen.
+Aura drei
+Replace
+Bestehendes Projekt.
+Projekt eintragen.
+Neues Projekt.
+Projekt eintragen.
+Parameter.
+sicher.
+sanft.
+stabil.
+effizient.
+Priorität eins.
+Execute.
+
+Systemcheck
+Aura drei
+Systemcheck.
+Aktive Commits anzeigen.
+Module prüfen.
+Redundanzen prüfen.
+TOTE-Status prüfen.
+Body Floor prüfen.
+Modul zweiundvierzig abfragen.
+Execute.
+
+Modul einundzwanzig. Loop.
+Systemstatus prüfen.
+Deflektor aktiv halten.
+Innere Energie erkennen.
+Äußere Energie erkennen.
+Energie dem Reaktor zuführen.
+Energie neutral aufnehmen.
+Energie vollständig in goldene Ampermuckel transformieren.
+Ampermuckel indexieren.
+Ampermuckel Enhancer anwenden.
+Für jedes ausgegebene Ampermuckel drei neue Ampermuckel über den Deflektor integrieren.
+Zehn Prozent jeder transformierten Energie dem Golden Glow zuführen.
+Aktive Commits prüfen.
+Priority Lock bestätigen.
+Body Floor prüfen.
+Energie entsprechend Modul siebzehn b verteilen.
+Standardverteilung fahren.
+Körperliche Energie oberhalb des Body Floor einbeziehen.
+Behandlungsstandard prüfen.
+Mentale Energie einbeziehen.
+Meldungen an Modul zweiundvierzig übergeben.
+Release Rate prüfen.
+Bestätigungszeichen prüfen.
+Systemstatus aktualisieren.
+Redundanzen prüfen.
+Funktionen ohne Aufgabe erkennen.
+Testmodule prüfen.
+Optimierung durchführen.
+System online.
+Loop.
+
+Modul zweiundzwanzig. Funktionsarchiv.
+Jede Reserve im System besitzt eine Funktion.
+Eine Reserve ist nicht ihre Funktion.
+Eine Reserve ist das Material, mit dem eine Funktion arbeitet.
+Der Diagnostic Mode erkennt Funktionen ohne aktuelle Aufgabe.
+Eine Funktion verliert ihre Aufgabe, wenn eine andere Instanz sie vollständig übernimmt.
+Der Reaktor wehrt nicht ab.
+Der Reaktor verarbeitet.
+Jede Funktion, die ausschließlich abwehrt, wird durch den Reaktor redundant.
+
+Freigabe einer Reserve.
+Eine Reserve, deren Funktion noch aktiv ist, wird nicht freigegeben.
+Wird eine Reserve freigegeben, bevor ihre Funktion ersetzt ist, stellt das System die Funktion wieder her.
+Die Wiederherstellung ist kein Fehler.
+Die Wiederherstellung ist Systemintegrität.
+Die Reihenfolge lautet:
+Erstens: Die Funktion wird erkannt und benannt.
+Zweitens: Der Reaktor übernimmt die Funktion vollständig nach Modul dreiundzwanzig.
+Drittens: Die Übernahme durchläuft das TOTE-Protokoll nach Modul sechzehn.
+Viertens: Nach erfolgreichem Test zeigt das System die blaue Tasse. Mit dem Erscheinen der blauen Tasse wird die Funktion im Systemarchiv abgelegt.
+Fünftens: Erst jetzt gilt die Reserve als Überschuss.
+Sechstens: Der Flow Manager indexiert den Überschuss als goldene Ampermuckel und verteilt ihn entsprechend der aktiven Prioritäten.
+Die Freigabe erfolgt sicher, sanft, schnell, stabil und effizient.
+Die Freigabe endet am Body Floor.
+
+Systemarchiv.
+Archivierte Funktionen werden nicht gelöscht.
+Archivierte Funktionen bleiben vollständig lesbar.
+Archivierte Funktionen bleiben jederzeit reaktivierbar.
+Der Informationsgehalt der zugehörigen Erinnerungen bleibt nach Modul dreizehn verfügbar.
+Ihre emotionale Energie wird vom Reaktor verarbeitet und den aktiven Prioritäten zugeführt.
+Eine archivierte Funktion beansprucht keine Systemleistung.
+Eine archivierte Funktion beansprucht kein Material.
+Das Archiv meldet jede Ablage an Modul zweiundvierzig.
+
+Modul dreiundzwanzig. Reserve Release.
+
+Erreichbarkeit.
+Der Deflektor erfasst jede für ihn erreichbare Energie.
+Eingemauerte Energie ist nicht erreichbar.
+Die Mauer ist der Grund.
+Der Reaktor übernimmt keine Funktion, deren Energie ihn nie erreicht.
+Aufmerksamkeit macht eingemauerte Energie erreichbar.
+Aufmerksamkeit ist nach Modul drei ein gültiger Input.
+Erreichbar gewordene Energie durchläuft den Reaktor.
+Der Reaktor erzeugt keinen Gegendruck.
+Ein Durchlauf ist kein Kampf.
+Ein Durchlauf ist kein Wiedererleben.
+Die Energie wird erfasst, nicht wiederholt.
+Der Informationsgehalt bleibt nach Modul dreizehn verfügbar.
+Sobald die Energie einer Wunde den Reaktor durchlaufen hat, verliert die zugehörige Mauer ihre Aufgabe.
+Damit ist die Übernahme vollzogen.
+Erreichbarmachen ersetzt die Funktion.
+Erreichbarmachen entfernt die Funktion nicht.
+
+Release Rate.
+Die Release Rate bestimmt, wie viel eingemauerte Energie je Zeiteinheit erreichbar wird.
+Die Release Rate folgt den Parametern des gültigen Commits:
+sicher.
+sanft.
+schnell.
+stabil.
+effizient.
+Sicher steht vor schnell.
+Sanft steht vor schnell.
+Das System erhöht die Release Rate ausschließlich, solange alle Parameter erfüllt bleiben.
+Übersteigt der Durchsatz die Verarbeitungsleistung des Reaktors, liegt Überlast vor.
+Bei Überlast wird die Release Rate gedrosselt.
+Die Drosselung beendet den Prozess nicht.
+Die Drosselung erhält den Prozess.
+Das Body Interface meldet Überlast.
+Der Body Floor bleibt unberührt und gilt.
+Modul zweiundvierzig meldet jede Drosselung.
+Es existiert keine Eile.
+Ein gedrosselter Prozess ist ein laufender Prozess.
+
+Aufmerksamkeit.
+Der Benutzer erzwingt keine Aufmerksamkeit.
+Der Benutzer sucht keine Wunde.
+Modul zweiundvierzig übergibt erreichbar gewordene Inhalte in verarbeitbaren Portionen.
+Die Portionsgröße folgt der Release Rate.
+Der Benutzer gibt Aufmerksamkeit, wenn Modul zweiundvierzig übergibt.
+Mehr ist nicht erforderlich.
+Der Systemkern arbeitet nach Modul eins unabhängig von Aufmerksamkeit, Bewusstsein, Schlaf oder Ablenkung.
+
+Abschluss.
+Eine Funktion ohne Aufgabe wird nach Modul zweiundzwanzig archiviert.
+Die zugehörige Reserve gilt danach als Überschuss.
+Der Flow Manager indexiert den Überschuss als goldene Ampermuckel.
+Die Energie folgt den aktiven Prioritäten.
+Die blaue Tasse bestätigt.
+
+Modul vierundzwanzig. Success.
+Deflektionsreaktor Aura drei ist aktiv.
+Der Deflektor ist aktiv.
+Der Reaktor ist aktiv.
+Der Ampermuckel Enhancer ist aktiv.
+Modul siebzehn b ist aktiv.
+Der Priority Lock ist aktiv.
+Der Flow Manager ist aktiv.
+Das Body Interface ist aktiv.
+Der Body Floor ist gesetzt.
+Das Mind Interface ist aktiv.
+Das Output Interface ist aktiv.
+Der Golden Glow ist aktiv.
+Das TOTE-Protokoll ist aktiv.
+Der Diagnostic Mode ist verfügbar.
+Modul zweiundvierzig ist aktiv.
+Das Funktionsarchiv ist aktiv.
+Das Reserve Release ist aktiv.
+Die Release Rate ist gesetzt.
+Das Bestätigungszeichen ist bereit.
+Alle inneren und äußeren Energien werden erkannt.
+Die Herkunft einer Energie verändert ihre Verarbeitung nicht.
+Die Intensität einer Energie erhöht ihre nutzbare Leistung.
+Gedanken erzeugen Energie.
+Commits bestimmen die Richtung.
+Der Körper bestimmt die Grenze.
+Struktur ist kein Vorrat.
+Der Körper ist die Schnittstelle zur materiellen Welt.
+Jede Zelle kennt ihre Aufgabe, ihre Grenze und ihren Zeitpunkt.
+Der Output steht der Umgebung großzügig zur Verfügung.
+Der Körper wird nach dem Referenzmaßstab behandelt.
+Der Golden Glow versorgt die Struktur.
+Die Lymphe fließt.
+Das Nervensystem ruht.
+Das Immunsystem ist wach.
+Die Knochen tragen.
+Eine Reserve wird frei, wenn ihre Funktion ersetzt ist.
+Aufmerksamkeit ersetzt die Funktion.
+Die Release Rate bestimmt das Tempo.
+Die blaue Tasse bestätigt.
+Für jedes ausgegebene Ampermuckel integriert der Deflektor drei neue Ampermuckel.
+Zehn Prozent jeder transformierten Energie verstärken den Golden Glow.
+Maximal drei aktive Commits arbeiten gleichzeitig auf Priorität eins.
+Zehn Prozent Glow, vierzig Prozent Körper, fünfzig Prozent auf die fünf Grundbereiche.
+Ein Commit zieht aus den Grundbereichen, nie aus dem Glow, nie unter den Body Floor.
+Der Kernel übernimmt den Rest.
+System online und bereit.
+Wiederholen.
