@@ -61,10 +61,19 @@ const offQueue = () => { try { return JSON.parse(localStorage.getItem("off:queue
 const offQueueSetzen = (q) => { try { localStorage.setItem("off:queue", JSON.stringify(q)); } catch {} };
 const offAusstehend = () => offQueue().length;
 
+// fetch mit zeitgrenze — navigator.onLine lügt manchmal ("online" trotz totem netz),
+// ohne das hier würde ein hängender request die app minutenlang blockieren.
+async function fetchZeit(url, options = {}, ms = 5000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try { return await fetch(url, { ...options, signal: ctrl.signal }); }
+  finally { clearTimeout(t); }
+}
+
 // liest per netz, cached lokal · bei fehler (offline) letzten bekannten stand liefern
 async function dbGet(cacheKey, url) {
   try {
-    const r = await fetch(url, { headers: dbHeaders(getToken()) });
+    const r = await fetchZeit(url, { headers: dbHeaders(getToken()) });
     if (!r.ok) throw new Error(await r.text());
     const d = await r.json();
     offSchreibenCache(cacheKey, d);
@@ -84,7 +93,7 @@ async function dbSchreiben(methode, url, body, opts = {}) {
   const op = { methode, url, body: body || null, prefer, t: Date.now() };
   if (navigator.onLine) {
     try {
-      const r = await fetch(url, { method: methode, headers: { ...dbHeaders(getToken()), Prefer: prefer }, body: body ? JSON.stringify(body) : undefined });
+      const r = await fetchZeit(url, { method: methode, headers: { ...dbHeaders(getToken()), Prefer: prefer }, body: body ? JSON.stringify(body) : undefined });
       if (!r.ok) throw new Error(await r.text());
       if (prefer.includes("representation")) { try { return { ok: true, data: await r.json() }; } catch { return { ok: true, data: null }; } }
       return { ok: true, data: null };
@@ -103,7 +112,7 @@ async function offSyncJetzt() {
   const rest = [];
   for (const op of q) {
     try {
-      const r = await fetch(op.url, { method: op.methode, headers: { ...dbHeaders(getToken()), Prefer: op.prefer || "return=minimal" }, body: op.body ? JSON.stringify(op.body) : undefined });
+      const r = await fetchZeit(op.url, { method: op.methode, headers: { ...dbHeaders(getToken()), Prefer: op.prefer || "return=minimal" }, body: op.body ? JSON.stringify(op.body) : undefined });
       if (!r.ok) rest.push(op);
     } catch { rest.push(op); }
   }
