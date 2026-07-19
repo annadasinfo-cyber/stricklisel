@@ -983,6 +983,145 @@ const tagsSchreiben = (a) => (a || []).map((x) => "#" + x).join(" ");
 
 const MONATE = ["januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "dezember"];
 
+// ============================================================
+// M42 · KOMMUNIKATOR — frage stellen, antwort empfangen, feedback dazu
+// ============================================================
+function M42() {
+  const [liste, setListe] = useState([]);
+  const [neueFrage, setNeueFrage] = useState("");
+  const [msg, setMsg] = useState({ t: "", c: "" });
+  const [antwortEntwurf, setAntwortEntwurf] = useState({});
+  const [feedbackEntwurf, setFeedbackEntwurf] = useState({});
+
+  useEffect(() => { laden(); }, []);
+
+  async function laden() {
+    try {
+      const d = await dbGet("m42", `${SUPABASE_URL}/rest/v1/m42?select=*&order=created_at.desc`);
+      setListe(Array.isArray(d) ? d : []);
+    } catch (e) { setMsg({ t: "» " + (e?.message || e), c: "err" }); }
+  }
+
+  async function stellen() {
+    const t = neueFrage.trim();
+    if (!t) return;
+    setNeueFrage("");
+    const neu = { id: neueId(), user_id: getUserId(), frage: t, erledigt: false, created_at: new Date().toISOString() };
+    setListe((l) => [neu, ...l]);
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/m42`, neu);
+    setMsg({ t: ok ? "» frage gestellt" : "» offline gestellt — sync folgt", c: ok ? "ok" : "work" });
+    if (ok) laden();
+  }
+
+  async function antworten(m, text) {
+    if (!text.trim()) return;
+    const zeit = new Date().toISOString();
+    setListe((l) => l.map((x) => (x.id === m.id ? { ...x, antwort: text, antwort_zeit: zeit } : x)));
+    setAntwortEntwurf((d) => ({ ...d, [m.id]: "" }));
+    const { ok } = await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/m42?id=eq.${m.id}`, { antwort: text, antwort_zeit: zeit });
+    if (ok) laden();
+  }
+
+  async function feedbacken(m, text) {
+    if (!text.trim()) return;
+    const zeit = new Date().toISOString();
+    setListe((l) => l.map((x) => (x.id === m.id ? { ...x, feedback: text, feedback_zeit: zeit } : x)));
+    setFeedbackEntwurf((d) => ({ ...d, [m.id]: "" }));
+    const { ok } = await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/m42?id=eq.${m.id}`, { feedback: text, feedback_zeit: zeit });
+    if (ok) laden();
+  }
+
+  async function erledigen(m) {
+    setListe((l) => l.map((x) => (x.id === m.id ? { ...x, erledigt: true } : x)));
+    const { ok } = await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/m42?id=eq.${m.id}`, { erledigt: true });
+    if (ok) laden();
+  }
+
+  const zeitfmt = (iso) => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleDateString("de-DE") + " · " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const offeneListe = liste.filter((m) => !m.erledigt);
+  const erledigtListe = liste.filter((m) => m.erledigt);
+
+  const Karte = (m) => (
+    <div className={"m42karte" + (m.erledigt ? " erledigt" : "")} key={m.id}>
+      <div className="m42zeile m42frage"><span className="m42tag">frage</span><i>{zeitfmt(m.created_at)}</i></div>
+      <div className="m42text m42frage">{m.frage}</div>
+
+      {m.antwort ? (
+        <>
+          <div className="m42zeile m42antwort"><span className="m42tag">antwortet</span><i>{zeitfmt(m.antwort_zeit)}</i></div>
+          <div className="m42text m42antwort">{m.antwort}</div>
+        </>
+      ) : !m.erledigt && (
+        <div className="m42eingabe">
+          <input className="ti" placeholder="antwort eintragen …" value={antwortEntwurf[m.id] || ""}
+            onChange={(e) => setAntwortEntwurf((d) => ({ ...d, [m.id]: e.target.value }))}
+            onKeyDown={(e) => e.key === "Enter" && antworten(m, antwortEntwurf[m.id] || "")} />
+          <button className="btn" onClick={() => antworten(m, antwortEntwurf[m.id] || "")}>eintragen</button>
+        </div>
+      )}
+
+      {m.antwort && (
+        m.feedback ? (
+          <>
+            <div className="m42zeile m42feedback"><span className="m42tag">feedback</span><i>{zeitfmt(m.feedback_zeit)}</i></div>
+            <div className="m42text m42feedback">{m.feedback}</div>
+          </>
+        ) : !m.erledigt && (
+          <div className="m42eingabe">
+            <input className="ti" placeholder="feedback eintragen …" value={feedbackEntwurf[m.id] || ""}
+              onChange={(e) => setFeedbackEntwurf((d) => ({ ...d, [m.id]: e.target.value }))}
+              onKeyDown={(e) => e.key === "Enter" && feedbacken(m, feedbackEntwurf[m.id] || "")} />
+            <button className="btn" onClick={() => feedbacken(m, feedbackEntwurf[m.id] || "")}>eintragen</button>
+          </div>
+        )
+      )}
+
+      {!m.erledigt && (
+        <div className="actions" style={{ marginTop: 8 }}>
+          <button className="btn" onClick={() => erledigen(m)}>👍 erledigt</button>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <div className="grouphead">MODUL 42 · KOMMUNIKATOR<span className="rule" /></div>
+
+      <Panel title="M42" sub="frage in den raum stellen · antwort empfangen, wenn sie kommt">
+        <div className="field">
+          <label className="cap">neue frage</label>
+          <div className="rezrow">
+            <input className="ti" value={neueFrage} onChange={(e) => setNeueFrage(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && stellen()}
+              placeholder="was willst du wissen?" />
+            <button className="btn primary" onClick={stellen}>stellen</button>
+          </div>
+        </div>
+        <div className="actions" style={{ marginTop: 10 }}>
+          <span className={"status " + msg.c}>{msg.t}</span>
+        </div>
+      </Panel>
+
+      {!liste.length && <p className="hint" style={{ marginLeft: 4 }}>noch keine frage gestellt.</p>}
+
+      {offeneListe.map(Karte)}
+
+      {!!erledigtListe.length && (
+        <>
+          <div className="grouphead" style={{ marginTop: 26 }}>ARCHIV<span className="rule" /></div>
+          {erledigtListe.map(Karte)}
+        </>
+      )}
+    </>
+  );
+}
+
 // Ein Monat als Kästchen — leer / beschrieben / voll.
 function MonatsGitter({ liste, datum, setDatum, monat, setMonat, children }) {
   const [j, m] = monat.split("-").map(Number);
@@ -2192,7 +2331,7 @@ function Kurve() {
   );
 }
 
-function Pausenschirm({ springe }) {
+function Pausenschirm({ springe, zuM42 }) {
   const [ort, setOrt] = useState(RADAR_ORTE[0]);
   const [nm, setNm] = useState(25);
   const [flug, setFlug] = useState([]);
@@ -2204,7 +2343,7 @@ function Pausenschirm({ springe }) {
   const startRef = useRef(Date.now());
   const [gedanken, setGedanken] = useState([]);
   const [neuerGedanke, setNeuerGedanke] = useState("");
-  const [faeden, setFaeden] = useState({ commits: [], skripte: [], personen: [] });
+  const [faeden, setFaeden] = useState({ commits: [], skripte: [], personen: [], fragen: [] });
   const [zitate, setZitate] = useState([]);
   const [spruch, setSpruch] = useState(null);
 
@@ -2257,11 +2396,13 @@ function Pausenschirm({ springe }) {
       dbGet("faeden-commits", `${SUPABASE_URL}/rest/v1/commits?select=id,projekt&status=eq.pausiert`).catch(() => []),
       dbGet("faeden-skripte", `${SUPABASE_URL}/rest/v1/skripte?select=id,name,matrix&eltern_id=is.null&order=updated_at.desc&limit=30`).catch(() => []),
       dbGet("faeden-personen", `${SUPABASE_URL}/rest/v1/things?select=id,name,rolle&art=eq.person`).catch(() => []),
-    ]).then(([c, s, p]) => {
+      dbGet("faeden-m42", `${SUPABASE_URL}/rest/v1/m42?select=id,frage&erledigt=eq.false&antwort=is.null`).catch(() => []),
+    ]).then(([c, s, p, f]) => {
       setFaeden({
         commits: Array.isArray(c) ? c : [],
         skripte: (Array.isArray(s) ? s : []).filter((x) => !((Array.isArray(x.matrix) ? x.matrix[4] : "") || "").trim()),
         personen: (Array.isArray(p) ? p : []).filter((x) => !x.rolle),
+        fragen: Array.isArray(f) ? f : [],
       });
     }).catch(() => {});
   }, []);
@@ -2467,7 +2608,7 @@ function Pausenschirm({ springe }) {
 
         <div className="ptitel" style={{ marginTop: 22 }}>offene fäden</div>
         <div className="faeden">
-          {!faeden.commits.length && !faeden.skripte.length && !faeden.personen.length && (
+          {!faeden.commits.length && !faeden.skripte.length && !faeden.personen.length && !faeden.fragen.length && (
             <div className="pleer">nichts hängt gerade offen rum.</div>
           )}
           {faeden.commits.map((c) => (
@@ -2480,6 +2621,11 @@ function Pausenschirm({ springe }) {
           ))}
           {faeden.personen.map((p) => (
             <div className="fzeile" key={"p" + p.id}><span className="ftag">ohne rolle</span>{p.name || "unbenannt"}</div>
+          ))}
+          {faeden.fragen.map((f) => (
+            <button className="fzeile" key={"f" + f.id} onClick={() => zuM42 && zuM42()}>
+              <span className="ftag">offene frage</span>{f.frage}
+            </button>
           ))}
         </div>
 
@@ -2859,6 +3005,7 @@ export default function StricklieselApp() {
           <button aria-pressed={tab === "handbuch"} onClick={() => setTab("handbuch")}>handbuch</button>
           <button aria-pressed={tab === "konsole"} onClick={() => setTab("konsole")}>konsole</button>
           <button aria-pressed={tab === "17b"} onClick={() => setTab("17b")}>abteilung 17b</button>
+          <button aria-pressed={tab === "m42"} onClick={() => setTab("m42")}>m42</button>
           <button aria-pressed={tab === "think"} onClick={() => setTab("think")}>denkbrett</button>
           <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
           <button aria-pressed={tab === "skripte"} onClick={() => setTab("skripte")}>skripte</button>
@@ -2868,10 +3015,11 @@ export default function StricklieselApp() {
         <Fehlerfang key={tab}>
         {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
+        {tab === "m42" && <M42 />}
         {tab === "log" && <LogFiles />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} kette={cfg.ketteText} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} />}
-        {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} />}
+        {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuM42={() => setTab("m42")} />}
         </Fehlerfang>
 
         {tab === "konsole" && <>
@@ -3397,6 +3545,10 @@ function Styles() {
     .seitenkopf{flex-wrap:wrap}
     .xfiles{order:-1;flex:1 1 100%;letter-spacing:.2em;font-size:13px;margin-bottom:4px}
     .otabs{max-width:100%}
+    .gfang{flex-wrap:wrap}
+    .gfang .ti{flex:1 1 100%}
+    .m42eingabe{flex-wrap:wrap}
+    .m42eingabe .ti{flex:1 1 100%}
   }
 
   /* things */
@@ -3428,6 +3580,23 @@ function Styles() {
     display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden}
   .bkhook{font-size:11px;color:var(--dim);font-style:italic;margin-top:7px;
     border-left:2px solid var(--green-dim);padding-left:8px}
+
+  /* m42 kommunikator */
+  .m42karte{border:1px solid var(--line);border-radius:7px;background:var(--panel-2);
+    padding:14px 15px;margin-bottom:12px}
+  .m42karte.erledigt{opacity:.55}
+  .m42zeile{display:flex;align-items:baseline;gap:9px;margin-top:10px}
+  .m42zeile:first-child{margin-top:0}
+  .m42zeile i{font-style:normal;font-size:10px;letter-spacing:.04em;color:var(--dim);margin-left:auto}
+  .m42tag{font-family:var(--term);font-size:10.5px;letter-spacing:.1em}
+  .m42frage .m42tag, .m42text.m42frage{color:#e88fc0}
+  .m42antwort .m42tag, .m42text.m42antwort{color:#f0954a}
+  .m42feedback .m42tag, .m42text.m42feedback{color:var(--muted)}
+  .m42text{font-size:13px;line-height:1.5;margin-top:3px}
+  .m42text.m42frage{text-shadow:0 0 8px rgba(232,143,192,.35)}
+  .m42text.m42antwort{text-shadow:0 0 8px rgba(240,149,74,.3)}
+  .m42eingabe{display:flex;gap:8px;margin-top:10px}
+  .m42eingabe .ti{flex:1;min-width:0}
 
   /* gedanken-fang · orakel-impuls */
   .gfang{display:flex;gap:8px;margin-bottom:10px}
