@@ -1943,6 +1943,23 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
 // ============================================================
 // THINGS · personen, orte, dinge
 // ============================================================
+
+// avatar-silhouetten — feine umrisse, unten offen, im terminal-look
+const AVATARE = ["mann", "frau", "monster", "kreatur", "magier"];
+function Avatar({ typ, size = 44 }) {
+  const inner = {
+    mann: <><circle className="avf" cx="0" cy="18" r="20" /><path className="avf" d="M-30 94 Q-30 44 0 44 Q30 44 30 94 Z" /><circle className="avl" cx="0" cy="18" r="20" /><path className="avl" d="M-30 94 Q-30 44 0 44 Q30 44 30 94" /></>,
+    frau: <><circle className="avf" cx="0" cy="12" r="15" /><path className="avf" d="M-15 32 L15 32 L0 52 Z" /><path className="avf" d="M0 40 Q-30 44 -28 94 Q0 94 28 94 Q30 44 0 40 Z" /><circle className="avl" cx="0" cy="12" r="15" /><path className="avl" d="M-15 32 L15 32 L0 52 Z" /><path className="avl" d="M0 40 Q-30 44 -28 94 M0 40 Q30 44 28 94" /></>,
+    monster: <><path className="avf" d="M-28 96 Q-30 34 0 30 Q30 34 28 96 Z" /><path className="avl" d="M-28 96 Q-30 34 0 30 Q30 34 28 96" /><path className="avl" d="M-28 40 Q-30 20 -20 16 Q-18 30 -12 34" /><path className="avl" d="M28 40 Q30 20 20 16 Q18 30 12 34" /><circle className="aveye" cx="-9" cy="54" r="3.2" /><circle className="aveye" cx="9" cy="54" r="3.2" /></>,
+    kreatur: <><path className="avf" d="M-10 56 Q-40 46 -34 18 Q-14 30 -8 54 Z" /><path className="avl" d="M-10 56 Q-40 46 -34 18 Q-14 30 -8 54 Z" /><path className="avf" d="M10 56 Q40 46 34 18 Q14 30 8 54 Z" /><path className="avl" d="M10 56 Q40 46 34 18 Q14 30 8 54 Z" /><path className="avf" d="M-22 96 Q-16 52 0 48 Q16 52 22 96 Q0 104 -22 96 Z" /><path className="avl" d="M-22 96 Q-16 52 0 48 Q16 52 22 96" /><circle className="avf" cx="0" cy="24" r="16" /><circle className="avl" cx="0" cy="24" r="16" /><circle className="aveye" cx="-6" cy="24" r="2.4" /><circle className="aveye" cx="6" cy="24" r="2.4" /></>,
+    magier: <><line className="avl" x1="28" y1="58" x2="28" y2="98" /><circle className="avf" cx="28" cy="53" r="3.5" /><circle className="avl" cx="28" cy="53" r="3.5" /><path className="avf" d="M0 -16 L14 20 Q0 25 -14 20 Z" /><path className="avl" d="M0 -16 L14 20 Q0 25 -14 20 Z" /><ellipse className="avl" cx="0" cy="20" rx="16" ry="3.5" /><circle className="avf" cx="0" cy="32" r="12" /><circle className="avl" cx="0" cy="32" r="12" /><path className="avf" d="M-25 96 L-14 54 Q0 50 14 54 L25 96 Q0 104 -25 96 Z" /><path className="avl" d="M-25 96 L-14 54 Q0 50 14 54 L25 96" /></>,
+  }[typ];
+  if (!inner) return null;
+  return (
+    <svg className="avatar" width={size} height={size} viewBox="-46 -20 92 128">{inner}</svg>
+  );
+}
+
 const ARTEN = [
   { v: "besetzung", t: "besetzung", ein: "" },
   { v: "person", t: "personen", ein: "person" },
@@ -2158,6 +2175,7 @@ function Things({ springe, projekt, setProjekt }) {
           {art !== "besetzung" && meine.map((th) => (
             <div className={"thing" + (offen === th.id ? " on" : "")} key={th.id}>
               <div className="thkopf" onClick={() => setOffen(offen === th.id ? null : th.id)}>
+                {th.avatar && <span className="thav"><Avatar typ={th.avatar} size={26} /></span>}
                 <span className="thname">{th.name || "unbenannt"}</span>
                 {th.rolle && <span className="throlle">{th.rolle}</span>}
                 {th.archetyp && <span className="tharch">{th.archetyp}</span>}
@@ -2177,6 +2195,17 @@ function Things({ springe, projekt, setProjekt }) {
                   </div>
                   {art === "person" && (
                     <>
+                    <div className="field" style={{ marginTop: 12 }}>
+                      <label className="cap">avatar</label>
+                      <div className="avwahl">
+                        <button className={"avopt" + (!th.avatar ? " on" : "")} onClick={() => feld(th, "avatar", "")} title="keiner">–</button>
+                        {AVATARE.map((a) => (
+                          <button key={a} className={"avopt" + (th.avatar === a ? " on" : "")} onClick={() => feld(th, "avatar", a)} title={a}>
+                            <Avatar typ={a} size={34} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="row" style={{ marginTop: 12 }}>
                       <div className="field">
                         <label className="cap">rolle · was sie tut</label>
@@ -2359,6 +2388,7 @@ function Pausenschirm({ springe, zuM42 }) {
   const [faeden, setFaeden] = useState({ commits: [], skripte: [], personen: [], fragen: [] });
   const [zitate, setZitate] = useState([]);
   const [spruch, setSpruch] = useState(null);
+  const [steckbriefe, setSteckbriefe] = useState([]);
 
   useEffect(() => {
     const iv = setInterval(() => { setUptime(Math.floor((Date.now() - startRef.current) / 1000)); setJetzt(new Date()); }, 1000);
@@ -2379,6 +2409,35 @@ function Pausenschirm({ springe, zuM42 }) {
         });
         setBuecher(echte.slice(0, 3));
       }).catch(() => {});
+  }, []);
+
+  // steckbriefe — die 5 personen mit den meisten fundstellen, projektübergreifend.
+  // "kill your darlings": zeigt, welche figuren am häufigsten in den skripten auftauchen.
+  useEffect(() => {
+    Promise.all([
+      dbGet("steckbrief-skripte", `${SUPABASE_URL}/rest/v1/skripte?select=id,matrix,texte`).catch(() => []),
+      dbGet("steckbrief-personen", `${SUPABASE_URL}/rest/v1/things?select=id,name,rolle,archetyp,avatar,ordner_id&art=eq.person`).catch(() => []),
+    ]).then(([sk, pe]) => {
+      const skripte = Array.isArray(sk) ? sk : [];
+      const zaehlen = (name) => {
+        const low = (name || "").trim().toLowerCase();
+        if (!low) return 0;
+        let n = 0;
+        skripte.forEach((s) => {
+          for (let i = 0; i < 9; i++) {
+            const m = (s.matrix?.[i] || ""), x = (s.texte?.[i] || "");
+            if (x.toLowerCase().includes(low) || m.toLowerCase().includes(low)) n++;
+          }
+        });
+        return n;
+      };
+      const mitZahl = (Array.isArray(pe) ? pe : [])
+        .map((p) => ({ ...p, anzahl: zaehlen(p.name) }))
+        .filter((p) => p.anzahl > 0)
+        .sort((a, b) => b.anzahl - a.anzahl)
+        .slice(0, 5);
+      setSteckbriefe(mitZahl);
+    }).catch(() => {});
   }, []);
 
   // gedanken-fang — lose gedanken, noch ohne commit-signatur
@@ -2570,6 +2629,23 @@ function Pausenschirm({ springe, zuM42 }) {
             </button>
           ))}
         </div>
+
+        {!!steckbriefe.length && (
+          <>
+            <div className="ptitel" style={{ marginTop: 22 }}>steckbriefe · kill your darlings</div>
+            <div className="bgrid">
+              {steckbriefe.map((p) => (
+                <div className="skarte" key={p.id}>
+                  <div className="sav">{p.avatar ? <Avatar typ={p.avatar} size={40} /> : <span className="savleer">?</span>}</div>
+                  <div className="sinfo">
+                    <div className="sname">{p.name || "unbenannt"} <span className="sanzahl">{p.anzahl}×</span></div>
+                    <div className="smeta">{[p.archetyp, p.rolle].filter(Boolean).join(" · ") || "—"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="pgrid">
           <div className="pradar">
@@ -3753,6 +3829,27 @@ function Styles() {
   .throlle{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--green);
     border:1px solid var(--line-hot);border-radius:3px;padding:1px 6px;flex:0 0 auto}
   .tharch{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--dim);flex:0 0 auto}
+
+  /* avatare */
+  .avatar .avl{fill:none;stroke:var(--green);stroke-width:1.4;opacity:.8;stroke-linejoin:round;stroke-linecap:round}
+  .avatar .avf{fill:var(--green);opacity:.12}
+  .avatar .aveye{fill:var(--green);opacity:.7}
+  .thav{flex:0 0 auto;display:inline-flex;margin-right:2px}
+  .avwahl{display:flex;gap:8px;flex-wrap:wrap}
+  .avopt{width:46px;height:46px;border:1px solid var(--line);border-radius:6px;background:var(--panel-2);
+    cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:15px;padding:0}
+  .avopt:hover{border-color:var(--line-hot)}
+  .avopt.on{border-color:var(--green);box-shadow:0 0 8px rgba(53,255,111,.3)}
+
+  /* steckbriefe */
+  .skarte{flex:1 1 200px;display:flex;align-items:center;gap:12px;border:1px solid var(--line);
+    border-radius:7px;background:var(--panel-2);padding:11px 13px}
+  .sav{flex:0 0 auto;width:40px;height:40px;display:flex;align-items:center;justify-content:center}
+  .savleer{font-family:var(--term);font-size:20px;color:var(--dim);opacity:.5}
+  .sinfo{min-width:0;flex:1}
+  .sname{font-family:var(--mono);font-size:13px;color:var(--ink);display:flex;align-items:baseline;gap:8px}
+  .sanzahl{font-family:var(--term);font-size:11px;color:var(--green);text-shadow:var(--glow);flex:0 0 auto}
+  .smeta{font-family:var(--term);font-size:10.5px;letter-spacing:.06em;color:var(--dim);margin-top:3px}
 
   /* handbuch */
   .handbuch{margin:14px 0 0;padding:16px;background:var(--panel-2);border:1px solid var(--line);
