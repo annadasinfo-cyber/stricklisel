@@ -2024,7 +2024,7 @@ const ARCHETYPEN = [
 ];
 const ARCHETYP_INFO = Object.fromEntries(ARCHETYPEN);
 
-function Things({ springe, projekt, setProjekt }) {
+function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson }) {
   const [ordner, setOrdner] = useState([]);
   const aktOrdner = projekt, setAktOrdner = setProjekt;
   const [art, setArt] = useState("person");
@@ -2036,6 +2036,19 @@ function Things({ springe, projekt, setProjekt }) {
 
   useEffect(() => { laden(); }, [projekt]);
   useEffect(() => { setFunde(null); }, [aktOrdner, art]);
+
+  // sprung aus dem denkbrett-steckbrief: person aufklappen
+  useEffect(() => {
+    if (!sprungPerson || !liste.length) return;
+    const p = liste.find((x) => x.id === sprungPerson);
+    if (p) {
+      setArt("person");
+      setAktOrdner("");
+      setOffen(sprungPerson);
+      setTimeout(() => document.querySelector('.thing.on')?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+    }
+    setSprungPerson && setSprungPerson(null);
+  }, [sprungPerson, liste]);
 
   async function laden() {
     try {
@@ -2373,7 +2386,7 @@ function Kurve() {
   );
 }
 
-function Pausenschirm({ springe, zuM42 }) {
+function Pausenschirm({ springe, zuM42, zurPerson }) {
   const [ort, setOrt] = useState(RADAR_ORTE[0]);
   const [nm, setNm] = useState(25);
   const [flug, setFlug] = useState([]);
@@ -2635,13 +2648,13 @@ function Pausenschirm({ springe, zuM42 }) {
             <div className="ptitel" style={{ marginTop: 22 }}>steckbriefe · kill your darlings</div>
             <div className="bgrid">
               {steckbriefe.map((p) => (
-                <div className="skarte" key={p.id}>
+                <button className="skarte" key={p.id} onClick={() => zurPerson && zurPerson(p.id)} title="→ zur akte">
                   <div className="sav">{p.avatar ? <Avatar typ={p.avatar} size={40} /> : <span className="savleer">?</span>}</div>
                   <div className="sinfo">
                     <div className="sname">{p.name || "unbenannt"} <span className="sanzahl">{p.anzahl}×</span></div>
                     <div className="smeta">{[p.archetyp, p.rolle].filter(Boolean).join(" · ") || "—"}</div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </>
@@ -2778,6 +2791,7 @@ export default function StricklieselApp() {
 
   const [tab, setTab] = useState("konsole");
   const [sprung, setSprung] = useState(null);
+  const [sprungPerson, setSprungPerson] = useState(null);
   // welches projekt gerade dran ist — teilen sich skripte und things
   const [projekt, setProjekt] = useState(() => { try { return localStorage.getItem("projekt") || ""; } catch { return ""; } });
   const setzeProjekt = (v) => { setProjekt(v); try { localStorage.setItem("projekt", v); } catch {} };
@@ -3123,8 +3137,8 @@ export default function StricklieselApp() {
         {tab === "m42" && <M42 />}
         {tab === "log" && <LogFiles />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} kette={cfg.ketteText} />}
-        {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} />}
-        {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuM42={() => setTab("m42")} />}
+        {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} sprungPerson={sprungPerson} setSprungPerson={setSprungPerson} />}
+        {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuM42={() => setTab("m42")} zurPerson={(id) => { setSprungPerson(id); setTab("things"); }} />}
         </Fehlerfang>
 
         {tab === "konsole" && <>
@@ -3843,7 +3857,9 @@ function Styles() {
 
   /* steckbriefe */
   .skarte{flex:1 1 200px;display:flex;align-items:center;gap:12px;border:1px solid var(--line);
-    border-radius:7px;background:var(--panel-2);padding:11px 13px}
+    border-radius:7px;background:var(--panel-2);padding:11px 13px;cursor:pointer;text-align:left;
+    font-family:inherit;transition:.12s}
+  .skarte:hover{border-color:var(--line-hot)}
   .sav{flex:0 0 auto;width:40px;height:40px;display:flex;align-items:center;justify-content:center}
   .savleer{font-family:var(--term);font-size:20px;color:var(--dim);opacity:.5}
   .sinfo{min-width:0;flex:1}
