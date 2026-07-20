@@ -2426,18 +2426,7 @@ const KANTEN = [
 
 function Kurve() {
   const [wach, setWach] = useState(null);
-  const [neueWendung, setNeueWendung] = useState("");
-  const [wheelMsg, setWheelMsg] = useState("");
   const p = (i) => KURVE[i];
-
-  async function wendungSpeichern() {
-    const t = neueWendung.trim();
-    if (!t) return;
-    setNeueWendung("");
-    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/wheel`, { id: neueId(), user_id: getUserId(), wendung: t });
-    setWheelMsg(ok ? "» ins wheel gelegt" : "» offline — sync folgt");
-    setTimeout(() => setWheelMsg(""), 2500);
-  }
 
   return (
     <div className="kwrap">
@@ -2481,13 +2470,6 @@ function Kurve() {
       </svg>
       <div className={"kfrage" + (wach !== null ? " an" : "")}>
         {wach !== null ? <><b>{KURVE[wach].n}</b> {KURVE[wach].frage}</> : "punkt antippen — dann steht hier die frage dazu."}
-      </div>
-      <div className="wheelrow">
-        <input className="ti" value={neueWendung} onChange={(e) => setNeueWendung(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && wendungSpeichern()}
-          placeholder="wendung fürs hitchcock-wheel …" />
-        <button className="btn" onClick={wendungSpeichern}>↻ ins wheel</button>
-        {wheelMsg && <span className="status ok">{wheelMsg}</span>}
       </div>
     </div>
   );
@@ -2718,14 +2700,11 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
       setDreht(false);
     }, 550);
   };
-  // sobald wendungen da sind: sofort eine zeigen, danach automatisch alle 90s
+  // eine zeigen sobald wendungen da sind — aber NICHT automatisch wechseln.
+  // wendungen sind sachen zum einbauen; sie sollen nicht verschwinden, bevor du sie genutzt hast.
   useEffect(() => {
     if (!wendungen.length) return;
     setWendung((w) => (w ? w : wendungen[Math.floor(Math.random() * wendungen.length)]));
-    const iv = setInterval(() => {
-      setWendung((w) => { const pool = wendungen.length > 1 ? wendungen.filter((x) => x !== w) : wendungen; return pool[Math.floor(Math.random() * pool.length)]; });
-    }, 90000);
-    return () => clearInterval(iv);
   }, [wendungen]);
 
   // hts_ultra · henkeltassen-schrank — gesendete hooks, zieht wie das orakel (king-konzept)
@@ -2979,16 +2958,6 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
           </div>
         </div>
 
-        <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
-          liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
-          wert={neueWendung} setWert={setNeueWendung} onAdd={wendungAdd} onWeg={wendungWeg}
-          platzhalter="neue wendung …" />
-
-        <VerwaltKarte titel="orakel · impulse" leer="noch keine impulse — trag welche ein."
-          liste={orakelListe} label={(o) => o.spruch} keyOf={(o) => o.id}
-          wert={neuerSpruch} setWert={setNeuerSpruch} onAdd={spruchAdd} onWeg={spruchWeg}
-          platzhalter="neuer impuls / spruch …" />
-
         <div className="ptitel" style={{ marginTop: 22 }}>offene fäden</div>
         <div className="faeden">
           {!faeden.commits.length && !faeden.skripte.length && !faeden.personen.length && !faeden.fragen.length && (
@@ -3027,6 +2996,16 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
         </div>
 
         <Kurve />
+
+        <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
+          liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
+          wert={neueWendung} setWert={setNeueWendung} onAdd={wendungAdd} onWeg={wendungWeg}
+          platzhalter="neue wendung …" />
+
+        <VerwaltKarte titel="orakel · impulse" leer="noch keine impulse — trag welche ein."
+          liste={orakelListe} label={(o) => o.spruch} keyOf={(o) => o.id}
+          wert={neuerSpruch} setWert={setNeuerSpruch} onAdd={spruchAdd} onWeg={spruchWeg}
+          platzhalter="neuer impuls / spruch …" />
 
         <div className="pfuss">// niemand kann dir sagen, was die matrix ist. du musst sie selbst sehen. 🐇</div>
       </div>
