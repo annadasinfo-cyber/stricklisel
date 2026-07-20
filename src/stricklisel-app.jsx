@@ -1527,6 +1527,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
   const [id, setId] = useState(null);
   const [name, setName] = useState("");
   const [hook, setHook] = useState("");
+  const [htsMsg, setHtsMsg] = useState("");
   const [bemerkung, setBemerkung] = useState("");
   const [matrix, setMatrix] = useState(leer9);
   const [texte, setTexte] = useState(leer9);
@@ -1679,6 +1680,15 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
     if (ok) laden();
   }
 
+  // hook in den henkeltassen-schrank (hts_ultra) im denkbrett schicken
+  async function htsSenden() {
+    const t = hook.trim();
+    if (!t) return;
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/hts`, { id: neueId(), user_id: getUserId(), hook: t });
+    setHtsMsg(ok ? "☕ im schrank" : "☕ offline — folgt");
+    setTimeout(() => setHtsMsg(""), 2500);
+  }
+
   // aus einer position ein eigenes skript machen — der baum
   async function verzweigen(i) {
     if (!matrix[i].trim()) { setMsg({ t: "erst beschreiben, was an der position passiert", c: "err" }); return; }
@@ -1827,6 +1837,10 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
           <label className="cap">the hook</label>
           <textarea className="ta" value={hook} onChange={(e) => aendern(() => setHook(e.target.value))}
             placeholder="der satz, der alles trägt" style={{ minHeight: 70 }} />
+          <div className="rezrow" style={{ marginTop: 8 }}>
+            <button className="btn" disabled={!hook.trim()} onClick={htsSenden}>☕ ans denkbrett senden</button>
+            {htsMsg && <span className="status ok">{htsMsg}</span>}
+          </div>
         </div>
         <div className="field" style={{ marginTop: 14 }}>
           <label className="cap">bemerkungen</label>
@@ -2479,6 +2493,39 @@ function Kurve() {
   );
 }
 
+// aufklappbare verwaltungs-karte für listen (wheel-wendungen, orakel-impulse)
+function VerwaltKarte({ titel, leer, liste, label, keyOf, wert, setWert, onAdd, onWeg, platzhalter, nurLesen, hinweis }) {
+  const [auf, setAuf] = useState(false);
+  return (
+    <div className="vkarte">
+      <button className="vkopf" onClick={() => setAuf((v) => !v)}>
+        <span className="vchev">{auf ? "▾" : "▸"}</span>
+        <span className="vtitel">{titel}</span>
+        <span className="vzahl">{liste.length}</span>
+      </button>
+      {auf && (
+        <div className="vbody">
+          {!nurLesen && (
+            <div className="vadd">
+              <input className="ti" value={wert} onChange={(e) => setWert(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && onAdd()} placeholder={platzhalter} />
+              <button className="btn" onClick={onAdd}>+ hinzu</button>
+            </div>
+          )}
+          {hinweis && <p className="vhinweis">{hinweis}</p>}
+          {!liste.length && <p className="vleer">{leer}</p>}
+          {liste.map((x) => (
+            <div className="vzeile" key={keyOf(x)}>
+              <span>{label(x)}</span>
+              {!nurLesen && <i onClick={() => onWeg(x)} title="löschen">✕</i>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Pausenschirm({ springe, zuM42, zurPerson }) {
   const [ort, setOrt] = useState(RADAR_ORTE[0]);
   const [nm, setNm] = useState(25);
@@ -2492,7 +2539,6 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
   const [gedanken, setGedanken] = useState([]);
   const [neuerGedanke, setNeuerGedanke] = useState("");
   const [faeden, setFaeden] = useState({ commits: [], skripte: [], personen: [], fragen: [] });
-  const [zitate, setZitate] = useState([]);
   const [spruch, setSpruch] = useState(null);
   const [steckbriefe, setSteckbriefe] = useState([]);
 
@@ -2600,18 +2646,35 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     }).catch(() => {});
   }, []);
 
-  // orakel-impuls — pool aus allen "the hook"-sätzen, die du selbst hinterlegt hast
-  useEffect(() => {
-    dbGet("zitate", `${SUPABASE_URL}/rest/v1/skripte?select=hook&order=updated_at.desc&limit=200`)
-      .then((d) => setZitate(Array.from(new Set((Array.isArray(d) ? d : []).map((x) => (x.hook || "").trim()).filter(Boolean)))))
+  // orakel-impuls — eigene bearbeitbare sammlung
+  const [orakelListe, setOrakelListe] = useState([]); // {id, spruch}
+  const zitate = orakelListe.map((o) => o.spruch);
+  const [neuerSpruch, setNeuerSpruch] = useState("");
+  const orakelLaden = () => {
+    dbGet("orakel", `${SUPABASE_URL}/rest/v1/orakel?select=id,spruch&order=created_at.desc&limit=300`)
+      .then((d) => setOrakelListe(Array.isArray(d) ? d.filter((x) => (x.spruch || "").trim()) : []))
       .catch(() => {});
-  }, []);
+  };
+  useEffect(orakelLaden, []);
+  async function spruchAdd() {
+    const t = neuerSpruch.trim();
+    if (!t) return;
+    setNeuerSpruch("");
+    const id = neueId();
+    setOrakelListe((l) => [{ id, spruch: t }, ...l]);
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/orakel`, { id, user_id: getUserId(), spruch: t });
+    if (ok) orakelLaden();
+  }
+  async function spruchWeg(o) {
+    setOrakelListe((l) => l.filter((x) => x.id !== o.id));
+    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/orakel?id=eq.${o.id}`);
+  }
   const orakelZiehen = () => {
     if (!zitate.length) return;
     const pool = zitate.length > 1 ? zitate.filter((z) => z !== spruch) : zitate;
     setSpruch(pool[Math.floor(Math.random() * pool.length)]);
   };
-  // sobald zitate da sind: sofort eins zeigen, danach automatisch alle 90s ein neues
+  // sobald sprüche da sind: sofort einen zeigen, danach automatisch alle 90s einen neuen
   useEffect(() => {
     if (!zitate.length) return;
     setSpruch((s) => (s ? s : zitate[Math.floor(Math.random() * zitate.length)]));
@@ -2619,17 +2682,33 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
       setSpruch((s) => { const pool = zitate.length > 1 ? zitate.filter((z) => z !== s) : zitate; return pool[Math.floor(Math.random() * pool.length)]; });
     }, 90000);
     return () => clearInterval(iv);
-  }, [zitate]);
+  }, [orakelListe]);
 
-  // hitchcock-wheel — deine eigene sammlung an wendungen, dreht wie das orakel
-  const [wendungen, setWendungen] = useState([]);
+  // hitch_wheel — deine eigene sammlung an wendungen, dreht wie das orakel
+  const [wheelListe, setWheelListe] = useState([]); // {id, wendung}
+  const wendungen = wheelListe.map((w) => w.wendung);
   const [wendung, setWendung] = useState(null);
   const [dreht, setDreht] = useState(false);
-  useEffect(() => {
-    dbGet("wheel", `${SUPABASE_URL}/rest/v1/wheel?select=wendung&order=created_at.desc&limit=300`)
-      .then((d) => setWendungen(Array.from(new Set((Array.isArray(d) ? d : []).map((x) => (x.wendung || "").trim()).filter(Boolean)))))
+  const [neueWendung, setNeueWendung] = useState("");
+  const wheelLaden = () => {
+    dbGet("wheel", `${SUPABASE_URL}/rest/v1/wheel?select=id,wendung&order=created_at.desc&limit=300`)
+      .then((d) => setWheelListe(Array.isArray(d) ? d.filter((x) => (x.wendung || "").trim()) : []))
       .catch(() => {});
-  }, []);
+  };
+  useEffect(wheelLaden, []);
+  async function wendungAdd() {
+    const t = neueWendung.trim();
+    if (!t) return;
+    setNeueWendung("");
+    const id = neueId();
+    setWheelListe((l) => [{ id, wendung: t }, ...l]);
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/wheel`, { id, user_id: getUserId(), wendung: t });
+    if (ok) wheelLaden();
+  }
+  async function wendungWeg(w) {
+    setWheelListe((l) => l.filter((x) => x.id !== w.id));
+    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/wheel?id=eq.${w.id}`);
+  }
   const drehen = () => {
     if (!wendungen.length) return;
     setDreht(true);
@@ -2648,6 +2727,43 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     }, 90000);
     return () => clearInterval(iv);
   }, [wendungen]);
+
+  // hts_ultra · henkeltassen-schrank — gesendete hooks, zieht wie das orakel (king-konzept)
+  const [htsListe, setHtsListe] = useState([]); // {id, hook}
+  const htsHooks = htsListe.map((h) => h.hook);
+  const [htsAktuell, setHtsAktuell] = useState(null);
+  const [htsDreht, setHtsDreht] = useState(false);
+  const htsLaden = () => {
+    dbGet("hts", `${SUPABASE_URL}/rest/v1/hts?select=id,hook&order=created_at.desc&limit=300`)
+      .then((d) => setHtsListe(Array.isArray(d) ? d.filter((x) => (x.hook || "").trim()) : []))
+      .catch(() => {});
+  };
+  useEffect(htsLaden, []);
+  async function htsWeg(h) {
+    setHtsListe((l) => l.filter((x) => x.id !== h.id));
+    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/hts?id=eq.${h.id}`);
+  }
+  const htsDrehen = () => {
+    if (!htsHooks.length) return;
+    setHtsDreht(true);
+    setTimeout(() => {
+      const pool = htsHooks.length > 1 ? htsHooks.filter((h) => h !== htsAktuell) : htsHooks;
+      setHtsAktuell(pool[Math.floor(Math.random() * pool.length)]);
+      setHtsDreht(false);
+    }, 550);
+  };
+  // eigenständig, aber versetzt: erst nach 40s einsteigen, dann alle 120s — nicht im gleichschritt
+  useEffect(() => {
+    if (!htsHooks.length) return;
+    setHtsAktuell((h) => (h ? h : htsHooks[Math.floor(Math.random() * htsHooks.length)]));
+    const start = setTimeout(function tick() {
+      setHtsAktuell((h) => { const pool = htsHooks.length > 1 ? htsHooks.filter((x) => x !== h) : htsHooks; return pool[Math.floor(Math.random() * pool.length)]; });
+    }, 40000);
+    const iv = setInterval(() => {
+      setHtsAktuell((h) => { const pool = htsHooks.length > 1 ? htsHooks.filter((x) => x !== h) : htsHooks; return pool[Math.floor(Math.random() * pool.length)]; });
+    }, 120000);
+    return () => { clearTimeout(start); clearInterval(iv); };
+  }, [htsListe]);
 
   useEffect(() => {
     dbGet("commits-aktiv-count", `${SUPABASE_URL}/rest/v1/commits?select=id,prioritaet&status=eq.aktiv`)
@@ -2742,9 +2858,19 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
             onKeyDown={(e) => e.key === "Enter" && gedankeSpeichern()}
             placeholder="ein gedanke, noch ohne commit-signatur …" />
           <button className="btn" onClick={gedankeSpeichern}>fangen</button>
-          <button className="btn" onClick={orakelZiehen} disabled={!zitate.length} title="ein zufälliger impuls aus deinen eigenen hooks">📟 orakel</button>
         </div>
-        {spruch && <div className="oraklspruch">📟 {spruch}</div>}
+
+        <div className="raeder">
+          <button className={"rad" + (dreht ? " dreht" : "")} onClick={orakelZiehen} disabled={!zitate.length} title="orakel · impuls ziehen">
+            <span className="radkopf">📟 orakel</span>
+            <span className="radtext" key={"o" + spruch}>{zitate.length ? (spruch || "…") : "— leer —"}</span>
+          </button>
+          <button className={"rad" + (htsDreht ? " dreht" : "")} onClick={htsDrehen} disabled={!htsHooks.length} title="hts_ultra · henkeltassen-schrank">
+            <span className="radkopf">☕ hts_ultra</span>
+            <span className="radtext" key={"h" + htsAktuell}>{htsHooks.length ? (htsAktuell || "…") : "— leer —"}</span>
+          </button>
+        </div>
+
         {!!gedanken.length && (
           <div className="gliste">
             {gedanken.map((g) => (
@@ -2837,10 +2963,10 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
           </div>
 
           <div className="ppanel">
-            <div className="ptitel">hitchcock-wheel</div>
+            <div className="ptitel">hitch_wheel</div>
             <button className={"wheel" + (dreht ? " dreht" : "")} onClick={drehen} disabled={!wendungen.length}
                     title={wendungen.length ? "dreh am rad" : "noch keine wendungen — unten bei der dramaturgie eintragen"}>
-              <span className="wheeltext">{wendungen.length ? (wendung || "…") : "— noch keine wendungen —"}</span>
+              <span className="wheeltext" key={wendung}>{wendungen.length ? (wendung || "…") : "— noch keine wendungen —"}</span>
               <span className="wheeldreh">↻ drehen</span>
             </button>
             <div className="ptitel" style={{ marginTop: 18 }}>systemstatus</div>
@@ -2852,6 +2978,16 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
             ))}
           </div>
         </div>
+
+        <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
+          liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
+          wert={neueWendung} setWert={setNeueWendung} onAdd={wendungAdd} onWeg={wendungWeg}
+          platzhalter="neue wendung …" />
+
+        <VerwaltKarte titel="orakel · impulse" leer="noch keine impulse — trag welche ein."
+          liste={orakelListe} label={(o) => o.spruch} keyOf={(o) => o.id}
+          wert={neuerSpruch} setWert={setNeuerSpruch} onAdd={spruchAdd} onWeg={spruchWeg}
+          platzhalter="neuer impuls / spruch …" />
 
         <div className="ptitel" style={{ marginTop: 22 }}>offene fäden</div>
         <div className="faeden">
@@ -3880,6 +4016,16 @@ function Styles() {
   .oraklspruch{font-family:var(--mono);font-size:12.5px;font-style:italic;color:var(--green);
     text-shadow:var(--glow);background:var(--panel-2);border:1px solid var(--line-hot);border-radius:6px;
     padding:11px 13px;margin-bottom:12px;line-height:1.55;animation:ankunft .4s ease-out}
+  .raeder{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
+  .rad{flex:1 1 180px;min-width:0;text-align:left;border:1px solid var(--line-hot);border-radius:8px;
+    background:var(--panel-2);padding:11px 13px;cursor:pointer;display:flex;flex-direction:column;gap:7px;
+    transition:.15s;font-family:inherit}
+  .rad:hover:not(:disabled){box-shadow:0 0 12px rgba(53,255,111,.16);border-color:var(--green)}
+  .rad:disabled{cursor:default;opacity:.5}
+  .radkopf{font-family:var(--term);font-size:10.5px;letter-spacing:.1em;color:var(--dim);text-transform:uppercase}
+  .radtext{font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--green);
+    text-shadow:var(--glow);min-height:2.6em;transition:opacity .25s}
+  .rad.dreht .radtext{opacity:.15}
   .gliste{display:flex;flex-direction:column;gap:5px;margin-bottom:22px}
   .geintrag{display:flex;align-items:baseline;gap:9px;font-size:12.5px;color:var(--muted);
     background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:7px 10px}
@@ -3919,8 +4065,8 @@ function Styles() {
     border-left:2px solid var(--line);padding:5px 0 5px 12px;margin-top:6px;transition:.2s}
   .kfrage.an{color:var(--muted);border-color:var(--green)}
   .kfrage b{color:var(--green);font-weight:400;padding-right:5px}
-  .pgrid{display:flex;flex-wrap:wrap;gap:26px;align-items:center;justify-content:center}
-  .pradar{flex:1 1 300px;max-width:340px;margin:0;display:flex;flex-direction:column}
+  .pgrid{display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start;justify-content:space-between}
+  .pradar{flex:1 1 300px;max-width:360px;margin:0;display:flex;flex-direction:column}
   .rsvg{width:100%;display:block;filter:drop-shadow(0 0 6px rgba(53,255,111,.18))}
   .mitte-punkt{animation:blink 1.4s ease-in-out infinite}
   .rtext{font-family:var(--term);font-size:8px;fill:var(--muted);letter-spacing:.06em}
@@ -3949,6 +4095,24 @@ function Styles() {
   @keyframes wheelspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   .wheelrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
   .wheelrow .ti{flex:1 1 200px;min-width:0}
+
+  /* verwaltungs-karten (wheel · orakel) */
+  .vkarte{border:1px solid var(--line);border-radius:7px;background:var(--panel-2);margin-top:12px;overflow:hidden}
+  .vkopf{width:100%;display:flex;align-items:center;gap:10px;background:transparent;border:0;cursor:pointer;
+    padding:11px 14px;font-family:var(--term);font-size:11px;letter-spacing:.18em;color:var(--green);text-transform:uppercase}
+  .vchev{color:var(--dim);flex:0 0 auto}
+  .vtitel{flex:1;text-align:left;text-shadow:var(--glow)}
+  .vzahl{flex:0 0 auto;color:var(--dim);font-size:11px}
+  .vbody{padding:0 14px 14px;border-top:1px dashed var(--line)}
+  .vadd{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;align-items:center}
+  .vadd .ti{flex:1 1 200px;min-width:0}
+  .vhinweis{font-size:11px;color:var(--dim);font-style:italic;margin:12px 0 8px}
+  .vleer{font-family:var(--term);font-size:11px;color:var(--dim);letter-spacing:.08em;padding:8px 0}
+  .vzeile{display:flex;align-items:baseline;gap:10px;font-size:12.5px;color:var(--muted);
+    padding:6px 0;border-bottom:1px dotted var(--line)}
+  .vzeile span{flex:1;min-width:0}
+  .vzeile i{font-style:normal;color:var(--dim);cursor:pointer;opacity:.6;flex:0 0 auto}
+  .vzeile i:hover{opacity:1;color:var(--amber)}
   .ptitel{font-family:var(--term);font-size:11px;letter-spacing:.24em;color:var(--green);
     text-shadow:var(--glow);margin-bottom:9px;text-transform:uppercase}
   .pzeile{display:flex;align-items:baseline;gap:7px;font-family:var(--term);font-size:12px;
