@@ -2049,7 +2049,7 @@ function Outliner({ zurKonsole }) {
 
   function neu() {
     setId(null); setName(""); setKernel(""); setBemerkung(""); setKapitel([]); setOffen({});
-    setDirty(false); setMsg({ t: "neues sachbuch", c: "" });
+    setDirty(false); setMsg({ t: "neues outline", c: "" });
   }
 
   function oeffnen(b) {
@@ -2079,7 +2079,7 @@ function Outliner({ zurKonsole }) {
   }
 
   async function loeschen(b) {
-    if (!confirm(`sachbuch „${b.name || "unbenannt"}" löschen?`)) return;
+    if (!confirm(`outline „${b.name || "unbenannt"}" löschen?`)) return;
     const { ok } = await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/outliner?id=eq.${b.id}`);
     if (b.id === id) neu();
     if (ok) laden();
@@ -2087,16 +2087,31 @@ function Outliner({ zurKonsole }) {
 
   // ---- 20×20-mutationen ----
   const kapAdd = () => aendern(() => setKapitel((k) => (k.length >= OL_MAX_KAP ? k : [...k, { titel: "", punkte: [] }])));
+  // enter auf einer überschrift: nächste danach einfügen (nur wenn die aktuelle benannt ist) + hinfokussieren
+  const kapAddNach = (ki) => {
+    if (kapitel.length >= OL_MAX_KAP) return;
+    if (!(kapitel[ki] && (kapitel[ki].titel || "").trim())) return;
+    aendern(() => setKapitel((k) => { const n = k.slice(); n.splice(ki + 1, 0, { titel: "", punkte: [] }); return n; }));
+    setTimeout(() => document.querySelectorAll(".olktitel")[ki + 1]?.focus(), 40);
+  };
   const kapWeg = (ki) => { if (!confirm("überschrift samt unterpunkten entfernen?")) return; aendern(() => setKapitel((k) => k.filter((_, n) => n !== ki))); };
   const kapTitel = (ki, v) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? { ...c, titel: v } : c))));
-  const punktAdd = (ki) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? (c.punkte.length >= OL_MAX_PUNKT ? c : { ...c, punkte: [...c.punkte, { text: "" }] }) : c))));
+  const punktAdd = (ki) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? (c.punkte.length >= OL_MAX_PUNKT ? c : { ...c, punkte: [...c.punkte, { titel: "", text: "" }] }) : c))));
+  // enter auf einer unterüberschrift: nächsten unterpunkt danach einfügen + hinfokussieren
+  const punktAddNach = (ki, pi) => {
+    const c = kapitel[ki]; if (!c || c.punkte.length >= OL_MAX_PUNKT) return;
+    if (!(c.punkte[pi] && (c.punkte[pi].titel || "").trim())) return;
+    aendern(() => setKapitel((k) => k.map((x, n) => (n === ki ? { ...x, punkte: (() => { const p = x.punkte.slice(); p.splice(pi + 1, 0, { titel: "", text: "" }); return p; })() } : x))));
+    setTimeout(() => document.querySelector(`[data-kp="${ki}-${pi + 1}"]`)?.focus(), 40);
+  };
   const punktWeg = (ki, pi) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? { ...c, punkte: c.punkte.filter((_, m) => m !== pi) } : c))));
-  const punktText = (ki, pi, v) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? { ...c, punkte: c.punkte.map((p, m) => (m === pi ? { text: v } : p)) } : c))));
+  const punktTitel = (ki, pi, v) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? { ...c, punkte: c.punkte.map((p, m) => (m === pi ? { ...p, titel: v } : p)) } : c))));
+  const punktText = (ki, pi, v) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? { ...c, punkte: c.punkte.map((p, m) => (m === pi ? { ...p, text: v } : p)) } : c))));
   const kippe = (ki) => setOffen((o) => ({ ...o, [ki]: !o[ki] }));
 
   // ein kapitel an die konsole schicken — thorsten/ilona liest die seiten vor
   const anKonsole = (c) => {
-    const t = c.punkte.map((p) => p.text).filter((x) => x && x.trim()).join("\n\n");
+    const t = c.punkte.map((p) => [p.titel, p.text].filter((x) => x && x.trim()).join("\n")).filter((x) => x.trim()).join("\n\n");
     if (t) zurKonsole(t);
   };
 
@@ -2108,22 +2123,22 @@ function Outliner({ zurKonsole }) {
     <>
       <div className="grouphead">OUTLINER<span className="rule" /></div>
       <div className="seitenkopf">
-        <span className="xfiles">{name || "neues sachbuch"}</span>
+        <span className="xfiles">{name || "neues outline"}</span>
         <button className="btn primary" onClick={() => setView("outline")}>weiter →</button>
       </div>
-      <Panel id="outliner-projekte" title="SACHBÜCHER" sub="20×20 · flaches outlining">
+      <Panel id="outliner-projekte" title="PROJEKTE" sub="20×20 · flaches outlining">
         <div className="otabs">
-          <button className="otab neu" onClick={neu}>+ neues sachbuch</button>
+          <button className="otab neu" onClick={neu}>+ neues outline</button>
         </div>
         <div className="baum">
-          {alle.length === 0 && <div className="bleer">noch kein sachbuch. „+ neues sachbuch" fängt an.</div>}
+          {alle.length === 0 && <div className="bleer">noch kein outline. „+ neues outline" fängt an.</div>}
           {alle.map((b) => {
             const sn = Array.isArray(b.kapitel) ? olSeitenGefuellt(b.kapitel) : 0;
             return (
-              <div className={"olbuch" + (b.id === id ? " on" : "")} key={b.id}>
-                <button className="olbuchname" onClick={() => oeffnen(b)}>
-                  <span className="olname">{b.name || "unbenannt"}</span>
-                  <span className="olmeta">{(b.kapitel && b.kapitel.length) || 0}/20 überschriften · {sn}/400 seiten</span>
+              <div className={"bzeile olzeile" + (b.id === id ? " on" : "")} key={b.id} style={{ "--lvl": "var(--green)" }}>
+                <button className="bhaupt" onClick={() => oeffnen(b)}>
+                  <span className="bname">{b.name || "unbenannt"}</span>
+                  <span className="bsub">{(b.kapitel && b.kapitel.length) || 0}/20 überschriften · {sn}/400 seiten</span>
                 </button>
                 <i className="olweg" onClick={() => loeschen(b)}>✕</i>
               </div>
@@ -2133,7 +2148,7 @@ function Outliner({ zurKonsole }) {
 
         <div className="field" style={{ marginTop: 16 }}>
           <label className="cap">arbeitstitel</label>
-          <input className="ti" value={name} onChange={(e) => aendern(() => setName(e.target.value))} placeholder="titel des sachbuchs" />
+          <input className="ti" value={name} onChange={(e) => aendern(() => setName(e.target.value))} placeholder="titel des outlines" />
         </div>
         <div className="field" style={{ marginTop: 14 }}>
           <label className="cap">der kernel</label>
@@ -2172,16 +2187,18 @@ function Outliner({ zurKonsole }) {
 
       {kapitel.map((c, ki) => {
         const auf = !!offen[ki];
-        const kseiten = c.punkte.filter((p) => p.text && p.text.trim()).length;
+        const kpunkte = c.punkte.length;
+        const kgefuellt = c.punkte.filter((p) => p.text && p.text.trim()).length;
         const seiteVor = olSeitenVor(kapitel, ki);
         return (
           <div className={"olkap" + (auf ? " auf" : "")} key={ki}>
             <div className="olkopf">
               <span className="olknr">{String(ki + 1).padStart(2, "0")}</span>
-              <input className="olktitel" value={c.titel} onChange={(e) => kapTitel(ki, e.target.value)}
-                placeholder={"überschrift " + (ki + 1)} />
-              <span className="olkmeta">{kseiten}/20</span>
-              {kseiten > 0 && <button className="btn txtbtn klein" title="dieses kapitel an die konsole — thorsten liest vor" onClick={() => anKonsole(c)}>▶</button>}
+              <input className="olktitel" data-k={ki} value={c.titel} onChange={(e) => kapTitel(ki, e.target.value)}
+                placeholder={"überschrift " + (ki + 1)}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); kapAddNach(ki); } }} />
+              <span className="olkmeta">{kpunkte}/20</span>
+              {kgefuellt > 0 && <button className="btn txtbtn klein" title="dieses kapitel an die konsole — thorsten liest vor" onClick={() => anKonsole(c)}>▶</button>}
               <i className="olweg" onClick={() => kapWeg(ki)}>✕</i>
               <button className="olchev" onClick={() => kippe(ki)}>{auf ? "▾" : "▸"}</button>
             </div>
@@ -2195,6 +2212,9 @@ function Outliner({ zurKonsole }) {
                     <div className="olpunkt" key={pi}>
                       <div className="olpkopf">
                         <span className="olpnr">{String(ki + 1).padStart(2, "0")}.{String(pi + 1).padStart(2, "0")}</span>
+                        <input className="olptitel" data-kp={ki + "-" + pi} value={p.titel || ""} onChange={(e) => punktTitel(ki, pi, e.target.value)}
+                          placeholder={"unterüberschrift " + (pi + 1)}
+                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); punktAddNach(ki, pi); } }} />
                         <span className="olpseite">seite {seiteVor + pi + 1}</span>
                         <i className="olweg" onClick={() => punktWeg(ki, pi)}>✕</i>
                       </div>
@@ -4482,14 +4502,10 @@ function Styles() {
   @keyframes fertig{0%{transform:scale(1)}40%{transform:scale(1.14)}100%{transform:scale(1)}}
 
   /* outliner · 20x20 */
-  .olbuch{display:flex;align-items:center;border-bottom:1px solid var(--line)}
-  .olbuch:last-child{border-bottom:none}
-  .olbuch.on{background:var(--green-dim)}
-  .olbuchname{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;align-items:flex-start;
-    background:none;border:none;text-align:left;padding:11px 12px;cursor:pointer;font-family:var(--mono)}
-  .olname{font-size:13px;color:var(--muted)}
-  .olbuch.on .olname{color:var(--white)}
-  .olmeta{font-size:11px;color:var(--dim);letter-spacing:.04em}
+  .olzeile{padding-left:8px}
+  .olzeile .bname{color:var(--green);opacity:.9;letter-spacing:.06em}
+  .olzeile.on .bname{opacity:1;text-shadow:0 0 8px var(--green)}
+  .olzeile .bsub{color:var(--dim);letter-spacing:.03em}
   .olweg{color:var(--dim);cursor:pointer;padding:0 10px;font-style:normal;font-size:12px;flex:0 0 auto}
   .olweg:hover{color:var(--amber)}
   .olkernelhint{font-size:11px;color:var(--dim);margin-top:6px;font-family:var(--mono);opacity:.8}
@@ -4513,8 +4529,12 @@ function Styles() {
   .olpunkt{margin-top:12px}
   .olpkopf{display:flex;align-items:center;gap:10px;margin-bottom:5px}
   .olpnr{font-family:var(--term);font-size:11px;color:var(--green-mid);
-    font-variant-numeric:tabular-nums;letter-spacing:.06em}
-  .olpseite{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em;flex:1}
+    font-variant-numeric:tabular-nums;letter-spacing:.06em;flex:0 0 auto}
+  .olptitel{flex:1;min-width:0;background:transparent;border:none;color:var(--muted);
+    font-family:var(--mono);font-size:12.5px;padding:3px 2px;border-bottom:1px dotted var(--line)}
+  .olptitel:focus{outline:none;color:var(--white);border-bottom-color:var(--green-dim)}
+  .olptitel::placeholder{color:var(--dim)}
+  .olpseite{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em;flex:0 0 auto}
   .olpunktadd,.olkapadd{margin-top:12px;font-family:var(--mono);font-size:12.5px}
   .olkapadd{margin-top:4px}
 
