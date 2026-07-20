@@ -2002,6 +2002,234 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
 }
 
 // ============================================================
+// OUTLINER · 20×20 — sachbuch-outlining (hommage an king, "der outsider")
+// 20 überschriften, je bis zu 20 unterpunkte. jeder unterpunkt = eine textbox
+// mit wortziel 250 = eine buchseite. 20×20 = 400 seiten, fertiges sachbuch.
+// bewusst FLACH (kein fraktal wie SKRIPTE) — passt nicht in die matrix, drum eigener tab.
+// ============================================================
+const OL_ZIEL = 250;      // wörter je unterpunkt = eine seite
+const OL_MAX_KAP = 20;    // überschriften
+const OL_MAX_PUNKT = 20;  // unterpunkte je überschrift
+// laufende seitennummer: alle boxen der kapitel davor
+const olSeitenVor = (kap, ki) => kap.slice(0, ki).reduce((s, c) => s + (c.punkte ? c.punkte.length : 0), 0);
+const olSeitenGefuellt = (kap) => kap.reduce((s, c) => s + (c.punkte || []).filter((p) => p.text && p.text.trim()).length, 0);
+
+function Outliner({ zurKonsole }) {
+  const [view, setView] = useState("projekte");
+  const [alle, setAlle] = useState([]);
+  const [id, setId] = useState(null);
+  const [name, setName] = useState("");
+  const [kernel, setKernel] = useState("");      // technisches pendant zum "hook" der skripte
+  const [bemerkung, setBemerkung] = useState("");
+  const [kapitel, setKapitel] = useState([]);    // [{titel, punkte:[{text}]}]
+  const [offen, setOffen] = useState({});        // welche überschrift aufgeklappt ist
+  const [msg, setMsg] = useState({ t: "bereit", c: "" });
+  const [dirty, setDirty] = useState(false);
+  const tRef = useRef(null);
+  const idRef = useRef(null);
+  useEffect(() => { idRef.current = id; }, [id]);
+
+  useEffect(() => { laden(); }, []);
+
+  useEffect(() => {
+    if (!dirty) return;
+    if (tRef.current) clearTimeout(tRef.current);
+    tRef.current = setTimeout(() => speichern(true), 2000);
+    return () => clearTimeout(tRef.current);
+  }, [name, kernel, bemerkung, kapitel, dirty]);
+
+  const aendern = (fn) => { fn(); setDirty(true); };
+
+  async function laden() {
+    try {
+      const b = await dbGet("outliner", `${SUPABASE_URL}/rest/v1/outliner?select=*&order=updated_at.desc`);
+      if (Array.isArray(b)) setAlle(b);
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+  }
+
+  function neu() {
+    setId(null); setName(""); setKernel(""); setBemerkung(""); setKapitel([]); setOffen({});
+    setDirty(false); setMsg({ t: "neues sachbuch", c: "" });
+  }
+
+  function oeffnen(b) {
+    setId(b.id); setName(b.name || ""); setKernel(b.kernel || ""); setBemerkung(b.bemerkung || "");
+    setKapitel(Array.isArray(b.kapitel) ? b.kapitel : []); setOffen({});
+    setDirty(false); setMsg({ t: "geladen: " + (b.name || "unbenannt"), c: "ok" });
+  }
+
+  async function speichern(still) {
+    const nm = name.trim() || "unbenannt · " + new Date().toLocaleDateString("de-DE");
+    const cur = idRef.current;
+    const eigeneId = cur || neueId();
+    const body = {
+      ...(cur ? {} : { id: eigeneId }),
+      user_id: getUserId(), name: nm, kernel, bemerkung, kapitel,
+      updated_at: new Date().toISOString(),
+    };
+    if (!still) setMsg({ t: "speichere …", c: "work" });
+    const { ok } = cur
+      ? await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/outliner?id=eq.${cur}`, body)
+      : await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/outliner`, body);
+    if (!cur) setId(eigeneId);
+    setDirty(false);
+    setMsg({ t: ok ? "gespeichert · " + nm : "offline gespeichert · " + nm + " — sync folgt", c: ok ? "ok" : "work" });
+    if (ok) laden();
+    return eigeneId;
+  }
+
+  async function loeschen(b) {
+    if (!confirm(`sachbuch „${b.name || "unbenannt"}" löschen?`)) return;
+    const { ok } = await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/outliner?id=eq.${b.id}`);
+    if (b.id === id) neu();
+    if (ok) laden();
+  }
+
+  // ---- 20×20-mutationen ----
+  const kapAdd = () => aendern(() => setKapitel((k) => (k.length >= OL_MAX_KAP ? k : [...k, { titel: "", punkte: [] }])));
+  const kapWeg = (ki) => { if (!confirm("überschrift samt unterpunkten entfernen?")) return; aendern(() => setKapitel((k) => k.filter((_, n) => n !== ki))); };
+  const kapTitel = (ki, v) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? { ...c, titel: v } : c))));
+  const punktAdd = (ki) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? (c.punkte.length >= OL_MAX_PUNKT ? c : { ...c, punkte: [...c.punkte, { text: "" }] }) : c))));
+  const punktWeg = (ki, pi) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? { ...c, punkte: c.punkte.filter((_, m) => m !== pi) } : c))));
+  const punktText = (ki, pi, v) => aendern(() => setKapitel((k) => k.map((c, n) => (n === ki ? { ...c, punkte: c.punkte.map((p, m) => (m === pi ? { text: v } : p)) } : c))));
+  const kippe = (ki) => setOffen((o) => ({ ...o, [ki]: !o[ki] }));
+
+  // ein kapitel an die konsole schicken — thorsten/ilona liest die seiten vor
+  const anKonsole = (c) => {
+    const t = c.punkte.map((p) => p.text).filter((x) => x && x.trim()).join("\n\n");
+    if (t) zurKonsole(t);
+  };
+
+  const seiten = olSeitenGefuellt(kapitel);
+  const woerterGesamt = kapitel.reduce((s, c) => s + c.punkte.reduce((x, p) => x + zaehleWoerter(p.text || ""), 0), 0);
+
+  // ---------- SEITE 1: projekte + kernel ----------
+  if (view === "projekte") return (
+    <>
+      <div className="grouphead">OUTLINER<span className="rule" /></div>
+      <div className="seitenkopf">
+        <span className="xfiles">{name || "neues sachbuch"}</span>
+        <button className="btn primary" onClick={() => setView("outline")}>weiter →</button>
+      </div>
+      <Panel id="outliner-projekte" title="SACHBÜCHER" sub="20×20 · flaches outlining">
+        <div className="otabs">
+          <button className="otab neu" onClick={neu}>+ neues sachbuch</button>
+        </div>
+        <div className="baum">
+          {alle.length === 0 && <div className="bleer">noch kein sachbuch. „+ neues sachbuch" fängt an.</div>}
+          {alle.map((b) => {
+            const sn = Array.isArray(b.kapitel) ? olSeitenGefuellt(b.kapitel) : 0;
+            return (
+              <div className={"olbuch" + (b.id === id ? " on" : "")} key={b.id}>
+                <button className="olbuchname" onClick={() => oeffnen(b)}>
+                  <span className="olname">{b.name || "unbenannt"}</span>
+                  <span className="olmeta">{(b.kapitel && b.kapitel.length) || 0}/20 überschriften · {sn}/400 seiten</span>
+                </button>
+                <i className="olweg" onClick={() => loeschen(b)}>✕</i>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="field" style={{ marginTop: 16 }}>
+          <label className="cap">arbeitstitel</label>
+          <input className="ti" value={name} onChange={(e) => aendern(() => setName(e.target.value))} placeholder="titel des sachbuchs" />
+        </div>
+        <div className="field" style={{ marginTop: 14 }}>
+          <label className="cap">der kernel</label>
+          <textarea className="ta" value={kernel} onChange={(e) => aendern(() => setKernel(e.target.value))}
+            placeholder="die eine aussage, aus der das ganze buch kompiliert" style={{ minHeight: 70 }} />
+          <div className="olkernelhint">// kein hook — der kernel ist der satz, den am ende jede der 400 seiten beweist.</div>
+        </div>
+        <div className="field" style={{ marginTop: 14 }}>
+          <label className="cap">bemerkungen</label>
+          <textarea className="ta" value={bemerkung} onChange={(e) => aendern(() => setBemerkung(e.target.value))}
+            placeholder="für wen, warum, in welchem ton" style={{ minHeight: 70 }} />
+        </div>
+        <div className="actions" style={{ marginTop: 16 }}>
+          <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
+        </div>
+      </Panel>
+    </>
+  );
+
+  // ---------- SEITE 2: die 20×20 ----------
+  return (
+    <>
+      <div className="seitenkopf">
+        <button className="btn" onClick={() => setView("projekte")}>← zurück</button>
+        <span className="xfiles">{name || "unbenannt"}</span>
+        <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
+      </div>
+
+      {kernel && <div className="hookzeile">◈ {kernel}</div>}
+
+      <div className="olstatus">
+        <span>überschriften <b>{kapitel.length}</b>/20</span>
+        <span>seiten <b>{seiten}</b>/400</span>
+        <span>{woerterGesamt.toLocaleString("de-DE")} wörter</span>
+      </div>
+
+      {kapitel.map((c, ki) => {
+        const auf = !!offen[ki];
+        const kseiten = c.punkte.filter((p) => p.text && p.text.trim()).length;
+        const seiteVor = olSeitenVor(kapitel, ki);
+        return (
+          <div className={"olkap" + (auf ? " auf" : "")} key={ki}>
+            <div className="olkopf">
+              <span className="olknr">{String(ki + 1).padStart(2, "0")}</span>
+              <input className="olktitel" value={c.titel} onChange={(e) => kapTitel(ki, e.target.value)}
+                placeholder={"überschrift " + (ki + 1)} />
+              <span className="olkmeta">{kseiten}/20</span>
+              {kseiten > 0 && <button className="btn txtbtn klein" title="dieses kapitel an die konsole — thorsten liest vor" onClick={() => anKonsole(c)}>▶</button>}
+              <i className="olweg" onClick={() => kapWeg(ki)}>✕</i>
+              <button className="olchev" onClick={() => kippe(ki)}>{auf ? "▾" : "▸"}</button>
+            </div>
+
+            {auf && (
+              <div className="olpunkte">
+                {c.punkte.map((p, pi) => {
+                  const w = zaehleWoerter(p.text || "");
+                  const voll = w >= OL_ZIEL;
+                  return (
+                    <div className="olpunkt" key={pi}>
+                      <div className="olpkopf">
+                        <span className="olpnr">{String(ki + 1).padStart(2, "0")}.{String(pi + 1).padStart(2, "0")}</span>
+                        <span className="olpseite">seite {seiteVor + pi + 1}</span>
+                        <i className="olweg" onClick={() => punktWeg(ki, pi)}>✕</i>
+                      </div>
+                      <AutoTa className="ta" value={p.text || ""} onChange={(e) => punktText(ki, pi, e.target.value)}
+                        placeholder="eine seite — ~250 wörter zu diesem punkt" />
+                      <div className="logfoot">
+                        <div className="logbar"><i style={{ width: Math.min(100, (w / OL_ZIEL) * 100) + "%" }} className={voll ? "voll" : ""} /></div>
+                        <div className={"wcount" + (voll ? " voll" : "")}>
+                          {voll ? <>✓ {w} wörter</> : <>{w} <span className="wziel">/ {OL_ZIEL}</span></>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <button className="btn olpunktadd" disabled={c.punkte.length >= OL_MAX_PUNKT} onClick={() => punktAdd(ki)}>
+                  {c.punkte.length >= OL_MAX_PUNKT ? "20 unterpunkte voll" : "+ unterpunkt (" + c.punkte.length + "/20)"}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <button className="btn olkapadd" disabled={kapitel.length >= OL_MAX_KAP} onClick={kapAdd}>
+        {kapitel.length >= OL_MAX_KAP ? "20 überschriften voll" : "+ überschrift (" + kapitel.length + "/20)"}
+      </button>
+
+      <div className="actions" style={{ marginTop: 14 }}>
+        <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
+      </div>
+    </>
+  );
+}
+
+// ============================================================
 // THINGS · personen, orte, dinge
 // ============================================================
 
@@ -3375,6 +3603,7 @@ export default function StricklieselApp() {
           <button aria-pressed={tab === "m42"} onClick={() => setTab("m42")}>m42</button>
           <button aria-pressed={tab === "think"} onClick={() => setTab("think")}>denkbrett</button>
           <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
+          <button aria-pressed={tab === "outliner"} onClick={() => setTab("outliner")}>outliner</button>
           <button aria-pressed={tab === "skripte"} onClick={() => setTab("skripte")}>skripte</button>
           <button aria-pressed={tab === "things"} onClick={() => setTab("things")}>things</button>
         </div>
@@ -3384,6 +3613,7 @@ export default function StricklieselApp() {
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "m42" && <M42 />}
         {tab === "log" && <LogFiles />}
+        {tab === "outliner" && <Outliner zurKonsole={zurKonsole} />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} kette={cfg.ketteText} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} sprungPerson={sprungPerson} setSprungPerson={setSprungPerson} />}
         {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuM42={() => setTab("m42")} zurPerson={(id) => { setSprungPerson(id); setTab("things"); }} />}
@@ -4057,7 +4287,7 @@ function Styles() {
   .rradius{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em}
   .rfuss .status{font-size:10.5px}
 
-  .ppanel{flex:1 1 300px;max-width:340px;min-width:0;display:flex;flex-direction:column;justify-content:center}
+  .ppanel{flex:1 1 300px;max-width:520px;min-width:0;display:flex;flex-direction:column;justify-content:center}
   .puhr{font-family:var(--term);color:var(--green);text-shadow:var(--glow);letter-spacing:.06em;
     font-variant-numeric:tabular-nums;line-height:1;font-size:clamp(38px,6.6vw,64px);margin-bottom:20px;text-align:left}
   .puhr i{font-style:normal;opacity:.42;font-size:.68em}
@@ -4250,6 +4480,43 @@ function Styles() {
   .wcount.voll{color:var(--white);text-shadow:0 0 12px var(--green),0 0 24px rgba(53,255,111,.5);
     animation:fertig .5s ease-out}
   @keyframes fertig{0%{transform:scale(1)}40%{transform:scale(1.14)}100%{transform:scale(1)}}
+
+  /* outliner · 20x20 */
+  .olbuch{display:flex;align-items:center;border-bottom:1px solid var(--line)}
+  .olbuch:last-child{border-bottom:none}
+  .olbuch.on{background:var(--green-dim)}
+  .olbuchname{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;align-items:flex-start;
+    background:none;border:none;text-align:left;padding:11px 12px;cursor:pointer;font-family:var(--mono)}
+  .olname{font-size:13px;color:var(--muted)}
+  .olbuch.on .olname{color:var(--white)}
+  .olmeta{font-size:11px;color:var(--dim);letter-spacing:.04em}
+  .olweg{color:var(--dim);cursor:pointer;padding:0 10px;font-style:normal;font-size:12px;flex:0 0 auto}
+  .olweg:hover{color:var(--amber)}
+  .olkernelhint{font-size:11px;color:var(--dim);margin-top:6px;font-family:var(--mono);opacity:.8}
+  .olstatus{display:flex;flex-wrap:wrap;gap:18px;margin:8px 0 16px;font-family:var(--term);
+    font-size:12px;letter-spacing:.1em;color:var(--dim)}
+  .olstatus b{color:var(--green);font-variant-numeric:tabular-nums;font-weight:400}
+  .olkap{border:1px solid var(--line);border-radius:7px;background:var(--panel-2);margin-bottom:10px;overflow:hidden}
+  .olkap.auf{border-color:var(--line-hot)}
+  .olkopf{display:flex;align-items:center;gap:10px;padding:9px 11px}
+  .olknr{font-family:var(--term);font-size:13px;color:var(--green-mid);flex:0 0 auto;
+    font-variant-numeric:tabular-nums;letter-spacing:.05em}
+  .olktitel{flex:1;min-width:0;background:transparent;border:none;color:var(--muted);
+    font-family:var(--mono);font-size:14px;padding:4px 2px;border-bottom:1px dotted var(--line)}
+  .olktitel:focus{outline:none;color:var(--white);border-bottom-color:var(--green-dim)}
+  .olktitel::placeholder{color:var(--dim)}
+  .olkmeta{font-family:var(--term);font-size:11px;color:var(--dim);flex:0 0 auto;
+    font-variant-numeric:tabular-nums;letter-spacing:.06em}
+  .olchev{background:none;border:none;color:var(--green-mid);cursor:pointer;font-size:13px;
+    padding:2px 4px;flex:0 0 auto}
+  .olpunkte{padding:4px 11px 12px;border-top:1px solid var(--line)}
+  .olpunkt{margin-top:12px}
+  .olpkopf{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+  .olpnr{font-family:var(--term);font-size:11px;color:var(--green-mid);
+    font-variant-numeric:tabular-nums;letter-spacing:.06em}
+  .olpseite{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em;flex:1}
+  .olpunktadd,.olkapadd{margin-top:12px;font-family:var(--mono);font-size:12.5px}
+  .olkapadd{margin-top:4px}
 
   /* commit-karten */
   .commit{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:10px}
