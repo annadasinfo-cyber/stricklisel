@@ -800,6 +800,53 @@ function Scope({ analyser, ctxRef }) {
   );
 }
 
+// laufschrift unter dem scope — subliminaltext läuft durch.
+// quelle umschaltbar (konsole / eigener text), an/aus, tempo. reines css, kein js-loop.
+function Laufschrift() {
+  const [an, setAn] = useState(true);
+  const [quelle, setQuelle] = useState("konsole"); // "konsole" | "eigen"
+  const [tempo, setTempo] = useState("langsam"); // "langsam" | "schnell"
+  const [eigen, setEigen] = useState("");
+  const [konsolenText, setKonsolenText] = useState("");
+
+  // konsolen-affirmationen aus dem zuletzt gespeicherten stand ziehen
+  useEffect(() => {
+    const lesen = () => {
+      const c = offLesen("konsole-cfg");
+      if (!c) { setKonsolenText(""); return; }
+      let t = "";
+      if (c.mode === "kette") t = c.ketteText || "";
+      else if (c.mode === "ich↔du") t = [c.linksText, c.rechtsText].filter(Boolean).join("  ·  ");
+      else t = (c.layers || []).map((l) => l.text).filter(Boolean).join("  ·  ");
+      setKonsolenText((t || "").trim());
+    };
+    lesen();
+    const iv = setInterval(lesen, 4000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const text = quelle === "eigen" ? eigen : konsolenText;
+  const zeigen = an && text.trim();
+
+  return (
+    <div className="lauf">
+      <div className="laufband">
+        {zeigen
+          ? <div className={"laufinner " + tempo}><span>{text}</span><span aria-hidden="true">{text}</span></div>
+          : <div className="laufleer">{an ? "— kein text —" : "— laufschrift aus —"}</div>}
+      </div>
+      <div className="laufctrl">
+        <button className={"laufbtn" + (an ? " on" : "")} onClick={() => setAn((v) => !v)}>{an ? "◉ an" : "○ aus"}</button>
+        <button className="laufbtn" onClick={() => setQuelle((q) => q === "konsole" ? "eigen" : "konsole")}>{quelle === "konsole" ? "konsole" : "eigener text"}</button>
+        <button className="laufbtn" onClick={() => setTempo((t) => t === "langsam" ? "schnell" : "langsam")}>{tempo === "langsam" ? "langsam" : "schnell"}</button>
+        {quelle === "eigen" && (
+          <input className="ti laufinput" value={eigen} onChange={(e) => setEigen(e.target.value)} placeholder="eigener lauftext …" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ============================================================
 // ABTEILUNG 17b · PRIORITY_MANAGER
 // ============================================================
@@ -2556,8 +2603,14 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
   }, [zitate]);
 
   useEffect(() => {
-    dbGet("commits-aktiv-count", `${SUPABASE_URL}/rest/v1/commits?select=id&status=eq.aktiv`)
-      .then((d) => setCommits(Array.isArray(d) ? d.length : 0)).catch(() => {});
+    dbGet("commits-aktiv-count", `${SUPABASE_URL}/rest/v1/commits?select=id,prioritaet&status=eq.aktiv`)
+      .then((d) => {
+        const arr = Array.isArray(d) ? d : [];
+        // besetzte prioritäts-ebenen (1/2/3), nicht rohe commit-zahl —
+        // 3× prio 1 + 1× prio 3 sind 2 belegte ebenen, nicht "4 von 3".
+        const ebenen = new Set(arr.map((c) => c.prioritaet)).size;
+        setCommits(ebenen);
+      }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -2808,6 +2861,8 @@ export default function StricklieselApp() {
   const [cfg, setCfg] = useState(DEFAULTS);
   const set = (k, v) => setCfg((c) => ({ ...c, [k]: v }));
   const setLayer = (i, k, v) => setCfg((c) => { const L = c.layers.map((x, n) => (n === i ? { ...x, [k]: v } : x)); return { ...c, layers: L }; });
+  // affirmationen für die laufschrift im denkbrett verfügbar machen
+  useEffect(() => { offSchreibenCache("konsole-cfg", { mode: cfg.mode, ketteText: cfg.ketteText, linksText: cfg.linksText, rechtsText: cfg.rechtsText, layers: cfg.layers }); }, [cfg.mode, cfg.ketteText, cfg.linksText, cfg.rechtsText, cfg.layers]);
 
   const [status, setStatus] = useState({ t: "bereit", c: "" });
   const [tts, setTts] = useState({ t: "» sätze werden gepackt · erzeugtes landet im cache", c: "" });
@@ -3146,6 +3201,7 @@ export default function StricklieselApp() {
         </header>
 
         <Scope analyser={analyser} ctxRef={ctxRef} />
+        <Laufschrift />
 
         <div className="tabs">
           <button aria-pressed={tab === "handbuch"} onClick={() => setTab("handbuch")}>handbuch</button>
@@ -3504,6 +3560,8 @@ function Styles() {
   @media(max-width:640px){.hoch{right:14px;bottom:14px}}
   .wrap{position:relative;z-index:1;max-width:940px;margin:0 auto;padding:26px 18px 90px}
 
+  header{position:sticky;top:0;z-index:6;background:var(--void);
+    padding-bottom:8px;margin-bottom:2px}
   .wordmark{font-family:var(--term);font-size:clamp(30px,6.2vw,52px);letter-spacing:.14em;
     color:var(--green);text-shadow:var(--glow);line-height:1;display:flex;align-items:center;flex-wrap:wrap}
   .wordmark .slash{color:var(--green-mid);opacity:.7}
@@ -3527,12 +3585,28 @@ function Styles() {
 
   .scope{margin:16px 0 6px;border:1px solid var(--line);border-radius:6px;
     background:linear-gradient(180deg,#07130c,#050b07);overflow:hidden;position:relative}
-  @media(min-width:641px){
-    .scope{position:sticky;top:0;z-index:5;box-shadow:0 8px 18px -6px rgba(0,0,0,.55)}
-  }
   #spectrum{display:block;width:100%;height:118px}
   .scope-lbl{position:absolute;top:8px;left:12px;font-family:var(--term);font-size:11px;letter-spacing:.14em;color:var(--dim)}
   .scope-ultra{position:absolute;bottom:7px;right:12px;font-family:var(--term);font-size:10.5px;color:var(--green);letter-spacing:.06em}
+
+  /* laufschrift unter dem scope */
+  .lauf{margin:0 0 10px}
+  .laufband{overflow:hidden;border:1px solid var(--line);border-radius:6px;background:var(--panel-2);
+    height:30px;display:flex;align-items:center;position:relative}
+  .laufinner{display:inline-flex;white-space:nowrap;will-change:transform}
+  .laufinner span{padding:0 40px;font-family:var(--term);font-size:12.5px;letter-spacing:.14em;
+    color:var(--green);text-shadow:var(--glow)}
+  .laufinner.langsam{animation:laufen 34s linear infinite}
+  .laufinner.schnell{animation:laufen 15s linear infinite}
+  @keyframes laufen{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .laufleer{font-family:var(--term);font-size:11px;letter-spacing:.1em;color:var(--dim);padding:0 12px}
+  .laufctrl{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px;align-items:center}
+  .laufbtn{font-family:var(--term);font-size:10.5px;letter-spacing:.06em;background:transparent;
+    border:1px solid var(--line);border-radius:4px;color:var(--dim);padding:3px 9px;cursor:pointer;transition:.12s}
+  .laufbtn:hover{border-color:var(--line-hot);color:var(--green)}
+  .laufbtn.on{color:var(--green);border-color:var(--line-hot);text-shadow:var(--glow)}
+  .laufinput{flex:1 1 160px;min-width:0}
+  @media(prefers-reduced-motion:reduce){.laufinner.langsam,.laufinner.schnell{animation:none}}
 
   /* tabs unterm skope */
   .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
@@ -3795,22 +3869,22 @@ function Styles() {
     border-left:2px solid var(--line);padding:5px 0 5px 12px;margin-top:6px;transition:.2s}
   .kfrage.an{color:var(--muted);border-color:var(--green)}
   .kfrage b{color:var(--green);font-weight:400;padding-right:5px}
-  .pgrid{display:flex;flex-wrap:wrap;gap:22px;align-items:stretch}
-  .pradar{flex:0 0 auto;width:min(340px,100%);margin:0 auto;display:flex;flex-direction:column}
+  .pgrid{display:flex;flex-wrap:wrap;gap:26px;align-items:center;justify-content:center}
+  .pradar{flex:1 1 300px;max-width:340px;margin:0;display:flex;flex-direction:column}
   .rsvg{width:100%;display:block;filter:drop-shadow(0 0 6px rgba(53,255,111,.18))}
   .mitte-punkt{animation:blink 1.4s ease-in-out infinite}
   .rtext{font-family:var(--term);font-size:8px;fill:var(--muted);letter-spacing:.06em}
   .rhimmel{font-family:var(--term);font-size:9px;fill:var(--dim);text-anchor:middle;letter-spacing:.1em}
-  .rfuss{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:8px;flex-wrap:wrap}
+  .rfuss{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:auto;padding-top:12px;flex-wrap:wrap}
   .rfuss select{flex:0 0 auto;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;color:var(--green);
     font-family:var(--term);font-size:12px;letter-spacing:.1em;padding:5px 8px;cursor:pointer}
   .rfuss select:focus{outline:none;border-color:var(--line-hot)}
   .rradius{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em}
   .rfuss .status{font-size:10.5px}
 
-  .ppanel{flex:1 1 260px;min-width:0;display:flex;flex-direction:column}
-  .puhr{font-family:var(--term);color:var(--green);text-shadow:var(--glow);letter-spacing:.08em;
-    font-variant-numeric:tabular-nums;line-height:1;font-size:clamp(30px,4.4vw,46px);margin-bottom:16px}
+  .ppanel{flex:1 1 300px;max-width:340px;min-width:0;display:flex;flex-direction:column;justify-content:center}
+  .puhr{font-family:var(--term);color:var(--green);text-shadow:var(--glow);letter-spacing:.06em;
+    font-variant-numeric:tabular-nums;line-height:1;font-size:clamp(38px,6.6vw,64px);margin-bottom:20px;text-align:left}
   .puhr i{font-style:normal;opacity:.42;font-size:.68em}
   .ptitel{font-family:var(--term);font-size:11px;letter-spacing:.24em;color:var(--green);
     text-shadow:var(--glow);margin-bottom:9px;text-transform:uppercase}
