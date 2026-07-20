@@ -1517,6 +1517,47 @@ const ersteSaetze = (s, n = 3) => { const a = satzTeilen(s); return a.slice(0, n
 const EBENE_FARBE = ["var(--green)", "var(--amber)", "#e88fc0", "#9b8cf0"];
 const farbe = (n) => EBENE_FARBE[Math.min(n, EBENE_FARBE.length - 1)];
 
+// ============================================================
+// KORREKTUR · lesefassung zum korrigieren & vorlesen.
+// jede box bleibt an ihr echtes feld gebunden (onChange) — korrekturen
+// fließen direkt zurück, KEIN zusammenkleben/zerlegen nötig. das flatten
+// passiert nur einseitig richtung konsole (vorlesen), nie zurück.
+// bloecke: [{ nr, sub, text, onChange, gruppe? }]  gruppe = überschrift über dem block
+// ============================================================
+function Korrektur({ titel, bloecke, onZurueck, onSpeichern, zurKonsole, dirty, msg }) {
+  const gefuellt = bloecke.filter((b) => (b.text || "").trim());
+  const alles = () => gefuellt.map((b) => (b.gruppe ? b.gruppe + ".\n\n" : "") + b.text.trim()).join("\n\n");
+  return (
+    <>
+      <div className="seitenkopf">
+        <button className="btn" onClick={onZurueck}>← zurück</button>
+        <span className="xfiles">{(titel || "unbenannt") + " · korrektur"}</span>
+        <button className="btn txtbtn" disabled={!gefuellt.length} onClick={() => { const t = alles(); if (t) zurKonsole(t); }}
+                title="ganze lesefassung an die konsole — thorsten liest vor">▶ alles vorlesen</button>
+        <button className="btn primary" onClick={onSpeichern}>⇥ speichern</button>
+      </div>
+      <div className="korr">
+        {gefuellt.length === 0 && <div className="pleer">noch nichts geschrieben, was sich korrigieren ließe.</div>}
+        {gefuellt.map((b, n) => (
+          <div className="korrblock" key={b.key || n}>
+            {b.gruppe && <div className="korrgruppe">{b.gruppe}</div>}
+            <div className="korrlabel">
+              <span className="korrnr">{b.nr}</span>
+              {b.sub && <span className="korrsub">{b.sub}</span>}
+              <span className="korrw">{zaehleWoerter(b.text || "")} w</span>
+              <button className="btn txtbtn klein" title="diesen abschnitt vorlesen" onClick={() => (b.text || "").trim() && zurKonsole(b.text.trim())}>▶</button>
+            </div>
+            <AutoTa className="ta korrta" value={b.text || ""} onChange={(e) => b.onChange(e.target.value)} placeholder="—" />
+          </div>
+        ))}
+      </div>
+      <div className="actions" style={{ marginTop: 14 }}>
+        <span className={"status " + (msg ? msg.c : "")}>{dirty ? "◉ rec" : (msg ? msg.t : "bereit")}</span>
+      </div>
+    </>
+  );
+}
+
 function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) {
   const [view, setView] = useState("projekte");
   const [ordner, setOrdner] = useState([]);
@@ -1897,6 +1938,24 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
     </>
   );
 
+  // ---------- KORREKTUR (lesefassung) ----------
+  if (view === "korrektur") return (
+    <Korrektur
+      titel={name}
+      dirty={dirty}
+      msg={msg}
+      zurKonsole={zurKonsole}
+      onZurueck={() => setView("schreiben")}
+      onSpeichern={() => speichern(false)}
+      bloecke={SCHREIB_ORDER.filter((i) => i !== 4).map((i) => ({
+        key: "sz" + i,
+        nr: POS[i].k,
+        text: texte[i] || "",
+        onChange: (v) => setT(i, v),
+      }))}
+    />
+  );
+
   // ---------- SEITE 3 ----------
   return (
     <>
@@ -1910,6 +1969,8 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
         </button>
         <button className="btn txtbtn klein" onClick={txtKopieren} disabled={!szenenTexte.length}
                 title="stattdessen in die zwischenablage">⧉</button>
+        <button className="btn txtbtn klein" onClick={() => setView("korrektur")} disabled={!szenenTexte.length}
+                title="lesefassung zum korrigieren & vorlesen">✎</button>
         <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
       </div>
 
@@ -2168,12 +2229,45 @@ function Outliner({ zurKonsole }) {
     </>
   );
 
+  // ---------- KORREKTUR (lesefassung) ----------
+  if (view === "korrektur") {
+    const bloecke = [];
+    kapitel.forEach((c, ki) => {
+      let ersterImKapitel = true;
+      c.punkte.forEach((p, pi) => {
+        if (!(p.text || "").trim()) return;
+        bloecke.push({
+          key: "p" + ki + "-" + pi,
+          nr: String(ki + 1).padStart(2, "0") + "." + String(pi + 1).padStart(2, "0"),
+          sub: p.titel || "",
+          text: p.text || "",
+          onChange: (v) => punktText(ki, pi, v),
+          gruppe: ersterImKapitel ? (String(ki + 1).padStart(2, "0") + " · " + (c.titel || "ohne überschrift")) : undefined,
+        });
+        ersterImKapitel = false;
+      });
+    });
+    return (
+      <Korrektur
+        titel={name}
+        dirty={dirty}
+        msg={msg}
+        zurKonsole={zurKonsole}
+        onZurueck={() => setView("outline")}
+        onSpeichern={() => speichern(false)}
+        bloecke={bloecke}
+      />
+    );
+  }
+
   // ---------- SEITE 2: die 20×20 ----------
   return (
     <>
       <div className="seitenkopf">
         <button className="btn" onClick={() => setView("projekte")}>← zurück</button>
         <span className="xfiles">{name || "unbenannt"}</span>
+        <button className="btn txtbtn klein" onClick={() => setView("korrektur")} disabled={seiten === 0}
+                title="lesefassung zum korrigieren & vorlesen">✎</button>
         <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
       </div>
 
@@ -4537,6 +4631,20 @@ function Styles() {
   .olpseite{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em;flex:0 0 auto}
   .olpunktadd,.olkapadd{margin-top:12px;font-family:var(--mono);font-size:12.5px}
   .olkapadd{margin-top:4px}
+
+  /* korrektur · lesefassung */
+  .korr{margin-top:6px}
+  .korrblock{margin-bottom:20px}
+  .korrgruppe{font-family:var(--term);font-size:12px;letter-spacing:.16em;color:var(--green);
+    margin:22px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--line-hot)}
+  .korrblock:first-child .korrgruppe{margin-top:4px}
+  .korrlabel{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .korrnr{font-family:var(--term);font-size:11px;color:var(--green-mid);
+    font-variant-numeric:tabular-nums;letter-spacing:.06em;flex:0 0 auto}
+  .korrsub{flex:1;min-width:0;font-family:var(--mono);font-size:13px;color:var(--muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .korrw{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.08em;flex:0 0 auto}
+  .korrta{font-size:15px;line-height:1.7;min-height:70px}
 
   /* commit-karten */
   .commit{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:10px}
