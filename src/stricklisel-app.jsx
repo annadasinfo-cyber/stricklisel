@@ -2412,7 +2412,19 @@ const KANTEN = [
 
 function Kurve() {
   const [wach, setWach] = useState(null);
+  const [neueWendung, setNeueWendung] = useState("");
+  const [wheelMsg, setWheelMsg] = useState("");
   const p = (i) => KURVE[i];
+
+  async function wendungSpeichern() {
+    const t = neueWendung.trim();
+    if (!t) return;
+    setNeueWendung("");
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/wheel`, { id: neueId(), user_id: getUserId(), wendung: t });
+    setWheelMsg(ok ? "» ins wheel gelegt" : "» offline — sync folgt");
+    setTimeout(() => setWheelMsg(""), 2500);
+  }
+
   return (
     <div className="kwrap">
       <div className="ptitel">dramaturgie</div>
@@ -2455,6 +2467,13 @@ function Kurve() {
       </svg>
       <div className={"kfrage" + (wach !== null ? " an" : "")}>
         {wach !== null ? <><b>{KURVE[wach].n}</b> {KURVE[wach].frage}</> : "punkt antippen — dann steht hier die frage dazu."}
+      </div>
+      <div className="wheelrow">
+        <input className="ti" value={neueWendung} onChange={(e) => setNeueWendung(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && wendungSpeichern()}
+          placeholder="wendung fürs hitchcock-wheel …" />
+        <button className="btn" onClick={wendungSpeichern}>↻ ins wheel</button>
+        {wheelMsg && <span className="status ok">{wheelMsg}</span>}
       </div>
     </div>
   );
@@ -2601,6 +2620,34 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     }, 90000);
     return () => clearInterval(iv);
   }, [zitate]);
+
+  // hitchcock-wheel — deine eigene sammlung an wendungen, dreht wie das orakel
+  const [wendungen, setWendungen] = useState([]);
+  const [wendung, setWendung] = useState(null);
+  const [dreht, setDreht] = useState(false);
+  useEffect(() => {
+    dbGet("wheel", `${SUPABASE_URL}/rest/v1/wheel?select=wendung&order=created_at.desc&limit=300`)
+      .then((d) => setWendungen(Array.from(new Set((Array.isArray(d) ? d : []).map((x) => (x.wendung || "").trim()).filter(Boolean)))))
+      .catch(() => {});
+  }, []);
+  const drehen = () => {
+    if (!wendungen.length) return;
+    setDreht(true);
+    setTimeout(() => {
+      const pool = wendungen.length > 1 ? wendungen.filter((w) => w !== wendung) : wendungen;
+      setWendung(pool[Math.floor(Math.random() * pool.length)]);
+      setDreht(false);
+    }, 550);
+  };
+  // sobald wendungen da sind: sofort eine zeigen, danach automatisch alle 90s
+  useEffect(() => {
+    if (!wendungen.length) return;
+    setWendung((w) => (w ? w : wendungen[Math.floor(Math.random() * wendungen.length)]));
+    const iv = setInterval(() => {
+      setWendung((w) => { const pool = wendungen.length > 1 ? wendungen.filter((x) => x !== w) : wendungen; return pool[Math.floor(Math.random() * pool.length)]; });
+    }, 90000);
+    return () => clearInterval(iv);
+  }, [wendungen]);
 
   useEffect(() => {
     dbGet("commits-aktiv-count", `${SUPABASE_URL}/rest/v1/commits?select=id,prioritaet&status=eq.aktiv`)
@@ -2790,10 +2837,13 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
           </div>
 
           <div className="ppanel">
-            <div className="puhr">
-              {p2(jetzt.getHours())}:{p2(jetzt.getMinutes())}<i>:{p2(jetzt.getSeconds())}</i>
-            </div>
-            <div className="ptitel">systemstatus</div>
+            <div className="ptitel">hitchcock-wheel</div>
+            <button className={"wheel" + (dreht ? " dreht" : "")} onClick={drehen} disabled={!wendungen.length}
+                    title={wendungen.length ? "dreh am rad" : "noch keine wendungen — unten bei der dramaturgie eintragen"}>
+              <span className="wheeltext">{wendungen.length ? (wendung || "…") : "— noch keine wendungen —"}</span>
+              <span className="wheeldreh">↻ drehen</span>
+            </button>
+            <div className="ptitel" style={{ marginTop: 18 }}>systemstatus</div>
             {ZEILEN.map(([k, v, warn]) => (
               <div className="pzeile" key={k}>
                 <span className={"ppunkt " + (warn || "")} />
@@ -3886,6 +3936,19 @@ function Styles() {
   .puhr{font-family:var(--term);color:var(--green);text-shadow:var(--glow);letter-spacing:.06em;
     font-variant-numeric:tabular-nums;line-height:1;font-size:clamp(38px,6.6vw,64px);margin-bottom:20px;text-align:left}
   .puhr i{font-style:normal;opacity:.42;font-size:.68em}
+  .wheel{width:100%;text-align:left;border:1px solid var(--line-hot);border-radius:8px;
+    background:var(--panel-2);padding:16px 16px 12px;margin-bottom:20px;cursor:pointer;
+    display:flex;flex-direction:column;gap:10px;transition:.15s;font-family:inherit}
+  .wheel:hover:not(:disabled){box-shadow:0 0 14px rgba(53,255,111,.18);border-color:var(--green)}
+  .wheel:disabled{cursor:default;opacity:.6}
+  .wheeltext{font-family:var(--mono);font-size:14px;line-height:1.5;color:var(--green);
+    text-shadow:var(--glow);min-height:2.6em;transition:opacity .25s}
+  .wheel.dreht .wheeltext{opacity:.15}
+  .wheeldreh{font-family:var(--term);font-size:10.5px;letter-spacing:.1em;color:var(--dim);align-self:flex-end}
+  .wheel.dreht .wheeldreh{animation:wheelspin .55s linear}
+  @keyframes wheelspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+  .wheelrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
+  .wheelrow .ti{flex:1 1 200px;min-width:0}
   .ptitel{font-family:var(--term);font-size:11px;letter-spacing:.24em;color:var(--green);
     text-shadow:var(--glow);margin-bottom:9px;text-transform:uppercase}
   .pzeile{display:flex;align-items:baseline;gap:7px;font-family:var(--term);font-size:12px;
