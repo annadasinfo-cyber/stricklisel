@@ -865,7 +865,7 @@ const rkMMSS = (ms) => {
   const s = Math.max(0, Math.round(ms / 1000));
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 };
-const RK_SEG = 30;  // anzahl retro-segmente im balken
+const RK_SEG = 64;  // viele schmale, stehende segmente (retro-ladebalken)
 const RkSegmente = ({ lit }) => (
   <div className="rkband">
     {Array.from({ length: RK_SEG }).map((_, i) => <i key={i} className={"rkseg" + (i < lit ? " an" : "")} />)}
@@ -3942,8 +3942,8 @@ function Styles() {
 
   /* reaktor-ladung · sanfter entlade-balken, sticky unterm header */
   .reaktor{position:sticky;top:0;z-index:40;margin:0 0 10px;padding-top:2px;background:var(--void)}
-  .rkband{display:flex;gap:2px;height:12px;padding:2px;border:1px solid var(--line);border-radius:5px;background:var(--panel-2)}
-  .rkseg{flex:1;min-width:0;border-radius:1px;background:var(--line);opacity:.5;transition:background .5s ease-out,box-shadow .5s ease-out,opacity .5s ease-out}
+  .rkband{display:flex;gap:2px;height:22px;padding:3px;border:1px solid var(--line);border-radius:5px;background:var(--panel-2);align-items:stretch}
+  .rkseg{flex:1;min-width:0;border-radius:1px;background:var(--line);opacity:.45;transition:background .5s ease-out,box-shadow .5s ease-out,opacity .5s ease-out}
   .rkseg.an{background:var(--green-mid);box-shadow:0 0 5px var(--green-dim);opacity:1}
   .reaktor.knapp .rkseg.an{background:var(--amber);box-shadow:0 0 6px var(--amber)}
   .reaktor.kuehlung .rkband{border-color:var(--amber)}
