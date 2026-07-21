@@ -1333,7 +1333,7 @@ function MonatsGitter({ liste, datum, setDatum, monat, setMonat, children }) {
   );
 }
 
-function LogFiles() {
+function LogFiles({ zeigeAbschreib }) {
   const [datum, setDatum] = useState(heute());
   const [monat, setMonat] = useState(() => heute().slice(0, 7));
   const [text, setText] = useState("");
@@ -1463,6 +1463,11 @@ function LogFiles() {
           </div>
         )}
       </MonatsGitter>
+
+      <div className="logextra">
+        <button className="btn txtbtn klein" disabled={!text.trim()} onClick={() => zeigeAbschreib(text)}
+                title="tageseintrag zum abschreiben — schwebendes fenster">▤ abschreiben</button>
+      </div>
 
       <Panel id="log-eintrag" title={"EINTRAG #" + String(eintragNr).padStart(3, "0")}
              sub={WOCHENTAG[d.getDay()] + " · " + d.toLocaleDateString("de-DE")}>
@@ -1629,7 +1634,47 @@ const farbe = (n) => EBENE_FARBE[Math.min(n, EBENE_FARBE.length - 1)];
 // passiert nur einseitig richtung konsole (vorlesen), nie zurück.
 // bloecke: [{ nr, sub, text, onChange, gruppe? }]  gruppe = überschrift über dem block
 // ============================================================
-function Korrektur({ titel, bloecke, onZurueck, onSpeichern, zurKonsole, dirty, msg }) {
+// ============================================================
+// SCHWEBE-FENSTER · text zum abschreiben, frei verschiebbar + größenverstellbar.
+// blockiert die app NICHT (kein backdrop) — an die seite ziehen, drunter weiterarbeiten.
+// reines txt. verschieben an der titelleiste, größe an der ecke unten rechts.
+// ============================================================
+function SchwebeFenster({ text, onClose }) {
+  const [pos, setPos] = useState({ x: 24, y: 96 });
+  const [kopiert, setKopiert] = useState(false);
+  if (text == null) return null;
+  const start = (e) => {
+    const p0 = e.touches ? e.touches[0] : e;
+    const sx = p0.clientX, sy = p0.clientY, ox = pos.x, oy = pos.y;
+    const move = (ev) => {
+      const p = ev.touches ? ev.touches[0] : ev;
+      if (ev.cancelable) ev.preventDefault();
+      let nx = ox + (p.clientX - sx), ny = oy + (p.clientY - sy);
+      nx = Math.max(0, Math.min(window.innerWidth - 70, nx));
+      ny = Math.max(0, Math.min(window.innerHeight - 46, ny));
+      setPos({ x: nx, y: ny });
+    };
+    const stop = () => {
+      window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", stop);
+      window.removeEventListener("touchmove", move); window.removeEventListener("touchend", stop);
+    };
+    window.addEventListener("mousemove", move); window.addEventListener("mouseup", stop);
+    window.addEventListener("touchmove", move, { passive: false }); window.addEventListener("touchend", stop);
+  };
+  const kopieren = () => { try { navigator.clipboard.writeText(text); setKopiert(true); setTimeout(() => setKopiert(false), 1400); } catch {} };
+  return (
+    <div className="schwebe" style={{ left: pos.x, top: pos.y }}>
+      <div className="schwebekopf" onMouseDown={start} onTouchStart={start}>
+        <span className="schwebetitel">▤ abschreiben</span>
+        <button className="schwebebtn" onClick={kopieren} title="in die zwischenablage">{kopiert ? "✓" : "⧉"}</button>
+        <button className="schwebebtn" onClick={onClose} title="schließen">×</button>
+      </div>
+      <div className="schwebetext">{text}</div>
+    </div>
+  );
+}
+
+function Korrektur({ titel, bloecke, onZurueck, onSpeichern, zurKonsole, zeigeAbschreib, dirty, msg }) {
   const gefuellt = bloecke.filter((b) => (b.text || "").trim());
   const alles = () => gefuellt.map((b) => (b.gruppe ? b.gruppe + ".\n\n" : "") + b.text.trim()).join("\n\n");
   return (
@@ -1639,6 +1684,8 @@ function Korrektur({ titel, bloecke, onZurueck, onSpeichern, zurKonsole, dirty, 
         <span className="xfiles">{(titel || "unbenannt") + " · korrektur"}</span>
         <button className="btn txtbtn" disabled={!gefuellt.length} onClick={() => { const t = alles(); if (t) zurKonsole(t); }}
                 title="ganze lesefassung an die konsole — thorsten liest vor">▶ alles vorlesen</button>
+        <button className="btn txtbtn klein" disabled={!gefuellt.length} onClick={() => zeigeAbschreib(alles())}
+                title="ganze lesefassung zum abschreiben — schwebendes fenster">▤</button>
         <button className="btn primary" onClick={onSpeichern}>⇥ speichern</button>
       </div>
       <div className="korr">
@@ -1651,6 +1698,7 @@ function Korrektur({ titel, bloecke, onZurueck, onSpeichern, zurKonsole, dirty, 
               {b.sub && <span className="korrsub">{b.sub}</span>}
               <span className="korrw">{zaehleWoerter(b.text || "")} w</span>
               <button className="btn txtbtn klein" title="diesen abschnitt vorlesen" onClick={() => (b.text || "").trim() && zurKonsole(b.text.trim())}>▶</button>
+              <button className="btn txtbtn klein" title="diesen abschnitt zum abschreiben" onClick={() => (b.text || "").trim() && zeigeAbschreib(b.text.trim())}>▤</button>
             </div>
             <AutoTa className="ta korrta" value={b.text || ""} onChange={(e) => b.onChange(e.target.value)} placeholder="—" />
           </div>
@@ -1663,7 +1711,7 @@ function Korrektur({ titel, bloecke, onZurueck, onSpeichern, zurKonsole, dirty, 
   );
 }
 
-function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) {
+function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbschreib, kette }) {
   const [view, setView] = useState("projekte");
   const [ordner, setOrdner] = useState([]);
   const [alle, setAlle] = useState([]);
@@ -2050,6 +2098,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
       dirty={dirty}
       msg={msg}
       zurKonsole={zurKonsole}
+      zeigeAbschreib={zeigeAbschreib}
       onZurueck={() => setView("schreiben")}
       onSpeichern={() => speichern(false)}
       bloecke={SCHREIB_ORDER.filter((i) => i !== 4).map((i) => ({
@@ -2074,6 +2123,8 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
         </button>
         <button className="btn txtbtn klein" onClick={txtKopieren} disabled={!szenenTexte.length}
                 title="stattdessen in die zwischenablage">⧉</button>
+        <button className="btn txtbtn klein" onClick={() => zeigeAbschreib(szenenText())} disabled={!szenenTexte.length}
+                title="text zum abschreiben — schwebendes fenster">▤</button>
         <button className="btn txtbtn" onClick={() => setView("korrektur")} disabled={!szenenTexte.length}
                 title="lesefassung zum korrigieren & vorlesen">✎ korrektur</button>
         <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
@@ -3216,6 +3267,8 @@ export default function StricklieselApp() {
     setTab("konsole");
     setStatus({ t: "text aus den skripten übernommen — jetzt auf stimme erzeugen", c: "ok" });
   };
+  const [abschreib, setAbschreib] = useState(null);
+  const zeigeAbschreib = (txt) => setAbschreib((txt || "").trim() || null);
   const [progName, setProgName] = useState("");
   const [progList, setProgList] = useState([]);
   const [progSel, setProgSel] = useState("");
@@ -3525,13 +3578,14 @@ export default function StricklieselApp() {
       <Styles />
       <Rain />
       <ScrollTop />
+      <SchwebeFenster text={abschreib} onClose={() => setAbschreib(null)} />
       <div className="wrap">
         <header>
           <div className="wordmark">SUB<span className="slash">//</span>CONSTRUCTOR<span className="cursor" /><Uhr /></div>
           <div className="subline"><span><b>operator console</b> · subliminal-build · deflektionsreaktor_aura3</span><SyncStatus /><Wetter /></div>
+          <Reaktorladung />
         </header>
 
-        <Reaktorladung />
         <Scope analyser={analyser} ctxRef={ctxRef} />
         <Laufschrift />
 
@@ -3550,8 +3604,8 @@ export default function StricklieselApp() {
         {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "m42" && <M42 />}
-        {tab === "log" && <LogFiles />}
-        {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} kette={cfg.ketteText} />}
+        {tab === "log" && <LogFiles zeigeAbschreib={zeigeAbschreib} />}
+        {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} zeigeAbschreib={zeigeAbschreib} kette={cfg.ketteText} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} sprungPerson={sprungPerson} setSprungPerson={setSprungPerson} />}
         {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuM42={() => setTab("m42")} zurPerson={(id) => { setSprungPerson(id); setTab("things"); }} />}
         </Fehlerfang>
@@ -3941,7 +3995,7 @@ function Styles() {
   @media(prefers-reduced-motion:reduce){.laufinner.langsam,.laufinner.schnell{animation:none}}
 
   /* reaktor-ladung · sanfter entlade-balken, sticky unterm header */
-  .reaktor{position:sticky;top:0;z-index:40;margin:0 0 10px;padding-top:2px;background:var(--void)}
+  .reaktor{margin:12px 0 0}
   .rkband{display:flex;gap:2px;height:22px;padding:3px;border:1px solid var(--line);border-radius:5px;background:var(--panel-2);align-items:stretch}
   .rkseg{flex:1;min-width:0;border-radius:1px;background:var(--line);opacity:.45;transition:background .5s ease-out,box-shadow .5s ease-out,opacity .5s ease-out}
   .rkseg.an{background:var(--green-mid);box-shadow:0 0 5px var(--green-dim);opacity:1}
@@ -3968,6 +4022,21 @@ function Styles() {
   .rkpoptext{font-family:var(--mono);font-size:13.5px;line-height:1.7;color:var(--muted);margin-bottom:20px}
   .rkpopbox .btn{font-family:var(--mono)}
   @media(prefers-reduced-motion:reduce){.rkpoptitel{animation:none}}
+
+  /* schwebe-fenster · text zum abschreiben */
+  .schwebe{position:fixed;z-index:150;display:flex;flex-direction:column;
+    width:min(460px,88vw);height:min(560px,72vh);min-width:220px;min-height:140px;
+    resize:both;overflow:hidden;border:1px solid var(--line-hot);border-radius:8px;
+    background:var(--panel);box-shadow:0 14px 50px rgba(0,0,0,.6)}
+  .schwebekopf{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:move;
+    border-bottom:1px solid var(--line);background:var(--panel-2);user-select:none;touch-action:none}
+  .schwebetitel{flex:1;font-family:var(--term);font-size:11px;letter-spacing:.14em;color:var(--green)}
+  .schwebebtn{background:transparent;border:1px solid var(--line);border-radius:4px;color:var(--dim);
+    width:26px;height:23px;cursor:pointer;font-size:12px;line-height:1;transition:.12s}
+  .schwebebtn:hover{border-color:var(--line-hot);color:var(--green)}
+  .schwebetext{flex:1;overflow:auto;padding:16px 18px;font-family:var(--mono);font-size:14px;
+    line-height:1.7;color:var(--muted);white-space:pre-wrap;word-break:break-word;user-select:text}
+  .logextra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
 
   /* tabs unterm skope */
   .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
