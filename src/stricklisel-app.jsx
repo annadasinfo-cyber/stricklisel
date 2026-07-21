@@ -865,6 +865,12 @@ const rkMMSS = (ms) => {
   const s = Math.max(0, Math.round(ms / 1000));
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 };
+const RK_SEG = 30;  // anzahl retro-segmente im balken
+const RkSegmente = ({ lit }) => (
+  <div className="rkband">
+    {Array.from({ length: RK_SEG }).map((_, i) => <i key={i} className={"rkseg" + (i < lit ? " an" : "")} />)}
+  </div>
+);
 function Reaktorladung() {
   const [an, setAn] = useState(() => { const v = offLesen("reaktor-an"); return v === null ? true : !!v; });
   const [start, setStart] = useState(() => {
@@ -906,7 +912,7 @@ function Reaktorladung() {
 
   if (!an) return (
     <div className="reaktor aus">
-      <div className="rkband"><i className="rkfill" style={{ width: "0%" }} /></div>
+      <RkSegmente lit={0} />
       <div className="rkctrl">
         <span className="rklabel">reaktor-ladung</span>
         <button className="laufbtn" onClick={umschalten}>○ aus</button>
@@ -917,11 +923,12 @@ function Reaktorladung() {
   const ladung = kuehlung ? 0 : Math.max(0, 100 * (1 - verstrichen / RK_SESSION));
   const knapp = !kuehlung && ladung <= 15;                 // erst gegen ende präsent
   const restCool = RK_ZYKLUS - verstrichen;
+  const lit = kuehlung ? 0 : Math.round(RK_SEG * ladung / 100);
 
   return (
     <>
       <div className={"reaktor" + (kuehlung ? " kuehlung" : knapp ? " knapp" : "")}>
-        <div className="rkband"><i className="rkfill" style={{ width: ladung + "%" }} /></div>
+        <RkSegmente lit={lit} />
         <div className="rkctrl">
           <span className="rklabel">
             {kuehlung
@@ -3935,11 +3942,10 @@ function Styles() {
 
   /* reaktor-ladung · sanfter entlade-balken, sticky unterm header */
   .reaktor{position:sticky;top:0;z-index:40;margin:0 0 10px;padding-top:2px;background:var(--void)}
-  .rkband{overflow:hidden;height:8px;border:1px solid var(--line);border-radius:5px;background:var(--panel-2);position:relative}
-  .rkfill{display:block;height:100%;background:linear-gradient(90deg,var(--green-dim),var(--green-mid));
-    box-shadow:0 0 8px var(--green-dim);opacity:.7;transition:width 1s linear,background .6s,box-shadow .6s,opacity .6s}
-  .reaktor.knapp .rkfill{background:linear-gradient(90deg,var(--amber),#c98a3a);box-shadow:0 0 12px var(--amber);opacity:1;
-    animation:rkpuls 1.6s ease-in-out infinite}
+  .rkband{display:flex;gap:2px;height:12px;padding:2px;border:1px solid var(--line);border-radius:5px;background:var(--panel-2)}
+  .rkseg{flex:1;min-width:0;border-radius:1px;background:var(--line);opacity:.5;transition:background .5s ease-out,box-shadow .5s ease-out,opacity .5s ease-out}
+  .rkseg.an{background:var(--green-mid);box-shadow:0 0 5px var(--green-dim);opacity:1}
+  .reaktor.knapp .rkseg.an{background:var(--amber);box-shadow:0 0 6px var(--amber)}
   .reaktor.kuehlung .rkband{border-color:var(--amber)}
   .rkctrl{display:flex;gap:9px;align-items:center;margin-top:5px}
   .rklabel{font-family:var(--term);font-size:10.5px;letter-spacing:.1em;color:var(--dim);flex:1}
@@ -3947,10 +3953,9 @@ function Styles() {
   .reaktor.knapp .rklabel b{color:var(--amber)}
   .rkblink{color:var(--amber);text-shadow:0 0 8px var(--amber);animation:rkblink 1s step-end infinite}
   .reaktor.aus{opacity:.5}
-  .reaktor.aus .rkfill{background:var(--line);box-shadow:none}
-  @keyframes rkpuls{0%,100%{opacity:1}50%{opacity:.55}}
+  .reaktor.aus .rkseg{box-shadow:none}
   @keyframes rkblink{0%,49%{opacity:1}50%,100%{opacity:.15}}
-  @media(prefers-reduced-motion:reduce){.reaktor.knapp .rkfill,.rkblink{animation:none}}
+  @media(prefers-reduced-motion:reduce){.rkblink{animation:none}}
 
   /* zugriff-verweigert-popup (wegklickbar, kein echtes sperren) */
   .rkpop{position:fixed;inset:0;z-index:200;background:rgba(2,4,3,.78);display:flex;align-items:center;justify-content:center;padding:24px;
