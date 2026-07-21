@@ -3787,7 +3787,7 @@ function Styles() {
     display:flex;align-items:center;justify-content:center;animation:ankunft .3s ease-out}
   .hoch:hover{background:var(--panel);border-color:var(--green)}
   @media(max-width:640px){.hoch{right:14px;bottom:14px}}
-  .wrap{position:relative;z-index:1;max-width:min(1240px, 92vw);margin:0 auto;padding:26px 18px 90px}
+  .wrap{position:relative;z-index:1;max-width:1020px;margin:0 auto;padding:26px 18px 90px}
 
   header{position:sticky;top:0;z-index:6;background:var(--void);
     padding-bottom:8px;margin-bottom:2px}
