@@ -851,6 +851,101 @@ function Laufschrift() {
 }
 
 // ============================================================
+// REAKTOR-LADUNG · sanfter entlade-balken (kein wegsperren!)
+// entlädt sich über 90 min. bei null: 10 min leer + orange blinkend
+// "reloade AMs" + einmal ein wegklickbares "ZUGRIFF VERWEIGERT"-popup.
+// danach lädt er voll und läuft neu. an/aus wie die laufschrift.
+// start-zeitstempel in localStorage → ein reload schummelt den zähler nicht.
+// gedacht als schubs (mal aufstehen), NICHT als sperre — man arbeitet weiter.
+// ============================================================
+const RK_SESSION = 90 * 60 * 1000;   // 90 min arbeitsfenster
+const RK_COOLDOWN = 10 * 60 * 1000;  // 10 min "leer"
+const RK_ZYKLUS = RK_SESSION + RK_COOLDOWN;
+const rkMMSS = (ms) => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+};
+function Reaktorladung() {
+  const [an, setAn] = useState(() => { const v = offLesen("reaktor-an"); return v === null ? true : !!v; });
+  const [start, setStart] = useState(() => {
+    const s = offLesen("reaktor-start");
+    if (typeof s === "number" && Date.now() - s < RK_ZYKLUS) return s;
+    const jetzt = Date.now(); offSchreibenCache("reaktor-start", jetzt); return jetzt;
+  });
+  const [jetzt, setJetzt] = useState(Date.now());
+  const [denied, setDenied] = useState(false);
+
+  // sekündlich ticken, solange an
+  useEffect(() => {
+    if (!an) return;
+    const iv = setInterval(() => setJetzt(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, [an]);
+
+  const verstrichen = jetzt - start;
+  const kuehlung = verstrichen >= RK_SESSION && verstrichen < RK_ZYKLUS;
+
+  // zyklus vorbei → frische sitzung (auch nach langer abwesenheit)
+  useEffect(() => {
+    if (!an) return;
+    if (verstrichen >= RK_ZYKLUS) {
+      const jetztNeu = Date.now();
+      setStart(jetztNeu); offSchreibenCache("reaktor-start", jetztNeu); setDenied(false);
+    }
+  }, [verstrichen, an]);
+
+  // popup EINMAL pro zyklus, wenn wir gerade in die kühlung kippen
+  useEffect(() => {
+    if (!an || !kuehlung) return;
+    if (offLesen("reaktor-denied-fuer") !== start) {
+      setDenied(true); offSchreibenCache("reaktor-denied-fuer", start);
+    }
+  }, [kuehlung, an, start]);
+
+  const umschalten = () => setAn((v) => { const n = !v; offSchreibenCache("reaktor-an", n); return n; });
+
+  if (!an) return (
+    <div className="reaktor aus">
+      <div className="rkband"><i className="rkfill" style={{ width: "0%" }} /></div>
+      <div className="rkctrl">
+        <span className="rklabel">reaktor-ladung</span>
+        <button className="laufbtn" onClick={umschalten}>○ aus</button>
+      </div>
+    </div>
+  );
+
+  const ladung = kuehlung ? 0 : Math.max(0, 100 * (1 - verstrichen / RK_SESSION));
+  const knapp = !kuehlung && ladung <= 15;                 // erst gegen ende präsent
+  const restCool = RK_ZYKLUS - verstrichen;
+
+  return (
+    <>
+      <div className={"reaktor" + (kuehlung ? " kuehlung" : knapp ? " knapp" : "")}>
+        <div className="rkband"><i className="rkfill" style={{ width: ladung + "%" }} /></div>
+        <div className="rkctrl">
+          <span className="rklabel">
+            {kuehlung
+              ? <span className="rkblink">reloade AMs · {rkMMSS(restCool)}</span>
+              : <>reaktor-ladung <b>{Math.round(ladung)}%</b></>}
+          </span>
+          <button className="laufbtn" onClick={umschalten}>◉ an</button>
+        </div>
+      </div>
+
+      {denied && (
+        <div className="rkpop" onClick={() => setDenied(false)}>
+          <div className="rkpopbox" onClick={(e) => e.stopPropagation()}>
+            <div className="rkpoptitel">ZUGRIFF VERWEIGERT</div>
+            <div className="rkpoptext">es gibt keinen löffel</div>
+            <button className="btn" onClick={() => setDenied(false)}>× wegklicken</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ============================================================
 // ABTEILUNG 17b · PRIORITY_MANAGER
 // ============================================================
 const PARAM_STD = ["sicher", "sanft", "schnell", "stabil", "effizient"];
@@ -3429,6 +3524,7 @@ export default function StricklieselApp() {
           <div className="subline"><span><b>operator console</b> · subliminal-build · deflektionsreaktor_aura3</span><SyncStatus /><Wetter /></div>
         </header>
 
+        <Reaktorladung />
         <Scope analyser={analyser} ctxRef={ctxRef} />
         <Laufschrift />
 
@@ -3836,6 +3932,37 @@ function Styles() {
   .laufbtn.on{color:var(--green);border-color:var(--line-hot);text-shadow:var(--glow)}
   .laufinput{flex:1 1 160px;min-width:0}
   @media(prefers-reduced-motion:reduce){.laufinner.langsam,.laufinner.schnell{animation:none}}
+
+  /* reaktor-ladung · sanfter entlade-balken, sticky unterm header */
+  .reaktor{position:sticky;top:0;z-index:40;margin:0 0 10px;padding-top:2px;background:var(--void)}
+  .rkband{overflow:hidden;height:8px;border:1px solid var(--line);border-radius:5px;background:var(--panel-2);position:relative}
+  .rkfill{display:block;height:100%;background:linear-gradient(90deg,var(--green-dim),var(--green-mid));
+    box-shadow:0 0 8px var(--green-dim);opacity:.7;transition:width 1s linear,background .6s,box-shadow .6s,opacity .6s}
+  .reaktor.knapp .rkfill{background:linear-gradient(90deg,var(--amber),#c98a3a);box-shadow:0 0 12px var(--amber);opacity:1;
+    animation:rkpuls 1.6s ease-in-out infinite}
+  .reaktor.kuehlung .rkband{border-color:var(--amber)}
+  .rkctrl{display:flex;gap:9px;align-items:center;margin-top:5px}
+  .rklabel{font-family:var(--term);font-size:10.5px;letter-spacing:.1em;color:var(--dim);flex:1}
+  .rklabel b{color:var(--green);font-variant-numeric:tabular-nums;font-weight:400}
+  .reaktor.knapp .rklabel b{color:var(--amber)}
+  .rkblink{color:var(--amber);text-shadow:0 0 8px var(--amber);animation:rkblink 1s step-end infinite}
+  .reaktor.aus{opacity:.5}
+  .reaktor.aus .rkfill{background:var(--line);box-shadow:none}
+  @keyframes rkpuls{0%,100%{opacity:1}50%{opacity:.55}}
+  @keyframes rkblink{0%,49%{opacity:1}50%,100%{opacity:.15}}
+  @media(prefers-reduced-motion:reduce){.reaktor.knapp .rkfill,.rkblink{animation:none}}
+
+  /* zugriff-verweigert-popup (wegklickbar, kein echtes sperren) */
+  .rkpop{position:fixed;inset:0;z-index:200;background:rgba(2,4,3,.78);display:flex;align-items:center;justify-content:center;padding:24px;
+    animation:rkein .18s ease-out}
+  @keyframes rkein{from{opacity:0}to{opacity:1}}
+  .rkpopbox{max-width:420px;width:100%;border:1px solid var(--danger);border-radius:8px;background:var(--panel);
+    padding:26px 24px;text-align:center;box-shadow:0 0 40px rgba(255,107,107,.25)}
+  .rkpoptitel{font-family:var(--term);font-size:22px;letter-spacing:.16em;color:var(--danger);
+    text-shadow:0 0 14px rgba(255,107,107,.5);margin-bottom:14px;animation:rkblink 1.1s step-end 3}
+  .rkpoptext{font-family:var(--mono);font-size:13.5px;line-height:1.7;color:var(--muted);margin-bottom:20px}
+  .rkpopbox .btn{font-family:var(--mono)}
+  @media(prefers-reduced-motion:reduce){.rkpoptitel{animation:none}}
 
   /* tabs unterm skope */
   .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
