@@ -2714,9 +2714,14 @@ function Kurve() {
   );
 }
 
-// aufklappbare verwaltungs-karte für listen (wheel-wendungen, orakel-impulse)
-function VerwaltKarte({ titel, leer, liste, label, keyOf, wert, setWert, onAdd, onWeg, platzhalter, nurLesen, hinweis }) {
+// aufklappbare verwaltungs-karte für listen (wheel-wendungen, orakel-impulse, hts-hooks)
+// zeile antippen -> ändern (wenn onEdit da), enter speichert / esc bricht ab, ✕ löscht.
+function VerwaltKarte({ titel, leer, liste, label, keyOf, wert, setWert, onAdd, onWeg, onEdit, platzhalter, nurLesen, hinweis }) {
   const [auf, setAuf] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editWert, setEditWert] = useState("");
+  const starteEdit = (x) => { setEditId(keyOf(x)); setEditWert(label(x)); };
+  const speichereEdit = (x) => { const v = editWert.trim(); if (v && v !== label(x)) onEdit(x, v); setEditId(null); };
   return (
     <div className="vkarte">
       <button className="vkopf" onClick={() => setAuf((v) => !v)}>
@@ -2737,7 +2742,16 @@ function VerwaltKarte({ titel, leer, liste, label, keyOf, wert, setWert, onAdd, 
           {!liste.length && <p className="vleer">{leer}</p>}
           {liste.map((x) => (
             <div className="vzeile" key={keyOf(x)}>
-              <span>{label(x)}</span>
+              {editId === keyOf(x) ? (
+                <input className="ti vedit" autoFocus value={editWert}
+                  onChange={(e) => setEditWert(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") speichereEdit(x); if (e.key === "Escape") setEditId(null); }}
+                  onBlur={() => speichereEdit(x)} />
+              ) : (
+                <span className={"vlabel" + (onEdit && !nurLesen ? " bearbeitbar" : "")}
+                  onClick={() => onEdit && !nurLesen && starteEdit(x)}
+                  title={onEdit && !nurLesen ? "antippen zum ändern" : undefined}>{label(x)}</span>
+              )}
               {!nurLesen && <i onClick={() => onWeg(x)} title="löschen">✕</i>}
             </div>
           ))}
@@ -2890,6 +2904,10 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     setOrakelListe((l) => l.filter((x) => x.id !== o.id));
     await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/orakel?id=eq.${o.id}`);
   }
+  async function spruchEdit(o, wert) {
+    setOrakelListe((l) => l.map((x) => x.id === o.id ? { ...x, spruch: wert } : x));
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/orakel?id=eq.${o.id}`, { spruch: wert });
+  }
   const orakelZiehen = () => {
     if (!zitate.length) return;
     const pool = zitate.length > 1 ? zitate.filter((z) => z !== spruch) : zitate;
@@ -2930,6 +2948,10 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     setWheelListe((l) => l.filter((x) => x.id !== w.id));
     await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/wheel?id=eq.${w.id}`);
   }
+  async function wendungEdit(w, wert) {
+    setWheelListe((l) => l.map((x) => x.id === w.id ? { ...x, wendung: wert } : x));
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/wheel?id=eq.${w.id}`, { wendung: wert });
+  }
   const drehen = () => {
     if (!wendungen.length) return;
     setDreht(true);
@@ -2951,6 +2973,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
   const htsHooks = htsListe.map((h) => h.hook);
   const [htsAktuell, setHtsAktuell] = useState(null);
   const [htsDreht, setHtsDreht] = useState(false);
+  const [neuerHook, setNeuerHook] = useState("");
   const htsLaden = () => {
     dbGet("hts", `${SUPABASE_URL}/rest/v1/hts?select=id,hook&order=created_at.desc&limit=300`)
       .then((d) => setHtsListe(Array.isArray(d) ? d.filter((x) => (x.hook || "").trim()) : []))
@@ -2960,6 +2983,19 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
   async function htsWeg(h) {
     setHtsListe((l) => l.filter((x) => x.id !== h.id));
     await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/hts?id=eq.${h.id}`);
+  }
+  async function htsAdd() {
+    const t = neuerHook.trim();
+    if (!t) return;
+    setNeuerHook("");
+    const id = neueId();
+    setHtsListe((l) => [{ id, hook: t }, ...l]);
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/hts`, { id, user_id: getUserId(), hook: t });
+    if (ok) htsLaden();
+  }
+  async function htsEdit(h, wert) {
+    setHtsListe((l) => l.map((x) => x.id === h.id ? { ...x, hook: wert } : x));
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/hts?id=eq.${h.id}`, { hook: wert });
   }
   const htsDrehen = () => {
     if (!htsHooks.length) return;
@@ -3238,13 +3274,18 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
 
         <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
           liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
-          wert={neueWendung} setWert={setNeueWendung} onAdd={wendungAdd} onWeg={wendungWeg}
+          wert={neueWendung} setWert={setNeueWendung} onAdd={wendungAdd} onWeg={wendungWeg} onEdit={wendungEdit}
           platzhalter="neue wendung …" />
 
         <VerwaltKarte titel="orakel · impulse" leer="noch keine impulse — trag welche ein."
           liste={orakelListe} label={(o) => o.spruch} keyOf={(o) => o.id}
-          wert={neuerSpruch} setWert={setNeuerSpruch} onAdd={spruchAdd} onWeg={spruchWeg}
+          wert={neuerSpruch} setWert={setNeuerSpruch} onAdd={spruchAdd} onWeg={spruchWeg} onEdit={spruchEdit}
           platzhalter="neuer impuls / spruch …" />
+
+        <VerwaltKarte titel="hts_ultra · henkeltassen-schrank" leer="noch keine hooks — schick welche per ☕ rein oder trag hier ein."
+          liste={htsListe} label={(h) => h.hook} keyOf={(h) => h.id}
+          wert={neuerHook} setWert={setNeuerHook} onAdd={htsAdd} onWeg={htsWeg} onEdit={htsEdit}
+          platzhalter="neuer hook …" hinweis="hooks aus den skripten landen automatisch hier. antippen zum kürzen, ✕ zum entfernen." />
 
         <div className="pfuss">// niemand kann dir sagen, was die matrix ist. du musst sie selbst sehen. 🐇</div>
       </div>
@@ -4381,6 +4422,9 @@ function Styles() {
   .vzeile span{flex:1;min-width:0}
   .vzeile i{font-style:normal;color:var(--dim);cursor:pointer;opacity:.6;flex:0 0 auto}
   .vzeile i:hover{opacity:1;color:var(--amber)}
+  .vlabel.bearbeitbar{cursor:text;border-bottom:1px dotted transparent;transition:.12s}
+  .vlabel.bearbeitbar:hover{border-bottom-color:var(--line-hot);color:var(--green)}
+  .vedit{flex:1 1 auto;min-width:0;font-size:12.5px;padding:4px 8px}
   .ptitel{font-family:var(--term);font-size:11px;letter-spacing:.24em;color:var(--green);
     text-shadow:var(--glow);margin-bottom:9px;text-transform:uppercase}
   .pzeile{display:flex;align-items:baseline;gap:7px;font-family:var(--term);font-size:12px;
