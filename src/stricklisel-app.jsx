@@ -802,11 +802,18 @@ function Scope({ analyser, ctxRef }) {
 
 // laufschrift unter dem scope — subliminaltext läuft durch.
 // quelle umschaltbar (konsole / eigener text), an/aus, tempo. reines css, kein js-loop.
+// erste n sätze — damit ein ellenlanges protokoll das band nicht flutet
+const laufKurz = (t, n = 3) => {
+  const s = (t || "").trim();
+  if (!s) return "";
+  const treffer = s.match(/[^.!?]+[.!?]+(\s|$)/g);
+  if (!treffer) return s;                       // kein satzende gefunden → ganzen (kurzen) text
+  const kurz = treffer.slice(0, n).join("").trim();
+  return kurz || s;
+};
 function Laufschrift() {
   const [an, setAn] = useState(true);
-  const [quelle, setQuelle] = useState("konsole"); // "konsole" | "eigen"
   const [tempo, setTempo] = useState("langsam"); // "langsam" | "schnell"
-  const [eigen, setEigen] = useState("");
   const [konsolenText, setKonsolenText] = useState("");
 
   // konsolen-affirmationen aus dem zuletzt gespeicherten stand ziehen
@@ -825,7 +832,7 @@ function Laufschrift() {
     return () => clearInterval(iv);
   }, []);
 
-  const text = quelle === "eigen" ? eigen : konsolenText;
+  const text = laufKurz(konsolenText, 3);
   const zeigen = an && text.trim();
 
   return (
@@ -837,11 +844,7 @@ function Laufschrift() {
       </div>
       <div className="laufctrl">
         <button className={"laufbtn" + (an ? " on" : "")} onClick={() => setAn((v) => !v)}>{an ? "◉ an" : "○ aus"}</button>
-        <button className="laufbtn" onClick={() => setQuelle((q) => q === "konsole" ? "eigen" : "konsole")}>{quelle === "konsole" ? "konsole" : "eigener text"}</button>
         <button className="laufbtn" onClick={() => setTempo((t) => t === "langsam" ? "schnell" : "langsam")}>{tempo === "langsam" ? "langsam" : "schnell"}</button>
-        {quelle === "eigen" && (
-          <input className="ti laufinput" value={eigen} onChange={(e) => setEigen(e.target.value)} placeholder="eigener lauftext …" />
-        )}
       </div>
     </div>
   );
@@ -1969,8 +1972,8 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, kette }) 
         </button>
         <button className="btn txtbtn klein" onClick={txtKopieren} disabled={!szenenTexte.length}
                 title="stattdessen in die zwischenablage">⧉</button>
-        <button className="btn txtbtn klein" onClick={() => setView("korrektur")} disabled={!szenenTexte.length}
-                title="lesefassung zum korrigieren & vorlesen">✎</button>
+        <button className="btn txtbtn" onClick={() => setView("korrektur")} disabled={!szenenTexte.length}
+                title="lesefassung zum korrigieren & vorlesen">✎ korrektur</button>
         <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
       </div>
 
@@ -2266,8 +2269,8 @@ function Outliner({ zurKonsole }) {
       <div className="seitenkopf">
         <button className="btn" onClick={() => setView("projekte")}>← zurück</button>
         <span className="xfiles">{name || "unbenannt"}</span>
-        <button className="btn txtbtn klein" onClick={() => setView("korrektur")} disabled={seiten === 0}
-                title="lesefassung zum korrigieren & vorlesen">✎</button>
+        <button className="btn txtbtn" onClick={() => setView("korrektur")} disabled={seiten === 0}
+                title="lesefassung zum korrigieren & vorlesen">✎ korrektur</button>
         <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
       </div>
 
