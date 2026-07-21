@@ -1466,7 +1466,7 @@ function LogFiles({ zeigeAbschreib }) {
 
       <div className="logextra">
         <button className="btn txtbtn klein" disabled={!text.trim()} onClick={() => zeigeAbschreib(text)}
-                title="tageseintrag zum abschreiben — schwebendes fenster">▤ abschreiben</button>
+                title="tageseintrag als klartext — schwebendes fenster">▤ klartext</button>
       </div>
 
       <Panel id="log-eintrag" title={"EINTRAG #" + String(eintragNr).padStart(3, "0")}
@@ -1641,19 +1641,14 @@ const farbe = (n) => EBENE_FARBE[Math.min(n, EBENE_FARBE.length - 1)];
 // ============================================================
 function SchwebeFenster({ text, onClose }) {
   const [pos, setPos] = useState({ x: 24, y: 96 });
+  const [groesse, setGroesse] = useState(() => ({
+    w: Math.min(460, Math.round(window.innerWidth * 0.88)),
+    h: Math.min(560, Math.round(window.innerHeight * 0.72)),
+  }));
   const [kopiert, setKopiert] = useState(false);
   if (text == null) return null;
-  const start = (e) => {
-    const p0 = e.touches ? e.touches[0] : e;
-    const sx = p0.clientX, sy = p0.clientY, ox = pos.x, oy = pos.y;
-    const move = (ev) => {
-      const p = ev.touches ? ev.touches[0] : ev;
-      if (ev.cancelable) ev.preventDefault();
-      let nx = ox + (p.clientX - sx), ny = oy + (p.clientY - sy);
-      nx = Math.max(0, Math.min(window.innerWidth - 70, nx));
-      ny = Math.max(0, Math.min(window.innerHeight - 46, ny));
-      setPos({ x: nx, y: ny });
-    };
+
+  const hoeren = (move) => {
     const stop = () => {
       window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", stop);
       window.removeEventListener("touchmove", move); window.removeEventListener("touchend", stop);
@@ -1661,15 +1656,42 @@ function SchwebeFenster({ text, onClose }) {
     window.addEventListener("mousemove", move); window.addEventListener("mouseup", stop);
     window.addEventListener("touchmove", move, { passive: false }); window.addEventListener("touchend", stop);
   };
+  const startMove = (e) => {
+    const p0 = e.touches ? e.touches[0] : e;
+    const sx = p0.clientX, sy = p0.clientY, ox = pos.x, oy = pos.y;
+    hoeren((ev) => {
+      const p = ev.touches ? ev.touches[0] : ev;
+      if (ev.cancelable) ev.preventDefault();
+      setPos({
+        x: Math.max(0, Math.min(window.innerWidth - 70, ox + (p.clientX - sx))),
+        y: Math.max(0, Math.min(window.innerHeight - 46, oy + (p.clientY - sy))),
+      });
+    });
+  };
+  const startResize = (e) => {
+    e.stopPropagation();
+    const p0 = e.touches ? e.touches[0] : e;
+    const sx = p0.clientX, sy = p0.clientY, ow = groesse.w, oh = groesse.h;
+    hoeren((ev) => {
+      const p = ev.touches ? ev.touches[0] : ev;
+      if (ev.cancelable) ev.preventDefault();
+      setGroesse({
+        w: Math.max(240, Math.min(window.innerWidth - pos.x - 6, ow + (p.clientX - sx))),
+        h: Math.max(140, Math.min(window.innerHeight - pos.y - 6, oh + (p.clientY - sy))),
+      });
+    });
+  };
   const kopieren = () => { try { navigator.clipboard.writeText(text); setKopiert(true); setTimeout(() => setKopiert(false), 1400); } catch {} };
+
   return (
-    <div className="schwebe" style={{ left: pos.x, top: pos.y }}>
-      <div className="schwebekopf" onMouseDown={start} onTouchStart={start}>
-        <span className="schwebetitel">▤ abschreiben</span>
+    <div className="schwebe" style={{ left: pos.x, top: pos.y, width: groesse.w, height: groesse.h }}>
+      <div className="schwebekopf" onMouseDown={startMove} onTouchStart={startMove}>
+        <span className="schwebetitel">▤ klartext</span>
         <button className="schwebebtn" onClick={kopieren} title="in die zwischenablage">{kopiert ? "✓" : "⧉"}</button>
         <button className="schwebebtn" onClick={onClose} title="schließen">×</button>
       </div>
       <div className="schwebetext">{text}</div>
+      <div className="schweberesize" onMouseDown={startResize} onTouchStart={startResize} title="größe ziehen" />
     </div>
   );
 }
@@ -1685,7 +1707,7 @@ function Korrektur({ titel, bloecke, onZurueck, onSpeichern, zurKonsole, zeigeAb
         <button className="btn txtbtn" disabled={!gefuellt.length} onClick={() => { const t = alles(); if (t) zurKonsole(t); }}
                 title="ganze lesefassung an die konsole — thorsten liest vor">▶ alles vorlesen</button>
         <button className="btn txtbtn klein" disabled={!gefuellt.length} onClick={() => zeigeAbschreib(alles())}
-                title="ganze lesefassung zum abschreiben — schwebendes fenster">▤</button>
+                title="ganze lesefassung als klartext — schwebendes fenster">▤</button>
         <button className="btn primary" onClick={onSpeichern}>⇥ speichern</button>
       </div>
       <div className="korr">
@@ -1698,7 +1720,7 @@ function Korrektur({ titel, bloecke, onZurueck, onSpeichern, zurKonsole, zeigeAb
               {b.sub && <span className="korrsub">{b.sub}</span>}
               <span className="korrw">{zaehleWoerter(b.text || "")} w</span>
               <button className="btn txtbtn klein" title="diesen abschnitt vorlesen" onClick={() => (b.text || "").trim() && zurKonsole(b.text.trim())}>▶</button>
-              <button className="btn txtbtn klein" title="diesen abschnitt zum abschreiben" onClick={() => (b.text || "").trim() && zeigeAbschreib(b.text.trim())}>▤</button>
+              <button className="btn txtbtn klein" title="diesen abschnitt als klartext" onClick={() => (b.text || "").trim() && zeigeAbschreib(b.text.trim())}>▤</button>
             </div>
             <AutoTa className="ta korrta" value={b.text || ""} onChange={(e) => b.onChange(e.target.value)} placeholder="—" />
           </div>
@@ -2124,7 +2146,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
         <button className="btn txtbtn klein" onClick={txtKopieren} disabled={!szenenTexte.length}
                 title="stattdessen in die zwischenablage">⧉</button>
         <button className="btn txtbtn klein" onClick={() => zeigeAbschreib(szenenText())} disabled={!szenenTexte.length}
-                title="text zum abschreiben — schwebendes fenster">▤</button>
+                title="text als klartext — schwebendes fenster">▤</button>
         <button className="btn txtbtn" onClick={() => setView("korrektur")} disabled={!szenenTexte.length}
                 title="lesefassung zum korrigieren & vorlesen">✎ korrektur</button>
         <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
@@ -4025,8 +4047,7 @@ function Styles() {
 
   /* schwebe-fenster · text zum abschreiben */
   .schwebe{position:fixed;z-index:150;display:flex;flex-direction:column;
-    width:min(460px,88vw);height:min(560px,72vh);min-width:220px;min-height:140px;
-    resize:both;overflow:hidden;border:1px solid var(--line-hot);border-radius:8px;
+    min-width:240px;min-height:140px;overflow:hidden;border:1px solid var(--line-hot);border-radius:8px;
     background:var(--panel);box-shadow:0 14px 50px rgba(0,0,0,.6)}
   .schwebekopf{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:move;
     border-bottom:1px solid var(--line);background:var(--panel-2);user-select:none;touch-action:none}
@@ -4036,6 +4057,9 @@ function Styles() {
   .schwebebtn:hover{border-color:var(--line-hot);color:var(--green)}
   .schwebetext{flex:1;overflow:auto;padding:16px 18px;font-family:var(--mono);font-size:14px;
     line-height:1.7;color:var(--muted);white-space:pre-wrap;word-break:break-word;user-select:text}
+  .schweberesize{position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;z-index:2;touch-action:none;
+    background:linear-gradient(135deg,transparent 46%,var(--green-mid) 46%,var(--green-mid) 56%,transparent 56%,transparent 68%,var(--green-mid) 68%,var(--green-mid) 78%,transparent 78%);opacity:.55}
+  .schweberesize:hover{opacity:1}
   .logextra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
 
   /* tabs unterm skope */
