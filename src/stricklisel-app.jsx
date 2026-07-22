@@ -943,7 +943,7 @@ function Reaktorladung() {
         <div className="rkpop" onClick={() => setDenied(false)}>
           <div className="rkpopbox" onClick={(e) => e.stopPropagation()}>
             <div className="rkpoptitel">ZUGRIFF VERWEIGERT</div>
-            <div className="rkpoptext">es gibt keinen löffel</div>
+            <div className="rkpoptext">🥄 es gibt keinen löffel, neo</div>
             <button className="btn" onClick={() => setDenied(false)}>× wegklicken</button>
           </div>
         </div>
@@ -1333,7 +1333,7 @@ function MonatsGitter({ liste, datum, setDatum, monat, setMonat, children }) {
   );
 }
 
-function LogFiles({ zeigeAbschreib }) {
+function LogFiles({ zeigeAbschreib, zurKonsole }) {
   const [datum, setDatum] = useState(heute());
   const [monat, setMonat] = useState(() => heute().slice(0, 7));
   const [text, setText] = useState("");
@@ -1347,6 +1347,9 @@ function LogFiles({ zeigeAbschreib }) {
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
   const [dirty, setDirty] = useState(false);
   const tRef = useRef(null);
+  // vier leucht-toggles der rollenden überarbeitungs-routine — reine an/aus-lichter, bleiben an (localStorage)
+  const [logFlags, setLogFlags] = useState(() => offLesen("logflags") || {});
+  const flagKlick = (k) => setLogFlags((f) => { const n = { ...f, [k]: !f[k] }; offSchreibenCache("logflags", n); return n; });
 
   const w = zaehleWoerter(text);
   const voll = w >= ZIEL_WOERTER;
@@ -1467,6 +1470,13 @@ function LogFiles({ zeigeAbschreib }) {
       <div className="logextra">
         <button className="btn txtbtn klein" disabled={!text.trim()} onClick={() => zeigeAbschreib(text)}
                 title="tageseintrag als klartext — schwebendes fenster">▤ klartext</button>
+        <button className="btn txtbtn klein" disabled={!text.trim()} onClick={() => text.trim() && zurKonsole(text)}
+                title="tageseintrag an die konsole — thorsten liest vor">▶</button>
+        <div className="logflags">
+          {[["skripte", "skripte"], ["ue2", "Ü2"], ["ue1", "Ü1"], ["htsm", "htsm_ultra"]].map(([k, l]) => (
+            <button key={k} type="button" className={"logflag" + (logFlags[k] ? " on" : "")} onClick={() => flagKlick(k)}>{l}</button>
+          ))}
+        </div>
       </div>
 
       <Panel id="log-eintrag" title={"EINTRAG #" + String(eintragNr).padStart(3, "0")}
@@ -1922,6 +1932,18 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
   // ohne mainstate (der hat kein textfeld) und ohne die matrix, nur der text.
   const szenenTexte = SCHREIB_ORDER.filter((i) => i !== 4).map((i) => (texte[i] || "").trim()).filter(Boolean);
   const szenenWoerter = szenenTexte.reduce((s, x) => s + zaehleWoerter(x), 0);
+  // wörter des GANZEN projekts (wurzel + alle nachkommen); mitte (mainstate) zählt nicht mit.
+  // seiten = volle 250-wörter-seiten. anzeige: "5326w // 21s"
+  const projektWoerter = (() => {
+    const zaehl = (t) => Array.isArray(t) ? t.reduce((a, x, i) => i === 4 ? a : a + zaehleWoerter(x || ""), 0) : 0;
+    if (!id) return zaehl(texte);
+    let w = alle.find((x) => x.id === id), g = 0;
+    while (w && w.eltern_id && g++ < 20) { const par = alle.find((x) => x.id === w.eltern_id); if (!par) break; w = par; }
+    const wurzel = w || { id, texte };
+    const baum = [wurzel, ...nachkommen(wurzel.id)];
+    return baum.reduce((a, sc) => a + zaehl(sc.id === id ? texte : sc.texte), 0);
+  })();
+  const projektBadge = projektWoerter + "w // " + Math.floor(projektWoerter / 250) + "s";
   // marker als eigener satz — dann liest thorsten sie als ansage, nicht als teil des textes
   const szenenText = () => SCHREIB_ORDER.filter((i) => i !== 4)
     .filter((i) => (texte[i] || "").trim())
@@ -2078,6 +2100,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
         <button className="btn" onClick={() => setView("projekte")}>← zurück</button>
         <span className="xfiles">x-files</span>
         <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
+        {projektWoerter > 0 && <span className="projektzaehler" title="ganzes projekt · volle seiten à 250 wörter">{projektBadge}</span>}
         <button className="btn primary" onClick={() => setView("schreiben")}>weiter →</button>
       </div>
       <Krumen ziel="matrix" />
@@ -2139,6 +2162,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
         <button className="btn" onClick={() => setView("matrix")}>← zurück</button>
         <span className="xfiles" style={{ color: farbe(ebene), textShadow: "0 0 8px " + farbe(ebene) + "60" }}>{name || "unbenannt"}</span>
         <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
+        {projektWoerter > 0 && <span className="projektzaehler" title="ganzes projekt · volle seiten à 250 wörter">{projektBadge}</span>}
         <button className="btn txtbtn" onClick={anDieKonsole} disabled={!szenenTexte.length}
                 title="alle szenentexte ins textfeld der konsole — thorsten liest vor">
           ▶ konsole{szenenWoerter ? " · " + szenenWoerter.toLocaleString("de-DE") + " w" : ""}
@@ -3667,7 +3691,7 @@ export default function StricklieselApp() {
         {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "m42" && <M42 />}
-        {tab === "log" && <LogFiles zeigeAbschreib={zeigeAbschreib} />}
+        {tab === "log" && <LogFiles zeigeAbschreib={zeigeAbschreib} zurKonsole={zurKonsole} />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} zeigeAbschreib={zeigeAbschreib} kette={cfg.ketteText} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} sprungPerson={sprungPerson} setSprungPerson={setSprungPerson} />}
         {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuM42={() => setTab("m42")} zurPerson={(id) => { setSprungPerson(id); setTab("things"); }} />}
@@ -4102,6 +4126,14 @@ function Styles() {
     background:linear-gradient(135deg,transparent 46%,var(--green-mid) 46%,var(--green-mid) 56%,transparent 56%,transparent 68%,var(--green-mid) 68%,var(--green-mid) 78%,transparent 78%);opacity:.55}
   .schweberesize:hover{opacity:1}
   .logextra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+  .logflags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .projektzaehler{font-family:var(--term);font-size:11px;letter-spacing:.06em;color:var(--green-mid);
+    border:1px solid var(--line);border-radius:4px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .logflag{font-family:var(--term);font-size:10.5px;letter-spacing:.08em;background:transparent;
+    border:1px solid var(--line);border-radius:4px;color:var(--dim);padding:4px 10px;cursor:pointer;transition:.14s}
+  .logflag:hover{border-color:var(--line-hot);color:var(--muted)}
+  .logflag.on{color:var(--void);background:var(--green-mid);border-color:var(--green);
+    box-shadow:0 0 10px var(--green-dim);text-shadow:none}
 
   /* tabs unterm skope */
   .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 6px;border-bottom:1px solid var(--line);padding-bottom:0}
