@@ -978,10 +978,16 @@ function Abteilung17b({ say }) {
   const [sig, setSig] = useState("");
   const [msg, setMsg] = useState({ t: "", c: "" });
   const [offen, setOffen] = useState(null);
-  const fbRef = useRef(null);
+  const fbRef = useRef({});
 
-  const aktiv = liste.filter((c) => c.status === "aktiv").length;
-  const frei = 3 - aktiv;
+  // es gibt DREI prioritätsstufen, nicht drei commit-plätze.
+  // 3x P1 + 1x P3 = zwei belegte stufen, nicht "4 von 3".
+  const stufen = new Set(
+    liste.filter((c) => c.status === "aktiv")
+      .map((c) => Number(c.prioritaet))
+      .filter((n) => n >= 1 && n <= 3)
+  );
+  const frei = Math.max(0, 3 - stufen.size);
 
   useEffect(() => { laden(); }, []);
 
@@ -995,7 +1001,7 @@ function Abteilung17b({ say }) {
   async function execute() {
     if (!projekt.trim()) { setMsg({ t: "» kein projekt eingetragen", c: "err" }); return; }
     if (!sig) { setMsg({ t: "» keine signatur — ohne signatur kein commit", c: "err" }); return; }
-    if (aktiv >= 3) { setMsg({ t: "» drei prioritätsplätze belegt — erst einen beenden oder pausieren", c: "err" }); return; }
+    if (!stufen.has(prio) && stufen.size >= 3) { setMsg({ t: "» alle drei prioritätsstufen belegt — erst eine freimachen", c: "err" }); return; }
     const neuC = { id: neueId(), user_id: getUserId(), projekt: projekt.trim(), parameter: param, prioritaet: prio, signatur: sig, start_datum: start || null, ziel_datum: ziel || null, status: "aktiv", created_at: new Date().toISOString() };
     setListe((l) => [neuC, ...l]);
     const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/commits`, neuC);
@@ -1004,14 +1010,20 @@ function Abteilung17b({ say }) {
     if (ok) laden();
   }
 
-  // priorität und feedback ändern — still gespeichert
+  // priorität und feedback ändern.
+  // WICHTIG: jedes feld jedes commits hat seinen EIGENEN timer — vorher teilten
+  // sich alle einen, dadurch hat die nächste änderung die vorherige abgewürgt
+  // (z.b. prio 1 -> 3 kam nie an). die priorität geht sofort raus, nur freitext bremst.
   function feld(c, k, v) {
     setListe((l) => l.map((x) => (x.id === c.id ? { ...x, [k]: v } : x)));
-    if (fbRef.current) clearTimeout(fbRef.current);
-    fbRef.current = setTimeout(async () => {
+    const schluessel = c.id + ":" + k;
+    const senden = async () => {
       const { ok } = await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/commits?id=eq.${c.id}`, { [k]: v, updated_at: new Date().toISOString() });
       setMsg({ t: ok ? "» gespeichert" : "» offline gespeichert — sync folgt", c: ok ? "ok" : "work" });
-    }, 900);
+    };
+    clearTimeout(fbRef.current[schluessel]);
+    if (k === "prioritaet") { senden(); return; }
+    fbRef.current[schluessel] = setTimeout(senden, 900);
   }
 
   async function setzeStatus(c, status, wort) {
@@ -1035,7 +1047,54 @@ function Abteilung17b({ say }) {
     return d < 0 ? "ziel überschritten" : d === 0 ? "ziel heute" : "noch " + d + " tage";
   };
 
-  const sortiert = [...liste].sort((a, b) => a.prioritaet - b.prioritaet);
+  const sortiert = [...liste].sort((a, b) =>
+    ((Number(a.prioritaet) || 9) - (Number(b.prioritaet) || 9)) ||
+    String(b.created_at || "").localeCompare(String(a.created_at || "")));
+  // beendetes wandert nach unten ins archiv — oben bleibt nur, was läuft
+  const laufend = sortiert.filter((c) => c.status !== "beendet");
+  const archiv = sortiert.filter((c) => c.status === "beendet");
+
+  const Karte = (c) => (
+        <div className={"commit " + c.status + (offen === c.id ? " auf" : "")} key={c.id}>
+          <div className="chead" onClick={() => setOffen(offen === c.id ? null : c.id)}>
+            <span className={"cdot " + c.status} />
+            <span className="cprio">P{c.prioritaet}</span>
+            <span className="cprojekt">{c.projekt}</span>
+            <span className="cstatus">{c.status}</span>
+            <span className="chev">▾</span>
+          </div>
+          <div className="cmeta">
+            {(c.parameter || []).join(" · ")}
+            {c.start_datum && <> &nbsp;|&nbsp; start {c.start_datum}</>}
+            {c.ziel_datum && <> &nbsp;|&nbsp; ziel {c.ziel_datum} <b>({tage(c)})</b></>}
+          </div>
+          <div className="csig">{c.signatur}</div>
+
+          {c.feedback && offen !== c.id && <div className="cfb">{c.feedback}</div>}
+
+          {offen === c.id && (
+            <div className="cedit">
+              <div className="field">
+                <label className="cap">priorität</label>
+                <Seg value={c.prioritaet} onChange={(v) => feld(c, "prioritaet", Number(v))}
+                     options={[{ v: 1, t: "1" }, { v: 2, t: "2" }, { v: 3, t: "3" }]} />
+                <p className="hint">gewichtung ändern — der commit bleibt, was er ist. alle drei dürfen auf 1 stehen.</p>
+              </div>
+              <div className="field" style={{ marginTop: 12 }}>
+                <label className="cap">feedback</label>
+                <AutoTa className="ta klein" value={c.feedback || ""} onChange={(e) => feld(c, "feedback", e.target.value)}
+                        placeholder="🥳 hat sich erfüllt am …" />
+              </div>
+            </div>
+          )}
+          <div className="crec">
+            <button title="resume" disabled={c.status === "aktiv"} onClick={() => setzeStatus(c, "aktiv", "resume")}>▶</button>
+            <button title="pause" disabled={c.status !== "aktiv"} onClick={() => setzeStatus(c, "pausiert", "pause")}>❚❚</button>
+            <button title="exit · ressourcen freigeben" disabled={c.status === "beendet"} onClick={() => setzeStatus(c, "beendet", "exit · ressourcen freigegeben")}>■</button>
+            <button title="aus dem archiv löschen" className="del" onClick={() => loeschen(c)}>✕</button>
+          </div>
+        </div>
+  );
 
   return (
     <>
@@ -1086,49 +1145,15 @@ function Abteilung17b({ say }) {
 
       <div className="grouphead">AKTIVE PRIORITÄTEN<span className="rule" /></div>
 
-      {!liste.length && <p className="hint" style={{ marginLeft: 4 }}>noch kein commit. aura3 definiert keine ziele.</p>}
+      {!laufend.length && <p className="hint" style={{ marginLeft: 4 }}>nichts läuft gerade. aura3 definiert keine ziele.</p>}
 
-      {sortiert.map((c) => (
-        <div className={"commit " + c.status + (offen === c.id ? " auf" : "")} key={c.id}>
-          <div className="chead" onClick={() => setOffen(offen === c.id ? null : c.id)}>
-            <span className={"cdot " + c.status} />
-            <span className="cprio">P{c.prioritaet}</span>
-            <span className="cprojekt">{c.projekt}</span>
-            <span className="cstatus">{c.status}</span>
-            <span className="chev">▾</span>
-          </div>
-          <div className="cmeta">
-            {(c.parameter || []).join(" · ")}
-            {c.start_datum && <> &nbsp;|&nbsp; start {c.start_datum}</>}
-            {c.ziel_datum && <> &nbsp;|&nbsp; ziel {c.ziel_datum} <b>({tage(c)})</b></>}
-          </div>
-          <div className="csig">{c.signatur}</div>
+      {laufend.map(Karte)}
 
-          {c.feedback && offen !== c.id && <div className="cfb">{c.feedback}</div>}
-
-          {offen === c.id && (
-            <div className="cedit">
-              <div className="field">
-                <label className="cap">priorität</label>
-                <Seg value={c.prioritaet} onChange={(v) => feld(c, "prioritaet", Number(v))}
-                     options={[{ v: 1, t: "1" }, { v: 2, t: "2" }, { v: 3, t: "3" }]} />
-                <p className="hint">gewichtung ändern — der commit bleibt, was er ist. alle drei dürfen auf 1 stehen.</p>
-              </div>
-              <div className="field" style={{ marginTop: 12 }}>
-                <label className="cap">feedback</label>
-                <AutoTa className="ta klein" value={c.feedback || ""} onChange={(e) => feld(c, "feedback", e.target.value)}
-                        placeholder="🥳 hat sich erfüllt am …" />
-              </div>
-            </div>
-          )}
-          <div className="crec">
-            <button title="resume" disabled={c.status === "aktiv"} onClick={() => setzeStatus(c, "aktiv", "resume")}>▶</button>
-            <button title="pause" disabled={c.status !== "aktiv"} onClick={() => setzeStatus(c, "pausiert", "pause")}>❚❚</button>
-            <button title="exit · ressourcen freigeben" disabled={c.status === "beendet"} onClick={() => setzeStatus(c, "beendet", "exit · ressourcen freigegeben")}>■</button>
-            <button title="aus dem archiv löschen" className="del" onClick={() => loeschen(c)}>✕</button>
-          </div>
-        </div>
-      ))}
+      {archiv.length > 0 && (<>
+        <div className="grouphead">ARCHIV<span className="rule" /></div>
+        <p className="hint" style={{ marginLeft: 4, marginBottom: 10 }}>beendet · ressourcen freigegeben.</p>
+        {archiv.map(Karte)}
+      </>)}
     </>
   );
 }
@@ -3049,7 +3074,9 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
         const arr = Array.isArray(d) ? d : [];
         // besetzte prioritäts-ebenen (1/2/3), nicht rohe commit-zahl —
         // 3× prio 1 + 1× prio 3 sind 2 belegte ebenen, nicht "4 von 3".
-        const ebenen = new Set(arr.map((c) => c.prioritaet)).size;
+        const ebenen = new Set(
+          arr.map((c) => Number(c.prioritaet)).filter((n) => n >= 1 && n <= 3)
+        ).size;
         setCommits(ebenen);
       }).catch(() => {});
   }, []);
@@ -4126,11 +4153,11 @@ function Styles() {
     background:linear-gradient(135deg,transparent 46%,var(--green-mid) 46%,var(--green-mid) 56%,transparent 56%,transparent 68%,var(--green-mid) 68%,var(--green-mid) 78%,transparent 78%);opacity:.55}
   .schweberesize:hover{opacity:1}
   .logextra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
-  .logflags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .logflags{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .projektzaehler{font-family:var(--term);font-size:11px;letter-spacing:.06em;color:var(--green-mid);
     border:1px solid var(--line);border-radius:4px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
-  .logflag{font-family:var(--term);font-size:10.5px;letter-spacing:.08em;background:transparent;
-    border:1px solid var(--line);border-radius:4px;color:var(--dim);padding:4px 10px;cursor:pointer;transition:.14s}
+  .logflag{font-family:var(--mono);font-size:12px;letter-spacing:.03em;background:transparent;
+    border:1px solid var(--line);border-radius:5px;color:var(--dim);padding:9px 11px;cursor:pointer;transition:.14s}
   .logflag:hover{border-color:var(--line-hot);color:var(--muted)}
   .logflag.on{color:var(--void);background:var(--green-mid);border-color:var(--green);
     box-shadow:0 0 10px var(--green-dim);text-shadow:none}
@@ -4719,7 +4746,11 @@ function Styles() {
     caret-shape:block;caret-color:var(--green)}
   .ta:focus{outline:none;border-color:var(--line-hot)}
   .ta::placeholder{color:var(--dim)}
-  .btn.gen{margin-top:8px;font-size:13px;padding:9px 16px}
+  .btn.gen{margin-top:8px;font-size:13px;padding:9px 16px;
+    border-color:var(--amber);color:var(--amber);background:rgba(224,178,106,.10);
+    box-shadow:0 0 10px rgba(224,178,106,.14)}
+  .btn.gen:hover{border-color:var(--amber);color:#ffd9a0;background:rgba(224,178,106,.20);
+    box-shadow:0 0 16px rgba(224,178,106,.30)}
   .ttsbar{font-family:var(--term);font-size:11.5px;letter-spacing:.03em;color:var(--dim);
     border:1px dashed var(--line);border-radius:5px;padding:8px 10px;margin:14px 0}
   .ttsbar.work{color:var(--amber);border-color:var(--line-hot)}
