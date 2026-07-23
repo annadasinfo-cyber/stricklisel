@@ -1370,6 +1370,8 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
   const tRef = useRef(null);
   // vier leucht-toggles der rollenden überarbeitungs-routine — reine an/aus-lichter, bleiben an (localStorage)
   const [logFlags, setLogFlags] = useState(() => offLesen("logflags") || {});
+  const [gewicht, setGewicht] = useState("");   // pro tag, wandert mit in den eintrag
+  const [schmerz, setSchmerz] = useState("");   // 0 = gar nicht … 10 = am schlimmsten
   const flagKlick = (k) => setLogFlags((f) => { const n = { ...f, [k]: !f[k] }; offSchreibenCache("logflags", n); return n; });
 
   const w = zaehleWoerter(text);
@@ -1390,7 +1392,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
     // tagText MUSS mit drin stehen: fehlte er, lief der autosave mit einem
     // veralteten tag-stand weiter und hat angeklickte//geänderte hashtags
     // wieder überschrieben ("nimmt nicht an", "änderung weg").
-  }, [text, tagText, dirty]);
+  }, [text, tagText, gewicht, schmerz, dirty]);
 
   async function laden() {
     try {
@@ -1400,9 +1402,11 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
   }
   async function ladeTag(dt) {
     try {
-      const d2 = await dbGet("logfiles-tag-" + dt, `${SUPABASE_URL}/rest/v1/logfiles?select=text,tags&datum=eq.${dt}`);
+      const d2 = await dbGet("logfiles-tag-" + dt, `${SUPABASE_URL}/rest/v1/logfiles?select=text,tags,gewicht,schmerz&datum=eq.${dt}`);
       setText(d2?.[0]?.text || "");
       setTagText(tagsSchreiben(d2?.[0]?.tags));
+      setGewicht(d2?.[0]?.gewicht ?? "");
+      setSchmerz(d2?.[0]?.schmerz ?? "");
       setDirty(false);
       setMsg(d2?.[0] ? { t: "eintrag geladen", c: "" } : { t: "neuer eintrag", c: "" });
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
@@ -1410,7 +1414,10 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
   async function speichern(still) {
     if (!still) setMsg({ t: "übertrage …", c: "work" });
     const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/logfiles?on_conflict=user_id,datum`,
-      { user_id: getUserId(), datum, text, woerter: w, tags: tagsLesen(tagText), updated_at: new Date().toISOString() },
+      { user_id: getUserId(), datum, text, woerter: w, tags: tagsLesen(tagText),
+        gewicht: gewicht === "" ? null : Number(gewicht),
+        schmerz: schmerz === "" ? null : Number(schmerz),
+        updated_at: new Date().toISOString() },
       { prefer: "resolution=merge-duplicates,return=minimal" });
     setDirty(false);
     setMsg({ t: ok ? "transmission saved · " + w + " wörter" : "offline gespeichert · " + w + " wörter — sync folgt", c: ok ? "ok" : "work" });
@@ -1524,6 +1531,26 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
         <div className="logflags">
           {[["skripte", "skripte"], ["ue2", "Ü2"], ["ue1", "Ü1"], ["htsm", "htsm_ultra"]].map(([k, l]) => (
             <button key={k} type="button" className={"logflag" + (logFlags[k] ? " on" : "")} onClick={() => flagKlick(k)}>{l}</button>
+          ))}
+        </div>
+
+        <label className="logfeld" title="aktuelles gewicht">
+          <span>kg</span>
+          <input className="ti minifeld" type="number" step="0.1" inputMode="decimal" placeholder="–"
+                 value={gewicht} onChange={(e) => { setGewicht(e.target.value); setDirty(true); }} />
+        </label>
+        <label className="logfeld" title="schmerz-skala · 0 = gar nicht, 10 = am allerschlimmsten">
+          <span>schmerz</span>
+          <select className="ti minifeld" value={schmerz}
+                  onChange={(e) => { setSchmerz(e.target.value); setDirty(true); }}>
+            <option value="">–</option>
+            {Array.from({ length: 11 }, (_, i) => <option key={i} value={i}>{i}</option>)}
+          </select>
+        </label>
+
+        <div className="logflags logAs">
+          {Array.from({ length: 8 }, (_, i) => "a" + i).map((k) => (
+            <button key={k} type="button" className={"logflag" + (logFlags[k] ? " on" : "")} onClick={() => flagKlick(k)}>{k.toUpperCase()}</button>
           ))}
         </div>
       </div>
@@ -4176,6 +4203,11 @@ function Styles() {
   .schweberesize:hover{opacity:1}
   .logextra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
   .logflags{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .logAs{margin-left:auto}
+  .logfeld{display:inline-flex;align-items:center;gap:7px;font-family:var(--term);
+    font-size:10.5px;letter-spacing:.08em;color:var(--dim)}
+  .logfeld .minifeld{width:78px;padding:9px 10px;font-size:12px}
+  .logfeld select.minifeld{width:64px;cursor:pointer;color:var(--green)}
   .projektzaehler{font-family:var(--term);font-size:11px;letter-spacing:.06em;color:var(--green-mid);
     border:1px solid var(--line);border-radius:4px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
   .logflag{font-family:var(--mono);font-size:12px;letter-spacing:.03em;background:transparent;
