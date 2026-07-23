@@ -1175,6 +1175,7 @@ const MONATE = ["januar", "februar", "märz", "april", "mai", "juni", "juli", "a
 function M42() {
   const [liste, setListe] = useState([]);
   const [neueFrage, setNeueFrage] = useState("");
+  const [neueBotschaft, setNeueBotschaft] = useState("");
   const [msg, setMsg] = useState({ t: "", c: "" });
   const [antwortEntwurf, setAntwortEntwurf] = useState({});
   const [feedbackEntwurf, setFeedbackEntwurf] = useState({});
@@ -1192,10 +1193,22 @@ function M42() {
     const t = neueFrage.trim();
     if (!t) return;
     setNeueFrage("");
-    const neu = { id: neueId(), user_id: getUserId(), frage: t, erledigt: false, created_at: new Date().toISOString() };
+    const neu = { id: neueId(), user_id: getUserId(), frage: t, art: "frage", erledigt: false, created_at: new Date().toISOString() };
     setListe((l) => [neu, ...l]);
     const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/m42`, neu);
     setMsg({ t: ok ? "» frage gestellt" : "» offline gestellt — sync folgt", c: ok ? "ok" : "work" });
+    if (ok) laden();
+  }
+
+  // gegenrichtung: eine botschaft kommt herein (orange), dein feedback geht raus (pink)
+  async function empfangen() {
+    const t = neueBotschaft.trim();
+    if (!t) return;
+    setNeueBotschaft("");
+    const neu = { id: neueId(), user_id: getUserId(), frage: t, art: "botschaft", erledigt: false, created_at: new Date().toISOString() };
+    setListe((l) => [neu, ...l]);
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/m42`, neu);
+    setMsg({ t: ok ? "» botschaft eingetragen" : "» offline eingetragen — sync folgt", c: ok ? "ok" : "work" });
     if (ok) laden();
   }
 
@@ -1232,48 +1245,56 @@ function M42() {
   const offeneListe = liste.filter((m) => !m.erledigt);
   const erledigtListe = liste.filter((m) => m.erledigt);
 
-  const Karte = (m) => (
-    <div className={"m42karte" + (m.erledigt ? " erledigt" : "")} key={m.id}>
-      <div className="m42zeile m42frage"><span className="m42tag">frage</span><i>{zeitfmt(m.created_at)}</i></div>
-      <div className="m42text m42frage">{m.frage}</div>
+  // zwei stränge, gespiegelte farben:
+  //   frage     — du fragst (pink)  -> antwort kommt (orange) -> dein feedback
+  //   botschaft — es kommt rein (orange) -> dein feedback (pink)
+  const Karte = (m) => {
+    const bot = m.art === "botschaft";
+    const kopfF = bot ? "m42antwort" : "m42frage";     // eröffnung
+    const fbF = bot ? "m42frage" : "m42feedback";      // dein feedback
+    return (
+      <div className={"m42karte" + (m.erledigt ? " erledigt" : "")} key={m.id}>
+        <div className={"m42zeile " + kopfF}><span className="m42tag">{bot ? "botschaft" : "frage"}</span><i>{zeitfmt(m.created_at)}</i></div>
+        <div className={"m42text " + kopfF}>{m.frage}</div>
 
-      {m.antwort ? (
-        <>
-          <div className="m42zeile m42antwort"><span className="m42tag">antwortet</span><i>{zeitfmt(m.antwort_zeit)}</i></div>
-          <div className="m42text m42antwort">{m.antwort}</div>
-        </>
-      ) : !m.erledigt && (
-        <div className="m42eingabe">
-          <input className="ti" placeholder="antwort eintragen …" value={antwortEntwurf[m.id] || ""}
-            onChange={(e) => setAntwortEntwurf((d) => ({ ...d, [m.id]: e.target.value }))}
-            onKeyDown={(e) => e.key === "Enter" && antworten(m, antwortEntwurf[m.id] || "")} />
-          <button className="btn" onClick={() => antworten(m, antwortEntwurf[m.id] || "")}>eintragen</button>
-        </div>
-      )}
-
-      {m.antwort && (
-        m.feedback ? (
+        {!bot && (m.antwort ? (
           <>
-            <div className="m42zeile m42feedback"><span className="m42tag">feedback</span><i>{zeitfmt(m.feedback_zeit)}</i></div>
-            <div className="m42text m42feedback">{m.feedback}</div>
+            <div className="m42zeile m42antwort"><span className="m42tag">antwortet</span><i>{zeitfmt(m.antwort_zeit)}</i></div>
+            <div className="m42text m42antwort">{m.antwort}</div>
           </>
         ) : !m.erledigt && (
           <div className="m42eingabe">
-            <input className="ti" placeholder="feedback eintragen …" value={feedbackEntwurf[m.id] || ""}
-              onChange={(e) => setFeedbackEntwurf((d) => ({ ...d, [m.id]: e.target.value }))}
-              onKeyDown={(e) => e.key === "Enter" && feedbacken(m, feedbackEntwurf[m.id] || "")} />
-            <button className="btn" onClick={() => feedbacken(m, feedbackEntwurf[m.id] || "")}>eintragen</button>
+            <input className="ti" placeholder="antwort eintragen …" value={antwortEntwurf[m.id] || ""}
+              onChange={(e) => setAntwortEntwurf((d) => ({ ...d, [m.id]: e.target.value }))}
+              onKeyDown={(e) => e.key === "Enter" && antworten(m, antwortEntwurf[m.id] || "")} />
+            <button className="btn" onClick={() => antworten(m, antwortEntwurf[m.id] || "")}>eintragen</button>
           </div>
-        )
-      )}
+        ))}
 
-      {!m.erledigt && (
-        <div className="actions" style={{ marginTop: 8 }}>
-          <button className="btn" onClick={() => erledigen(m)}>👍 erledigt</button>
-        </div>
-      )}
-    </div>
-  );
+        {(bot || m.antwort) && (
+          m.feedback ? (
+            <>
+              <div className={"m42zeile " + fbF}><span className="m42tag">feedback</span><i>{zeitfmt(m.feedback_zeit)}</i></div>
+              <div className={"m42text " + fbF}>{m.feedback}</div>
+            </>
+          ) : !m.erledigt && (
+            <div className="m42eingabe">
+              <input className="ti" placeholder="feedback eintragen …" value={feedbackEntwurf[m.id] || ""}
+                onChange={(e) => setFeedbackEntwurf((d) => ({ ...d, [m.id]: e.target.value }))}
+                onKeyDown={(e) => e.key === "Enter" && feedbacken(m, feedbackEntwurf[m.id] || "")} />
+              <button className="btn" onClick={() => feedbacken(m, feedbackEntwurf[m.id] || "")}>eintragen</button>
+            </div>
+          )
+        )}
+
+        {!m.erledigt && (
+          <div className="actions" style={{ marginTop: 8 }}>
+            <button className="btn" onClick={() => erledigen(m)}>👍 erledigt</button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -1289,12 +1310,24 @@ function M42() {
             <button className="btn primary" onClick={stellen}>stellen</button>
           </div>
         </div>
+      </Panel>
+
+      <Panel title="M42 · eingang" sub="botschaft eintragen, die hereinkam · dein feedback dazu">
+        <div className="field">
+          <label className="cap">neue botschaft</label>
+          <div className="rezrow">
+            <input className="ti" value={neueBotschaft} onChange={(e) => setNeueBotschaft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && empfangen()}
+              placeholder="was kam herein?" />
+            <button className="btn primary" onClick={empfangen}>eintragen</button>
+          </div>
+        </div>
         <div className="actions" style={{ marginTop: 10 }}>
           <span className={"status " + msg.c}>{msg.t}</span>
         </div>
       </Panel>
 
-      {!liste.length && <p className="hint" style={{ marginLeft: 4 }}>noch keine frage gestellt.</p>}
+      {!liste.length && <p className="hint" style={{ marginLeft: 4 }}>noch nichts eingetragen.</p>}
 
       {offeneListe.map(Karte)}
 
@@ -3325,6 +3358,8 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
           </div>
         )}
 
+        <VerlaufKurve />
+
         <div className="ptitel">worum es gerade geht</div>
         <div className="bgrid">
           {!buecher.length && <div className="pleer">noch kein projekt. die skripte warten.</div>}
@@ -3460,7 +3495,6 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
         </div>
 
         <Kurve />
-        <VerlaufKurve />
 
         <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
           liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
