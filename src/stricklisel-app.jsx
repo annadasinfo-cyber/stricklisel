@@ -944,7 +944,7 @@ function Reaktorladung() {
           <div className="rkpopbox" onClick={(e) => e.stopPropagation()}>
             <div className="rkpoptitel">ZUGRIFF VERWEIGERT</div>
             <div className="rkpoptext">🥄 es gibt keinen löffel, neo</div>
-            <button className="btn" onClick={() => setDenied(false)}>× wegklicken</button>
+            <button className="btn" onClick={() => setDenied(false)}>follow_me</button>
           </div>
         </div>
       )}
@@ -980,14 +980,10 @@ function Abteilung17b({ say }) {
   const [offen, setOffen] = useState(null);
   const fbRef = useRef({});
 
-  // es gibt DREI prioritätsstufen, nicht drei commit-plätze.
-  // 3x P1 + 1x P3 = zwei belegte stufen, nicht "4 von 3".
-  const stufen = new Set(
-    liste.filter((c) => c.status === "aktiv")
-      .map((c) => Number(c.prioritaet))
-      .filter((n) => n >= 1 && n <= 3)
-  );
-  const frei = Math.max(0, 3 - stufen.size);
+  // begrenzt ist NUR prio 1: höchstens drei gleichzeitig.
+  // prio 2 und 3 sind unbegrenzt (parkplatz) und zählen hier nicht mit.
+  const p1 = liste.filter((c) => c.status === "aktiv" && Number(c.prioritaet) === 1).length;
+  const frei = Math.max(0, 3 - p1);
 
   useEffect(() => { laden(); }, []);
 
@@ -1001,7 +997,7 @@ function Abteilung17b({ say }) {
   async function execute() {
     if (!projekt.trim()) { setMsg({ t: "» kein projekt eingetragen", c: "err" }); return; }
     if (!sig) { setMsg({ t: "» keine signatur — ohne signatur kein commit", c: "err" }); return; }
-    if (!stufen.has(prio) && stufen.size >= 3) { setMsg({ t: "» alle drei prioritätsstufen belegt — erst eine freimachen", c: "err" }); return; }
+    if (prio === 1 && p1 >= 3) { setMsg({ t: "» drei prio-1-plätze belegt — erst einen beenden, pausieren oder runterstufen", c: "err" }); return; }
     const neuC = { id: neueId(), user_id: getUserId(), projekt: projekt.trim(), parameter: param, prioritaet: prio, signatur: sig, start_datum: start || null, ziel_datum: ziel || null, status: "aktiv", created_at: new Date().toISOString() };
     setListe((l) => [neuC, ...l]);
     const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/commits`, neuC);
@@ -1100,7 +1096,7 @@ function Abteilung17b({ say }) {
     <>
       <div className="grouphead">NEUER COMMIT<span className="rule" /></div>
 
-      <Panel title="AURA3_COMMIT" sub={`${frei} von 3 prioritätsplätzen frei`}>
+      <Panel title="AURA3_COMMIT" sub={`${frei} von 3 prio-1-plätzen frei`}>
         <div className="field">
           <label className="cap">projekt</label>
           <input className="ti" value={projekt} onChange={(e) => setProjekt(e.target.value)} placeholder="roman fertigstellen." />
@@ -1391,7 +1387,10 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
     if (tRef.current) clearTimeout(tRef.current);
     tRef.current = setTimeout(() => speichern(true), 2000);
     return () => clearTimeout(tRef.current);
-  }, [text, dirty]);
+    // tagText MUSS mit drin stehen: fehlte er, lief der autosave mit einem
+    // veralteten tag-stand weiter und hat angeklickte//geänderte hashtags
+    // wieder überschrieben ("nimmt nicht an", "änderung weg").
+  }, [text, tagText, dirty]);
 
   async function laden() {
     try {
@@ -1448,6 +1447,29 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
     const treffer = alleTags.filter((x) => x !== l && !schon.includes(x) && (l ? x.startsWith(l) : true));
     setTagVorschlag(l || tagFokus ? treffer.slice(0, 8) : []);
   }
+  // hashtag aus ALLEN einträgen entfernen — sonst steht er ewig in der vorschlagsliste
+  async function tagLoeschen(tg) {
+    if (!confirm(`hashtag #${tg} überall entfernen?\n\nder tag verschwindet aus allen einträgen — die texte bleiben.`)) return;
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/logfiles?select=datum,tags&tags=cs.{${encodeURIComponent(tg)}}`,
+        { headers: dbHeaders(getToken()) });
+      const zeilen = await r.json();
+      for (const z of (Array.isArray(zeilen) ? zeilen : [])) {
+        await dbSchreiben("PATCH",
+          `${SUPABASE_URL}/rest/v1/logfiles?user_id=eq.${getUserId()}&datum=eq.${z.datum}`,
+          { tags: (z.tags || []).filter((x) => x !== tg), updated_at: new Date().toISOString() });
+      }
+      if (tagFilter === tg) setTagFilter("");
+      setTagText((v) => tagsSchreiben(tagsLesen(v).filter((x) => x !== tg)));
+      setMsg({ t: "#" + tg + " entfernt", c: "ok" });
+      laden();
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+  }
+  // tagwechsel nur mit gesichertem stand — sonst geht ungespeichertes verloren
+  async function gehZuDatum(dt) {
+    if (dirty) await speichern(true);
+    setDatum(dt);
+  }
   function tagUebernehmen(tg) {
     setTagText((v) => v.replace(/[^\s,]*$/, "") + "#" + tg + " ");
     setDirty(true); setTagVorschlag([]);
@@ -1464,7 +1486,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
     <>
       <div className="grouphead">LOG-FILES<span className="rule" /></div>
 
-      <MonatsGitter liste={liste} datum={datum} setDatum={setDatum} monat={monat} setMonat={setMonat}>
+      <MonatsGitter liste={liste} datum={datum} setDatum={gehZuDatum} monat={monat} setMonat={setMonat}>
         <div className="suchzeile">
           <input className="ti" value={suche} placeholder="⌕ in allen einträgen suchen …" onChange={(e) => setSuche(e.target.value)} />
           {(suche || tagFilter) && <button className="btn" onClick={() => { setSuche(""); setTagFilter(""); }}>✕</button>}
@@ -1472,8 +1494,10 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
         {alleTags.length > 0 && (
           <div className="chips">
             {alleTags.map((tg) => (
-              <button key={tg} className={"chip" + (tagFilter === tg ? " on" : "")}
-                onClick={() => setTagFilter(tagFilter === tg ? "" : tg)}>#{tg}</button>
+              <span key={tg} className={"chip" + (tagFilter === tg ? " on" : "")}>
+                <button className="chipname" onClick={() => setTagFilter(tagFilter === tg ? "" : tg)}>#{tg}</button>
+                <i className="chipweg" title="hashtag überall entfernen" onClick={() => tagLoeschen(tg)}>✕</i>
+              </span>
             ))}
           </div>
         )}
@@ -1481,7 +1505,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
           <div className="treffer">
             <div className="tkopf">{treffer.length} {treffer.length === 1 ? "eintrag" : "einträge"}{tagFilter && <> mit <b>#{tagFilter}</b></>}</div>
             {treffer.map((x) => (
-              <button key={x.datum} className="tzeile" onClick={() => { setDatum(x.datum); setSuche(""); setTagFilter(""); }}>
+              <button key={x.datum} className="tzeile" onClick={() => { gehZuDatum(x.datum); setSuche(""); setTagFilter(""); }}>
                 <span className="tdatum">{x.datum}</span>
                 <span className="tschnipsel">{schnipsel(x.text, suche)}</span>
                 <span className="twoerter">{x.woerter} w</span>
@@ -2815,7 +2839,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
   const [nm, setNm] = useState(25);
   const [flug, setFlug] = useState([]);
   const [stand, setStand] = useState({ t: "verbinde …", c: "work" });
-  const [stufen, setStufen] = useState([]);   // welche prioritätsstufen gerade laufen, z.b. [1,3]
+  const [p1Aktiv, setP1Aktiv] = useState(0);   // aktive prio-1-commits (nur die sind auf 3 begrenzt)
   const [uptime, setUptime] = useState(0);
   const [buecher, setBuecher] = useState([]);
   const [jetzt, setJetzt] = useState(new Date());
@@ -3072,13 +3096,9 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     dbGet("commits-aktiv-count", `${SUPABASE_URL}/rest/v1/commits?select=id,prioritaet&status=eq.aktiv`)
       .then((d) => {
         const arr = Array.isArray(d) ? d : [];
-        // WELCHE prioritätsstufen laufen (1/2/3) — nicht die rohe commit-zahl.
-        // 3× prio 1 + 1× prio 3 sind zwei belegte stufen, nicht "4 von 3".
-        // angezeigt wird die stufe selbst (P3), sonst liest sich "1 von 3" wie "prio 1".
-        const ebenen = [...new Set(
-          arr.map((c) => Number(c.prioritaet)).filter((n) => n >= 1 && n <= 3)
-        )].sort((a, b) => a - b);
-        setStufen(ebenen);
+        // begrenzt ist nur prio 1 — höchstens drei gleichzeitig.
+        // prio 2 und 3 sind unbegrenzt und zählen hier nicht mit.
+        setP1Aktiv(arr.filter((c) => Number(c.prioritaet) === 1).length);
       }).catch(() => {});
   }, []);
 
@@ -3149,7 +3169,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     ["am_enhancer", "1 : 3"],
     ["golden_glow", "pulsiert"],
     ["body_floor", "gesichert"],
-    ["modul 17b", stufen.length ? stufen.map((n) => "P" + n).join("·") + " · " + stufen.length + "/3" : "keine aktiv", stufen.length >= 3 ? "" : "gelb"],
+    ["modul 17b", p1Aktiv + " von 3 aktiv", p1Aktiv >= 3 ? "" : "gelb"],
     ["loop", "läuft"],
     ["uptime", up],
   ];
@@ -3368,7 +3388,8 @@ export default function StricklieselApp() {
   const [playing, setPlaying] = useState(false);
   const [gen, setGen] = useState(null);
 
-  const [tab, setTab] = useState("konsole");
+  const [tab, setTab] = useState(() => offLesen("tab") || "konsole");
+  useEffect(() => { offSchreibenCache("tab", tab); }, [tab]);
   const [sprung, setSprung] = useState(null);
   const [sprungPerson, setSprungPerson] = useState(null);
   // welches projekt gerade dran ist — teilen sich skripte und things
@@ -4615,10 +4636,14 @@ function Styles() {
   .tagvor:hover{border-color:var(--line-hot);color:var(--green)}
   .tagvor.erst{border-color:var(--green-dim);color:var(--green)}
   .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
-  .chip{font-family:var(--term);font-size:11px;letter-spacing:.08em;background:transparent;
-    border:1px solid var(--line);color:var(--dim);border-radius:11px;padding:3px 10px;cursor:pointer;transition:.12s}
+  .chip{display:inline-flex;align-items:center;font-family:var(--term);font-size:11px;letter-spacing:.08em;
+    background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:11px;transition:.12s}
   .chip:hover{border-color:var(--line-hot);color:var(--green)}
   .chip.on{background:var(--green-dim);border-color:var(--line-hot);color:var(--white)}
+  .chipname{background:none;border:none;color:inherit;font:inherit;letter-spacing:inherit;
+    padding:3px 4px 3px 10px;cursor:pointer}
+  .chipweg{font-style:normal;font-size:10px;opacity:.35;cursor:pointer;padding:3px 9px 3px 3px;transition:.12s}
+  .chipweg:hover{opacity:1;color:var(--amber)}
   .treffer{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
   .tkopf{font-family:var(--term);font-size:11px;letter-spacing:.12em;color:var(--dim);margin-bottom:8px}
   .tkopf b{color:var(--green);font-weight:400}
