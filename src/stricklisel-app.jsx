@@ -2763,6 +2763,96 @@ const KANTEN = [
   { a: 3, b: 4, t: "das problem wird gelöst" },
 ];
 
+// ============================================================
+// VERLAUF · gewicht + schmerz übereinandergelegt.
+// zwei skalen: gewicht links (passt sich an), schmerz rechts fest 0–10.
+// zeigt, ob die beiden miteinander laufen.
+// ============================================================
+function VerlaufKurve() {
+  const [reihen, setReihen] = useState(null);
+  const [fehler, setFehler] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const d = await dbGet("logfiles-verlauf",
+          `${SUPABASE_URL}/rest/v1/logfiles?select=datum,gewicht,schmerz&order=datum.asc&limit=400`);
+        setReihen(Array.isArray(d) ? d : []);
+      } catch {
+        setFehler("die spalten gewicht/schmerz gibt es noch nicht — sql fehlt noch");
+        setReihen([]);
+      }
+    })();
+  }, []);
+
+  const daten = (reihen || []).filter((r) => r.gewicht != null || r.schmerz != null);
+  const gw = daten.filter((r) => r.gewicht != null);
+  const sm = daten.filter((r) => r.schmerz != null);
+
+  const W = 1000, L = 52, R = 52, T = 20, B = 250;
+  const n = daten.length;
+  const X = (i) => (n <= 1 ? (L + W - R) / 2 : L + (i * (W - L - R)) / (n - 1));
+
+  const gWerte = gw.map((r) => Number(r.gewicht));
+  const gmin = gWerte.length ? Math.min(...gWerte) : 0;
+  const gmax = gWerte.length ? Math.max(...gWerte) : 1;
+  const luft = Math.max(0.6, (gmax - gmin) * 0.18);
+  const lo = gmin - luft, hi = gmax + luft;
+  const Yg = (v) => B - ((v - lo) / (hi - lo || 1)) * (B - T);
+  const Ys = (v) => B - (v / 10) * (B - T);
+
+  const linie = (arr, feld, Y) => arr
+    .map((r) => X(daten.indexOf(r)) + "," + Y(Number(r[feld])))
+    .join(" ");
+
+  const kurz = (d) => (d || "").slice(8, 10) + "." + (d || "").slice(5, 7) + ".";
+
+  return (
+    <div className="kwrap">
+      <div className="ptitel">verlauf · gewicht &amp; schmerz</div>
+
+      {reihen === null && <p className="vleer">lade …</p>}
+      {reihen !== null && daten.length < 2 && (
+        <p className="vleer">{fehler || "noch zu wenig werte — trag gewicht und schmerz ein paar tage in den log-files ein, dann wächst hier die kurve."}</p>
+      )}
+
+      {daten.length >= 2 && (<>
+        <svg viewBox={`0 0 ${W} 285`} className="vsvg">
+          {[0, 5, 10].map((v) => (
+            <g key={v} className="vgitter">
+              <line x1={L} y1={Ys(v)} x2={W - R} y2={Ys(v)} />
+              <text x={W - R + 8} y={Ys(v) + 4}>{v}</text>
+            </g>
+          ))}
+          <text x={L - 8} y={Yg(gmax) + 4} className="vskala">{gmax}</text>
+          <text x={L - 8} y={Yg(gmin) + 4} className="vskala">{gmin}</text>
+
+          {sm.length > 1 && <polyline className="vschmerz" points={linie(sm, "schmerz", Ys)} />}
+          {gw.length > 1 && <polyline className="vgewicht" points={linie(gw, "gewicht", Yg)} />}
+
+          {sm.map((r) => (
+            <circle key={"s" + r.datum} className="vpunkt s" cx={X(daten.indexOf(r))} cy={Ys(Number(r.schmerz))} r="3">
+              <title>{r.datum} · schmerz {r.schmerz}</title>
+            </circle>
+          ))}
+          {gw.map((r) => (
+            <circle key={"g" + r.datum} className="vpunkt g" cx={X(daten.indexOf(r))} cy={Yg(Number(r.gewicht))} r="3">
+              <title>{r.datum} · {r.gewicht} kg</title>
+            </circle>
+          ))}
+
+          <text x={L} y={278} className="vdatum">{kurz(daten[0].datum)}</text>
+          <text x={W - R} y={278} className="vdatum" textAnchor="end">{kurz(daten[n - 1].datum)}</text>
+        </svg>
+        <div className="vlegende">
+          <span className="vlg">▬ gewicht (kg, linke skala)</span>
+          <span className="vls">▬ schmerz (0–10, rechte skala)</span>
+        </div>
+      </>)}
+    </div>
+  );
+}
+
 function Kurve() {
   const [wach, setWach] = useState(null);
   const p = (i) => KURVE[i];
@@ -3370,6 +3460,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
         </div>
 
         <Kurve />
+        <VerlaufKurve />
 
         <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
           liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
@@ -4467,6 +4558,19 @@ function Styles() {
 
   /* dramaturgie */
   .kwrap{margin-top:26px;padding-top:20px;border-top:1px dashed var(--line)}
+  /* verlauf gewicht + schmerz */
+  .vsvg{width:100%;height:auto;margin-top:10px;overflow:visible}
+  .vgitter line{stroke:var(--line);stroke-width:1;stroke-dasharray:3 5}
+  .vgitter text{fill:var(--dim);font-family:var(--term);font-size:11px}
+  .vskala{fill:var(--green-mid);font-family:var(--term);font-size:11px;text-anchor:end}
+  .vgewicht{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;filter:drop-shadow(0 0 4px var(--green-dim))}
+  .vschmerz{fill:none;stroke:var(--amber);stroke-width:2;stroke-linejoin:round;stroke-dasharray:6 4}
+  .vpunkt.g{fill:var(--green)}
+  .vpunkt.s{fill:var(--amber)}
+  .vdatum{fill:var(--dim);font-family:var(--term);font-size:11px}
+  .vlegende{display:flex;gap:20px;flex-wrap:wrap;margin-top:6px;font-family:var(--term);font-size:10.5px;letter-spacing:.06em}
+  .vlg{color:var(--green)} .vls{color:var(--amber)}
+  .vleer{font-family:var(--mono);font-size:12.5px;color:var(--dim);margin-top:10px;line-height:1.6}
   .ksvg{width:100%;display:block}
   .kberg{fill:none;stroke:var(--green-dim);stroke-width:1;opacity:.5}
   .kbergtext{font-family:var(--term);font-size:9px;fill:var(--dim);text-anchor:middle;letter-spacing:.16em}
