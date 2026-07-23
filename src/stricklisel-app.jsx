@@ -1549,7 +1549,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
         </label>
 
         <div className="logflags logAs">
-          {Array.from({ length: 8 }, (_, i) => "a" + i).map((k) => (
+          {Array.from({ length: 6 }, (_, i) => "a" + i).map((k) => (
             <button key={k} type="button" className={"logflag" + (logFlags[k] ? " on" : "")} onClick={() => flagKlick(k)}>{k.toUpperCase()}</button>
           ))}
         </div>
