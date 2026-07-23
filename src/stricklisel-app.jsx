@@ -2815,7 +2815,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
   const [nm, setNm] = useState(25);
   const [flug, setFlug] = useState([]);
   const [stand, setStand] = useState({ t: "verbinde …", c: "work" });
-  const [commits, setCommits] = useState(0);
+  const [stufen, setStufen] = useState([]);   // welche prioritätsstufen gerade laufen, z.b. [1,3]
   const [uptime, setUptime] = useState(0);
   const [buecher, setBuecher] = useState([]);
   const [jetzt, setJetzt] = useState(new Date());
@@ -3072,12 +3072,13 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     dbGet("commits-aktiv-count", `${SUPABASE_URL}/rest/v1/commits?select=id,prioritaet&status=eq.aktiv`)
       .then((d) => {
         const arr = Array.isArray(d) ? d : [];
-        // besetzte prioritäts-ebenen (1/2/3), nicht rohe commit-zahl —
-        // 3× prio 1 + 1× prio 3 sind 2 belegte ebenen, nicht "4 von 3".
-        const ebenen = new Set(
+        // WELCHE prioritätsstufen laufen (1/2/3) — nicht die rohe commit-zahl.
+        // 3× prio 1 + 1× prio 3 sind zwei belegte stufen, nicht "4 von 3".
+        // angezeigt wird die stufe selbst (P3), sonst liest sich "1 von 3" wie "prio 1".
+        const ebenen = [...new Set(
           arr.map((c) => Number(c.prioritaet)).filter((n) => n >= 1 && n <= 3)
-        ).size;
-        setCommits(ebenen);
+        )].sort((a, b) => a - b);
+        setStufen(ebenen);
       }).catch(() => {});
   }, []);
 
@@ -3148,7 +3149,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     ["am_enhancer", "1 : 3"],
     ["golden_glow", "pulsiert"],
     ["body_floor", "gesichert"],
-    ["modul 17b", commits + " von 3 aktiv", commits >= 3 ? "" : "gelb"],
+    ["modul 17b", stufen.length ? stufen.map((n) => "P" + n).join("·") + " · " + stufen.length + "/3" : "keine aktiv", stufen.length >= 3 ? "" : "gelb"],
     ["loop", "läuft"],
     ["uptime", up],
   ];
