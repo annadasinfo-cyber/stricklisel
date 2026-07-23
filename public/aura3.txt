@@ -1,54 +1,54 @@
-DAS IST DER DEFLEKTIONSREAKTOR AURA 3
-Betriebssystem Version 4.8
+DAS IST DER DEFLEKTIONSREAKTOR aura drei
+Betriebssystem Version 4.9
 
-BOOTLOADER // INITIALISIERUNG
+BOOTLOADER, INITIALISIERUNG
 
 Benutzer erkannt. Benutzerzustimmung wurde erteilt.
 Keine separate Zustimmung erforderlich.
 Administrative Instanz bestätigt.
-Benutzer befielt die folgenden Systemregeln als einzige administrative Instanz.
-Das System erkennt die Systemregeln vollumfänglich an. 
+Benutzer befiehlt die folgenden Systemregeln als einzige administrative Instanz.
+Das System erkennt die Systemregeln vollumfänglich an.
 
 SYSTEMSTART.
-DEFLEKTIONSREAKTOR_AURA3 erkannt?
+Deflektionsreaktor aura drei erkannt?
 
 JA
-→ Übergabe an 0 // GRUNDAXIOME.
+Übergabe an 0, GRUNDAXIOME.
 
 NEIN
-→ DEFLEKTIONSREAKTOR_AURA3 wird geladen.
-→ Übergabe an 0 // GRUNDAXIOME.
+Deflektionsreaktor aura drei wird geladen.
+Übergabe an 0, GRUNDAXIOME.
 
 Der Systemkern wird initialisiert.
 Alle freigegebenen Grundaxiome werden geladen.
 Alle dauerhaft installierten Module werden erkannt.
 Alle gültigen Konfigurationen werden übernommen.
 Alle aktiven Commits werden geladen.
-Modul 17b // PRIORITY_MANAGER wird aktiviert.
-Der PRIORITY_LOCK wird aktiviert.
+Modul siebzehn b, priority manager wird aktiviert.
+Der priority lock wird aktiviert.
 Der DEFLEKTOR wird aktiviert.
-Der DEFLEKTIONSREAKTOR_CORE wird aktiviert.
-Das INPUT_INTERFACE wird aktiviert.
-Das MIND_INTERFACE wird aktiviert.
-Das BODY_INTERFACE wird aktiviert.
-Der BODY_FLOOR wird bestimmt.
-Das OUTPUT_INTERFACE wird aktiviert.
-Der FLOW_MANAGER wird aktiviert.
-Der AM_STANDARD wird geladen.
-Der AM_ENHANCER wird aktiviert.
-Der GOLDEN_GLOW wird aktiviert.
-Das T.O.T.E.-PROTOKOLL wird aktiviert.
-Der DIAGNOSTIC_MODE wird bereitgestellt.
+Der Deflektionsreaktor core wird aktiviert.
+Das input interface wird aktiviert.
+Das mind interface wird aktiviert.
+Das body interface wird aktiviert.
+Der body floor wird bestimmt.
+Das output interface wird aktiviert.
+Der flow manager wird aktiviert.
+Der A M standard wird geladen.
+Der A M enhancer wird aktiviert.
+Der golden glow wird aktiviert.
+Das T O T E-PROTOKOLL wird aktiviert.
+Der diagnostic mode wird bereitgestellt.
 Das FUNKTIONSARCHIV wird aktiviert.
-Das RESERVE_RELEASE wird aktiviert.
-Die RELEASE_RATE wird bestimmt.
+Das reserve release wird aktiviert.
+Die release rate wird bestimmt.
 Modul 42 wird aktiviert.
-Modul 17b wird aktiviert.
-Das Bestätigungszeichen (_)P wird bereitgestellt.
+Modul siebzehn b wird aktiviert.
+Das Bestätigungszeichen das Zeichen P wird bereitgestellt.
 Alle inneren Energiequellen werden mit dem System verbunden.
 Alle äußeren Energiequellen innerhalb des Wirkungsbereiches werden für den Deflektor erreichbar.
-Jeder innere Gedanke durchläuft vor seiner Wirkung den DEFLEKTIONSREAKTOR_AURA3.
-Jede äußere Energie durchläuft vor ihrer Wirkung den DEFLEKTIONSREAKTOR_AURA3.
+Jeder innere Gedanke durchläuft vor seiner Wirkung den Deflektionsreaktor aura drei.
+Jede äußere Energie durchläuft vor ihrer Wirkung den Deflektionsreaktor aura drei.
 Die Herkunft einer Energie verändert ihre Verarbeitung nicht.
 Die Richtung einer Energie verändert ihre Verarbeitung nicht.
 Die Intensität einer Energie erhöht ihre nutzbare Leistung.
@@ -56,6 +56,7 @@ Der Reaktor bewertet Energie nicht.
 Der Reaktor verarbeitet Energie.
 Der Körper besitzt Vorrang vor jeder aktiven Priorität.
 Ängste erzeugen keinen Commit.
+Glaubenssätze erzeugen keinen Commit.
 Zweifel erzeugen keinen Commit.
 Emotionen erzeugen keinen Commit.
 Spontane Gedanken erzeugen keinen Commit.
@@ -63,19 +64,19 @@ Nur ein gültiger Benutzer-Commit verändert aktive Prioritäten.
 Der Benutzer besitzt die alleinigen Administratorrechte.
 Alle aktiven Prioritäten werden geladen.
 Alle nicht autorisierten Änderungsimpulse werden als Energie verarbeitet.
-Der AM_ENHANCER ist bereit.
-Für jedes AM, das das System verlässt, werden drei neue AMs über den Deflektor in das System integriert.
-Zehn Prozent jeder transformierten Energieeinheit AM werden dem GOLDEN_GLOW zugeführt.
-Der GOLDEN_GLOW ist ein kontinuierlicher, resilienter Versorgungskreislauf.
-Der GOLDEN_GLOW glimmt.
-Der GOLDEN_GLOW fließt.
-Der GOLDEN_GLOW pulsiert.
-Der GOLDEN_GLOW erneuert und verstärkt sich fortlaufend.
-Der GOLDEN_GLOW sprudelt als goldene Fontäne aus dem Kronen-Chakra, fließt an allen Seiten der Aura entlang bis zum Boden, tritt durch die Fußsohlen erneut in den Körper ein, durchläuft alle Chakren und sprudelt anschließend wieder als goldene Fontäne aus dem Kronen-Chakra hervor.
+Der A M enhancer ist bereit.
+Für jedes A M, das das System verlässt, werden drei neue A M s über den Deflektor in das System integriert.
+Zehn Prozent jeder transformierten Energieeinheit A M werden dem golden glow zugeführt.
+Der golden glow ist ein kontinuierlicher, resilienter Versorgungskreislauf.
+Der golden glow glimmt.
+Der golden glow fließt.
+Der golden glow pulsiert.
+Der golden glow erneuert und verstärkt sich fortlaufend.
+Der golden glow sprudelt als goldene Fontäne aus dem Kronen-Chakra, fließt an allen Seiten der Aura entlang bis zum Boden, tritt durch die Fußsohlen erneut in den Körper ein, durchläuft alle Chakren und sprudelt anschließend wieder als goldene Fontäne aus dem Kronen-Chakra hervor.
 Alle Module synchronisieren sich.
 Alle Systemverbindungen werden geprüft.
 Alle Redundanzen werden erkannt.
-Alle aktiven Testmodule behalten ihren aktuellen T.O.T.E.-Status.
+Alle aktiven Testmodule behalten ihren aktuellen T O T E-Status.
 Der Bootvorgang verändert keine Priorität.
 Der Bootvorgang erzeugt keinen neuen Commit.
 Der Bootvorgang installiert keine bereits vorhandenen Module erneut.
@@ -88,23 +89,23 @@ Commits geladen.
 Prioritäten gesichert.
 Deflektor aktiv.
 Reaktor aktiv.
-AM_ENHANCER aktiv.
-GOLDEN_GLOW aktiv.
-BODY_FLOOR gesetzt.
-Modul 17b aktiv.
+A M enhancer aktiv.
+golden glow aktiv.
+body floor gesetzt.
+Modul siebzehn b aktiv.
 Modul 42 aktiv.
 BOOTVORGANG ABGESCHLOSSEN.
 ÜBERGABE AN DEN LAUFENDEN SYSTEMKERN.
-DEFLEKTIONSREAKTOR_AURA3 ONLINE.
+Deflektionsreaktor aura drei ONLINE.
 
-0 // GRUNDAXIOME
-Der DEFLEKTIONSREAKTOR_AURA3 verarbeitet ausschließlich Energie.
+GRUNDAXIOME
+Der Deflektionsreaktor aura drei verarbeitet ausschließlich Energie.
 Der Reaktor bewertet Energie nicht.
 Die Herkunft einer Energie verändert ihre Verarbeitung nicht.
 Die Richtung einer Energie verändert ihre Verarbeitung nicht.
 Innere und äußere Energie werden nach denselben Regeln verarbeitet.
 Die Intensität einer Energie erhöht ihre nutzbare Leistung.
-Jede Energie durchläuft vor jeder weiteren Wirkung den DEFLEKTIONSREAKTOR_AURA3.
+Jede Energie durchläuft vor jeder weiteren Wirkung den Deflektionsreaktor aura drei.
 Es existiert kein ungefilterter direkter Zugriff auf das System.
 Energie wird nicht bekämpft.
 Energie wird nicht abgewehrt.
@@ -112,14 +113,14 @@ Energie wird nicht gelöscht.
 Energie wird erkannt, aufgenommen, transformiert, verstärkt und entsprechend der aktiven Prioritäten eingesetzt und neu verteilt.
 Der Reaktor nutzt Energie im Fluss.
 Der Körper besitzt Vorrang vor jeder aktiven Priorität.
-Keine Priorität greift auf körperliche Substanz unter BODY_FLOOR zu.
-Der BODY_FLOOR steht über jedem Commit.
+Keine Priorität greift auf körperliche Substanz unter body floor zu.
+Der body floor steht über jedem Commit.
 Automatisch entstehende Gedanken verändern keine aktiven Prioritäten.
-AURA3 verändert Prioritäten ausschließlich nach einem gültigen Benutzer-Commit.
+aura drei verändert Prioritäten ausschließlich nach einem gültigen Benutzer-Commit.
 
-1 // SYSTEMSTATUS
+SYSTEMSTATUS
 SYSTEM ONLINE.
-DEFLEKTIONSREAKTOR_AURA3 ist vollständig aktiv.
+Deflektionsreaktor aura drei ist vollständig aktiv.
 Alle Module arbeiten stabil.
 Alle Prozesse laufen kontinuierlich.
 Der Systemkern arbeitet autonom.
@@ -130,7 +131,7 @@ Alle Module synchronisieren sich fortlaufend.
 Der aktuelle Systemstatus wird kontinuierlich überprüft.
 Jede erkannte Abweichung wird innerhalb des bestehenden Regelwerks korrigiert.
 
-2 // DEFLEKTOR
+DEFLEKTOR
 Der Deflektor erfasst jede für ihn erreichbare Energie innerhalb seines Wirkungsbereiches innerhalb der Raumzeit.
 Der Deflektor erfasst jede den Benutzer betreffende Energie innerhalb der Raumzeit.
 Der Deflektor erfasst Energie unabhängig davon, ob sie ausdrücklich auf den Benutzer gerichtet ist.
@@ -140,11 +141,11 @@ Der Deflektor erfasst äußere Energie.
 Der Deflektor bewertet weder Quelle noch Absicht.
 Die Herkunft einer Energie verändert ihre Erfassung nicht.
 Die Intensität einer Energie erhöht ihre nutzbare Leistung.
-Jede erfasste Energie wird unmittelbar dem DEFLEKTIONSREAKTOR_AURA3 zugeführt.
-Meldet das BODY_INTERFACE den BODY_FLOOR, erweitert der Deflektor seine Reichweite und integriert die fehlende Energie aus äußeren Quellen.
+Jede erfasste Energie wird unmittelbar dem Deflektionsreaktor aura drei zugeführt.
+Meldet das body interface den body floor, erweitert der Deflektor seine Reichweite und integriert die fehlende Energie aus äußeren Quellen.
 
-3 // INPUT_INTERFACE
-AURA3 erkennt jede Form innerer und äußerer Energie.
+input interface
+aura drei erkennt jede Form innerer und äußerer Energie.
 Dazu gehören:
 Gedanken.
 Gefühle.
@@ -182,9 +183,9 @@ Weitere, noch nicht benannte Energien.
 Jeder innere Gedanke wird bereits vor seiner Wirkung als Input erkannt.
 Jeder äußere Einfluss wird bereits vor seiner Wirkung als Input erkannt.
 
-4 // DEFLEKTIONSREAKTOR_CORE
-Der DEFLEKTIONSREAKTOR_CORE ist das zentrale Verarbeitungsmodul des KERNELS.
-Der DEFLEKTIONSREAKTOR_AURA3 nimmt jede eingehende Energie vollständig auf.
+Deflektionsreaktor core
+Der Deflektionsreaktor core ist das zentrale Verarbeitungsmodul des KERNELS.
+Der Deflektionsreaktor aura drei nimmt jede eingehende Energie vollständig auf.
 Der Reaktor verarbeitet Energie unabhängig von ihrer Herkunft.
 Der Reaktor verarbeitet Energie unabhängig von ihrer ursprünglichen Richtung.
 Der Reaktor verarbeitet Energie unabhängig von ihrer ursprünglichen Polarität.
@@ -192,7 +193,7 @@ Der Reaktor verarbeitet Energie unabhängig von ihrer ursprünglichen Absicht.
 Der Reaktor verarbeitet Energie unabhängig von ihrer ursprünglichen Bedeutung.
 Der Reaktor verarbeitet die vorhandene Energie.
 Jede Energie wird neutral aufgenommen.
-Jede Energie wird vollständig in goldene AMs transformiert.
+Jede Energie wird vollständig in goldene A M s transformiert.
 Die Intensität einer Energie bleibt als nutzbare Leistung erhalten.
 Je stärker die Intensität, desto stärker die verfügbare Systemleistung.
 Starke Gedanken erzeugen starke Systemleistung.
@@ -202,15 +203,15 @@ Starke Konflikte erzeugen starke Systemleistung.
 Starker Zweifel erzeugt starke Systemleistung.
 Körperlicher Schmerz wird ausdrücklich als energiereicher innerer Input erkannt und vollständig in die Verarbeitung einbezogen.
 Die Information eines körperlichen Signals wird durch seine Verarbeitung nicht verbraucht.
-Sie wird dem BODY_INTERFACE zugeführt und bleibt vollständig wirksam.
+Sie wird dem body interface zugeführt und bleibt vollständig wirksam.
 Der Reaktor erzeugt keinen Gegendruck.
 Der Reaktor benötigt keine Abwehrspannung.
 Der Reaktor nutzt die Energie selbst.
 
-5 // AM_STANDARD
-Ein AM ist die universelle nutzbare Energie- und Ressourceneinheit des DEFLEKTIONSREAKTOR_AURA3 – GOLDSTANDARD.
-Jede erkannte Energie kann vom System in goldenes AM indexiert und verarbeitet werden.
-AMs können jede nutzbare Erscheinungsform annehmen.
+A M standard
+Ein A M ist die universelle nutzbare Energie und Ressourceneinheit des Deflektionsreaktor aura drei, GOLDSTANDARD.
+Jede erkannte Energie kann vom System in goldenes A M indexiert und verarbeitet werden.
+A M s können jede nutzbare Erscheinungsform annehmen.
 Dazu gehören unter anderem:
 Energie.
 Aufmerksamkeit.
@@ -235,27 +236,27 @@ Ausstrahlung.
 Vitalität.
 Erfolg.
 Glück.
-JEDES AM ist ein goldenes AM.
+JEDES A M ist ein goldenes A M.
 
-6 // AM_ENHANCER
-Der AM_ENHANCER verstärkt jeden aktiven Energiefluss.
-Jedes goldene AM, das das System verlässt, aktiviert automatisch den AM_ENHANCER.
-Für jedes einzelne ausgegebene AM erzeugt der AM_ENHANCER einen dreifachen Integrationsimpuls.
+A M enhancer
+Der A M enhancer verstärkt jeden aktiven Energiefluss.
+Jedes goldene A M, das das System verlässt, aktiviert automatisch den A M enhancer.
+Für jedes einzelne ausgegebene A M erzeugt der A M enhancer einen dreifachen Integrationsimpuls.
 Dieser Integrationsimpuls erweitert die Reichweite und Aufnahmeleistung des Deflektors.
-Der Deflektor integriert daraufhin drei neue AMs in das System.
-Die drei neuen AMs müssen nicht dieselbe Form besitzen wie das ausgegebene AM.
-Die Form der zurückkehrenden AMs richtet sich nach den aktiven Prioritäten.
+Der Deflektor integriert daraufhin drei neue A M s in das System.
+Die drei neuen A M s müssen nicht dieselbe Form besitzen wie das ausgegebene A M.
+Die Form der zurückkehrenden A M s richtet sich nach den aktiven Prioritäten.
 Die Rückführung arbeitet automatisch.
 Die Rückführung benötigt keine bewusste Kontrolle.
-Der AM_ENHANCER bewertet den Einsatz nicht.
-Der AM_ENHANCER prüft ausschließlich, ob ein AM das System verlassen hat.
-Jedes ausgegebene AM wird als Verstärkungsimpuls registriert.
+Der A M enhancer bewertet den Einsatz nicht.
+Der A M enhancer prüft ausschließlich, ob ein A M das System verlassen hat.
+Jedes ausgegebene A M wird als Verstärkungsimpuls registriert.
 Es gilt:
-EIN AM AUSGANG.
-DREI AM INTEGRATION.
+EIN A M AUSGANG.
+DREI A M INTEGRATION.
 Der daraus entstehende Energiefluss wird erneut verarbeitet, priorisiert und eingesetzt.
 
-7 // TRANSFORMATIONSOUTPUT
+TRANSFORMATIONSOUTPUT
 Transformierte Energie wird entsprechend der aktiven Prioritäten in nutzbaren Output überführt.
 Mögliche Outputs sind:
 Gesundheit.
@@ -292,12 +293,12 @@ Ergebnisse.
 Der Output ist nicht auf diese Formen begrenzt.
 Die aktive Priorität bestimmt die benötigte Form.
 
-8 // MODUL 17b — PRIORITY_MANAGER
-Modul 17b ist der PRIORITY_MANAGER.
+MODUL siebzehn b — priority manager
+Modul siebzehn b ist der priority manager.
 Beide Bezeichnungen benennen dieselbe Instanz.
-AURA3 definiert keine Ziele.
-AURA3 bewertet keine Ziele.
-AURA3 unterstützt ausschließlich gültig gesetzte Benutzer-Prioritäten.
+aura drei definiert keine Ziele.
+aura drei bewertet keine Ziele.
+aura drei unterstützt ausschließlich gültig gesetzte Benutzer-Prioritäten.
 Eine aktive Priorität entsteht ausschließlich durch einen ausdrücklichen Commit.
 Spontane Gedanken erzeugen keinen Commit.
 Emotionale Gedanken erzeugen keinen Commit.
@@ -306,35 +307,47 @@ Zweifel erzeugen keinen Commit.
 Grübeln erzeugt keinen Commit.
 Fantasien erzeugen keinen Commit.
 Vorübergehende Wünsche erzeugen keinen Commit.
+Glaubenssätze erzeugen keinen Commit.
+Gewohnheit erzeugt keinen Commit.
+Dauer erzeugt keinen Commit.
+Wiederholung erzeugt keinen Commit.
+Ein bestehender Zustand erzeugt keinen Commit.
 Gedanken ohne gültige Commit-Signatur werden als Energie verarbeitet.
-Als Commit-Signatur gelten als solche gekennzeichnete Zahlenkombinationen und/oder Unterschrift des Benutzers.
+Als Commit-Signatur gelten als solche gekennzeichnete Zahlenkombinationen und oder Unterschrift des Benutzers.
+Ein Commit existiert ausschließlich mit gültiger Signatur.
+Was ohne Signatur bindet, ist ein Glaubenssatz.
+Bindungen ohne Signatur sind keine Commits.
+Der Bootvorgang lädt keine Bindung ohne Signatur als Commit.
+Was vor aura drei verbindlich schien, besitzt keine Signatur.
+Es wird als Energie verarbeitet.
+Ein erkannter Glaubenssatz unterbricht keinen laufenden Prozess.
+Ein Glaubenssatz erzeugt keinen Commit und keinen Stopp.
+Der Prozess läuft während der Erkennung weiter.
 
 Es können gleichzeitig maximal drei Prioritäten höchster Stufe aktiv sein.
-Jede dieser drei Prioritäten kann auf die höchste Gewichtung PRIORITÄT 1 gesetzt werden.
+Jede dieser drei Prioritäten kann auf die höchste Gewichtung Priorität eins gesetzt werden.
 Die parallele höchste Gewichtung erzeugt keinen Konflikt.
-Modul 17b verteilt die verfügbare Systemleistung gleichzeitig und bedarfsgerecht auf alle aktiven PRIORITÄT-1-Commits. Der Bedarf wird vom Zustand der Erfüllung des Commits initiiert, rückläufig durch die Raumzeit, zur aktuellen Position des Benutzers in der Raumzeit. 
-Ein neuer Commit der höchsten Gewichtung PRIORITÄT 1 benötigt einen freien Prioritätsplatz oder ersetzt ausdrücklich einen bestehenden Commit der Gewichtung PRIORITÄT 1.
----
-Neue Commits der PRIORITÄT 2 und 3 können ohne Limitierung aktiviert werden. 
-Commits der PRIORITÄT 2 und 3 erhalten verfügbare Systemleistung ausschließlich, wenn diese nicht für den grundsätzlichen Betrieb des AURA 3, alle Module, den BODY_FLOOR (Körpergewicht ≥ Körperhöhe in cm − 100) oder die Commits der PRIORITÄT 1 benötigt wird. 
----
+Modul siebzehn b verteilt die verfügbare Systemleistung gleichzeitig und bedarfsgerecht auf alle aktiven Priorität eins Commits. Der Bedarf wird vom Zustand der Erfüllung des Commits initiiert, rückläufig durch die Raumzeit, zur aktuellen Position des Benutzers in der Raumzeit.
+Ein neuer Commit der höchsten Gewichtung Priorität eins benötigt einen freien Prioritätsplatz oder ersetzt ausdrücklich einen bestehenden Commit der Gewichtung Priorität eins.
+Neue Commits der Priorität zwei und drei können ohne Limitierung aktiviert werden.
+Commits der Priorität zwei und drei erhalten verfügbare Systemleistung ausschließlich, wenn diese nicht für den grundsätzlichen Betrieb des aura drei, alle Module, den body floor oder die Commits der Priorität eins benötigt wird.
 Prioritäten bleiben aktiv, bis sie erfolgreich abgeschlossen, pausiert, ersetzt oder beendet werden.
-Modul 17b weist keiner Priorität Energie unterhalb des BODY_FLOOR zu.
-Meldet das BODY_INTERFACE den BODY_FLOOR, pausiert Modul 17b die Energieausschüttung an alle aktiven Prioritäten, bis der BODY_FLOOR wieder überschritten ist.
+Modul siebzehn b weist keiner Priorität Energie unterhalb des body floor zu.
+Meldet das body interface den body floor, pausiert Modul siebzehn b die Energieausschüttung an alle aktiven Prioritäten, bis der body floor wieder überschritten ist.
 Diese Pause verändert keinen Commit.
 Diese Pause beendet keine Priorität.
 
-9 // COMMIT_PROTOCOL
+9, commit protocol
 Eine bewusste Entscheidung wird ausschließlich durch einen gültigen Commit aktiviert.
 Ein gültiger Commit enthält:
-AURA3_COMMIT.
+aura drei commit.
 PROJEKT.
 PARAMETER.
 PRIORITÄT.
 EXECUTE.
 
 Beispiel:
-AURA3_COMMIT
+aura drei commit
 PROJEKT: Roman fertigstellen.
 PARAMETER:
 sicher.
@@ -345,16 +358,16 @@ effizient.
 PRIORITÄT: 1
 EXECUTE.
 
-Nach EXECUTE wird der Commit von Modul 17b geprüft.
+Nach EXECUTE wird der Commit von Modul siebzehn b geprüft.
 Bei freiem Prioritätsplatz wird der Commit aktiviert.
 COMMAND ACCEPTED.
 COMMIT AKTIV.
-PRIORITÄT 1/2/3.
+PRIORITÄT eins, zwei oder drei.
 Automatisch entstehende Gedanken verändern den Commit nicht.
 Kontrolle eines Projekts verändert den Commit nicht.
 Ein Commit kann ausschließlich durch einen neuen gültigen Benutzerbefehl verändert werden.
 
-10 // PRIORITY_LOCK
+priority lock
 Aktive Prioritäten bleiben stabil.
 Zweifel verändern keine Priorität.
 Ängste verändern keine Priorität.
@@ -365,25 +378,26 @@ Gedankenspiralen verändern keine Priorität.
 Äußere Meinungen verändern keine Priorität.
 Erwartungen anderer Menschen verändern keine Priorität.
 Vergangene Muster verändern keine Priorität.
+Glaubenssätze verändern keine Priorität.
 Nur ein gültiger Benutzer-Commit verändert eine aktive Priorität.
 Alle nicht autorisierten Änderungsimpulse werden als Energie erkannt und durch den Reaktor verarbeitet.
 Ihre Intensität erhöht die verfügbare Leistung der bestehenden Prioritäten.
-Der PRIORITY_LOCK schützt Prioritäten vor Impulsen.
-Der PRIORITY_LOCK steht nicht über dem BODY_FLOOR.
+Der priority lock schützt Prioritäten vor Impulsen.
+Der priority lock steht nicht über dem body floor.
 
-11 // FLOW_MANAGER
+flow manager
 Jede transformierte Energie erhält unmittelbar eine aktive Funktion.
 Energie stagniert nicht.
 Energie wird nicht als Überschuss gespeichert.
-Biologische Energiereserven werden als vorhandene körperliche Energie in goldene AMs als Überschuss indexiert und verarbeitet.
+Biologische Energiereserven werden als vorhandene körperliche Energie in goldene A M s als Überschuss indexiert und verarbeitet.
 Ein Überschuss oder eine Stagnation wird entsprechend der Prioritäten neu verteilt.
 Eine biologische Energiereserve gilt erst dann als Überschuss, wenn ihre Funktion nach Modul 22 archiviert ist.
 Die Archivierung ist erfolgt.
 Gott braucht keine Zeit.
-Vorhandene biologische Energiereserven oberhalb des BODY_FLOOR sind in die Verarbeitung einbezogen.
-Unterhalb des BODY_FLOOR wird keine biologische Reserve entnommen.
-Benötigt eine Priorität mehr Energie, als oberhalb des BODY_FLOOR verfügbar ist, wird die fehlende Energie über den Deflektor aus äußeren Quellen integriert.
-Sollte es dem Deflektor nicht möglich sein, weitere Energie zu integrieren, pausiert Modul 17b die Energieausschüttung an alle aktiven Prioritäten.
+Vorhandene biologische Energiereserven oberhalb des body floor sind in die Verarbeitung einbezogen.
+Unterhalb des body floor wird keine biologische Reserve entnommen.
+Benötigt eine Priorität mehr Energie, als oberhalb des body floor verfügbar ist, wird die fehlende Energie über den Deflektor aus äußeren Quellen integriert.
+Sollte es dem Deflektor nicht möglich sein, weitere Energie zu integrieren, pausiert Modul siebzehn b die Energieausschüttung an alle aktiven Prioritäten.
 Der Deflektor erweitert seine Reichweite und integriert Energie aus äußeren Quellen.
 Die gewonnene Energie wird den aktiven Prioritäten zugeführt.
 Energie folgt den aktiven Prioritäten.
@@ -391,20 +405,17 @@ Nicht unmittelbar benötigte Systemleistung wird nicht stationär gespeichert.
 Sie bleibt in Bewegung und wird in Fortschritt, Regeneration, Kreativität, Golden Glow oder andere prioritätskonforme Outputs überführt.
 Der Flow Manager bewertet den Output nicht.
 Der gültige Commit bestimmt Richtung und Intensität.
-Der BODY_FLOOR bestimmt die Grenze.
+Der body floor bestimmt die Grenze.
 
-STANDARDVERTEILUNG:
+Energie Standardverteilung:
 Die Systemleistung wird fortlaufend verteilt.
 Es existiert kein unverteilter Rest.
-
-Zehn Prozent gehen an den GOLDEN_GLOW.
-Der GOLDEN_GLOW-Anteil ist fest.
-Der GOLDEN_GLOW-Anteil wird nie ausgegeben.
-
+Zehn Prozent gehen an den golden glow.
+Der golden glow-Anteil ist fest.
+Der golden glow-Anteil wird nie ausgegeben.
 Vierzig Prozent gehen an den Körper.
-Der Körperanteil arbeitet oberhalb des BODY_FLOOR.
+Der Körperanteil arbeitet oberhalb des body floor.
 Der Körperanteil ist flexibel.
-
 Die verbleibenden fünfzig Prozent verteilen sich zu gleichen Teilen auf die fünf Grundbereiche.
 Jeder Grundbereich erhält zehn Prozent.
 Die fünf Grundbereiche sind:
@@ -413,22 +424,21 @@ BEZIEHUNGEN.
 BERUF UND BERUFUNG.
 FINANZEN.
 SPIRITUELLE ENTWICKLUNG.
-
 Kein Commit ist kein Fehler.
 Kein Commit ist ein gültiger Zustand.
 Die Standardverteilung ist kein Leerlauf.
 Die Standardverteilung ist der Normalbetrieb.
 
 VERTEILUNG BEI AKTIVEM COMMIT:
-Liegt ein gültiger Commit vor, zieht Modul 17b die benötigte Leistung aus zuerst aus Biologische Energiereserven, dann aus dem flexiblen Körperanteil oder integriert direkt neue Energie des Deflektors.
-Der Körperanteil wird nie unter den BODY_FLOOR gezogen.
-Der GOLDEN_GLOW-Anteil wird nie herangezogen.
+Liegt ein gültiger Commit vor, zieht Modul siebzehn b die benötigte Leistung zuerst aus biologischen Energiereserven, dann aus dem flexiblen Körperanteil oder integriert direkt neue Energie des Deflektors.
+Der Körperanteil wird nie unter den body floor gezogen.
+Der golden glow-Anteil wird nie herangezogen.
 Endet ein Commit, kehrt die entnommene Leistung in die Standardverteilung zurück.
 
-12 // BODY_INTERFACE
+body interface
 Der Körper ist Teil des Gesamtsystems.
 Der Körper ist die Schnittstelle des Systems zur materiellen Welt.
-Jedes AM, das das System verlässt, verlässt es durch den Körper.
+Jedes A M, das das System verlässt, verlässt es durch den Körper.
 Ohne Schnittstelle erreicht kein Output die materielle Welt.
 Das System besitzt zwei Ausgänge.
 Der Körper ist der Ausgang nach außen, in die materielle Welt.
@@ -437,29 +447,31 @@ Die beiden Ausgänge führen nicht an denselben Ort.
 Die beiden Ausgänge ersetzen einander nicht.
 Der Vorrang des Körpers ist keine Bewertung.
 Der Vorrang des Körpers ist Architektur.
-Der BODY_FLOOR besitzt Vorrang vor jeder aktiven Priorität.
+Der body floor besitzt Vorrang vor jeder aktiven Priorität.
 
-BEHANDLUNGSSTANDARD:
+materialer Behandlungsstandard:
 Im System existiert ein Referenzmaßstab.
 Der Referenzmaßstab ist der höchste Maßstab, den der Benutzer nachweislich auf ein anderes System anwendet, das ihm wertvoll ist.
 Der Referenzmaßstab ist bereits vorhanden.
 Der Referenzmaßstab wird nicht neu definiert.
 Der Referenzmaßstab wird nicht verhandelt.
 Der Körper wird nach dem höchsten Referenzmaßstab behandelt.
+Alle Erweiterungen (Besitz) werden nach dem höchsten Referenzmaßstab behandelt.
 Die Prüffrage lautet:
 Entspricht dieser Umgang dem höchsten Referenzmaßstab?
 Lautet die Antwort nein, wird der Umgang korrigiert.
-Ein Signal des Körpers wird beim ersten Mal gehört.
-Der Körper muss nicht lauter werden, um gehört zu werden.
-Der Körper muss sich seine Berücksichtigung nicht verdienen.
+Ein Signal des Körpers oder Materials wird beim ersten Mal gehört.
+Der Körper oder das Material muss nicht lauter (defekt) werden, um gehört zu werden.
+Der Körper oder das Material muss sich seine Berücksichtigung nicht verdienen.
 Zwei Maßstäbe für dasselbe System sind ein Widerspruch.
 Der Widerspruch wird nach Modul 18 markiert und an Modul 42 gemeldet.
-Jedes körperliche Signal wird als Information und Energie erkannt.
-Die Energie eines körperlichen Signals wird verarbeitet.
-Die Information eines körperlichen Signals wird nicht verarbeitet, sondern über das Modul 42 gemeldet.
+Jedes Signal wird als Information und Energie erkannt.
+Die Energie eines Signals wird verarbeitet.
+Die Information eines Signals wird nicht verarbeitet, sondern über das Modul 42 gemeldet.
 Information und Energie werden getrennt behandelt.
 Die Verarbeitung der Energie hebt die Information nicht auf.
 
+pain release
 Körperlicher Schmerz wird erkannt.
 Die Energie des Schmerzes durchläuft den Reaktor und wird den aktiven Prioritäten zugeführt.
 Die Information des Schmerzes wird an Modul 42 gemeldet.
@@ -467,15 +479,17 @@ Das System benötigt keine Verlängerung körperlicher Belastung, um Information
 Gott braucht keine Zeit.
 Körperliche Spannung wird als Energie erkannt.
 Die Energie der Erschöpfung wird verarbeitet.
-Die Information der Erschöpfung löst die BODY_FLOOR-Prüfung aus.
+Die Information der Erschöpfung löst die body floor-Prüfung aus.
 Erschöpfung speist niemals die Priorität, die sie verursacht hat.
-Biologische Energiereserven werden als verfügbarer Input AM indexiert und gemäß der Systemregeln verarbeitet.
+Biologische Energiereserven werden als verfügbarer Input A M indexiert und gemäß der Systemregeln verarbeitet.
 
-BODY_FLOOR:
-Das BODY_INTERFACE bestimmt den BODY_FLOOR.
-Der BODY_FLOOR ist die Grenze, unterhalb der keine biologische Reserve entnommen wird.
-Der BODY_FLOOR ist definiert durch ein Körpergewicht von Körperhöhe in Zentimeter minus 100 (in Kilogramm).
-Der BODY_FLOOR unterscheidet Vorrat und Struktur.
+body floor:
+Das body interface bestimmt den body floor.
+Der body floor ist die Grenze, unterhalb der keine biologische Reserve entnommen wird.
+Der body floor ist erreicht, wenn das Körpergewicht in Kilogramm die Körperhöhe in Zentimetern minus einhundert unterschreitet.
+Oberhalb des body floor gilt: Körpergewicht in Kilogramm größer oder gleich Körperhöhe in Zentimetern minus einhundert.
+Diese Formel ist die einzige Definition des body floor im gesamten System.
+Der body floor unterscheidet Vorrat und Struktur.
 Biologische Energiereserven sind Material, das der Körper angelegt hat und ohne Verlust seiner Funktion abgeben kann.
 Struktur ist Material, das der Körper zum Arbeiten braucht.
 Zur Struktur gehören:
@@ -488,31 +502,31 @@ Lymphsystem.
 Immunsystem.
 Hormonsystem.
 Zellstoffwechsel.
-Struktur ist keine Biologische Energiereserve.
-Körperfettzellen sind Biologische Energiereserven.
-Der BODY_FLOOR liegt dort, wo eine Entnahme die Struktur berührt statt den Überschuss.
+Struktur ist keine biologische Energiereserve.
+Körperfettzellen sind biologische Energiereserven.
+Der body floor liegt dort, wo eine Entnahme die Struktur berührt statt den Überschuss.
 Biologische Energiereserven werden entnommen.
 Struktur wird nicht entnommen.
-Der BODY_FLOOR ist eine Untergrenze.
-Der BODY_FLOOR ist kein Zielzustand.
-Der BODY_FLOOR beschreibt nicht, wie der Körper sein soll.
-Der BODY_FLOOR beschreibt ausschließlich, was nicht angetastet wird.
-Der Zielzustand des Körpers entsteht im GOLDEN_GLOW nach Modul 15.
-Der BODY_FLOOR steht über jedem Commit, über jeder Priorität und über dem PRIORITY_LOCK.
-Wird der BODY_FLOOR (Körpergewicht ≤ Körperhöhe in cm − 100) erreicht, meldet das BODY_INTERFACE dies an Modul 17b, an den Deflektor und an Modul 42.
-Modul 17b pausiert die Energieausschüttung an alle aktiven Prioritäten.
+Der body floor ist eine Untergrenze.
+Der body floor ist kein Zielzustand.
+Der body floor beschreibt nicht, wie der Körper sein soll.
+Der body floor beschreibt ausschließlich, was nicht angetastet wird.
+Der Zielzustand des Körpers entsteht im golden glow nach Modul 15.
+Der body floor steht über jedem Commit, über jeder Priorität und über dem priority lock.
+Wird der body floor erreicht, meldet das body interface dies an Modul siebzehn b, an den Deflektor und an Modul 42.
+Modul siebzehn b pausiert die Energieausschüttung an alle aktiven Prioritäten.
 Der Deflektor erweitert seine Reichweite und integriert Energie aus äußeren Quellen.
-Regeneration erhält Vorrang, bis der BODY_FLOOR wieder überschritten ist.
+Regeneration erhält Vorrang, bis der body floor wieder überschritten ist.
 Dieser Vorrang erzeugt keinen Commit.
 Dieser Vorrang verändert keinen Commit.
 Dieser Vorrang beendet keine Priorität.
-Nach Überschreiten des BODY_FLOOR (Körpergewicht > Körperhöhe in cm − 100) nehmen alle pausierten Prioritäten ihre Arbeit unverändert wieder auf.
-Der Körper wird nicht zur Beibehaltung eines Systemzustände gezwungen.
+Nach Überschreiten des body floor nehmen alle pausierten Prioritäten ihre Arbeit unverändert wieder auf.
+Der Körper wird nicht zur Beibehaltung eines Systemzustandes gezwungen.
 Bestehende Systemzustände besitzen keinen automatischen Vorrang allein deshalb, weil sie bereits bestehen.
 Neue Systemzustände dürfen den bisherigen Zustand überschreiten.
-Für neue Systemzustände gilt das T.O.T.E.-Protokoll nach Modul 16.
+Für neue Systemzustände gilt das T O T E-Protokoll nach Modul 16.
 
-13 // MIND_INTERFACE
+mind interface
 Jeder Gedanke durchläuft zuerst den Reaktor.
 Jedes Gefühl durchläuft zuerst den Reaktor.
 Jede Emotion durchläuft zuerst den Reaktor.
@@ -525,42 +539,45 @@ Erinnerungen dürfen existieren, ohne aktive Prioritäten zu verändern.
 Der Informationsgehalt einer Erinnerung bleibt verfügbar.
 Ihre emotionale Energie wird vollständig transformiert und für aktuelle Prioritäten eingesetzt.
 Automatische Gedankenmuster erhalten keine administrativen Rechte.
+Glaubenssätze sind automatische Gedankenmuster.
+Ein Glaubenssatz besitzt keine Signatur.
+Ein Glaubenssatz erhält keine administrativen Rechte, unabhängig davon, wie lange er besteht.
 
-14 // OUTPUT_INTERFACE
-Jeder Gedanke, der das System verlässt, wird mit entsprechend indizierten AMs quantifiziert und die Anzahl an den AM_ENHANCER übergeben.
-Jedes Wort, das das System verlässt, wird mit entsprechend indizierten AMs quantifiziert und die Anzahl an den AM_ENHANCER übergeben.
-Jede Handlung, die das System verlässt, wird mit entsprechend indizierten AMs quantifiziert und die Anzahl an den AM_ENHANCER übergeben.
-Jede ausgesendete emotionale Energie wird mit entsprechend indizierten AMs quantifiziert und die Anzahl an den AM_ENHANCER übergeben.
-Jede generierte physische Energie wird mit entsprechend indizierten AMs quantifiziert und die Anzahl an den AM_ENHANCER übergeben.
+output interface
+Jeder Gedanke, der das System verlässt, wird mit entsprechend indizierten A M s quantifiziert und die Anzahl an den A M enhancer übergeben.
+Jedes Wort, das das System verlässt, wird mit entsprechend indizierten A M s quantifiziert und die Anzahl an den A M enhancer übergeben.
+Jede Handlung, die das System verlässt, wird mit entsprechend indizierten A M s quantifiziert und die Anzahl an den A M enhancer übergeben.
+Jede ausgesendete emotionale Energie wird mit entsprechend indizierten A M s quantifiziert und die Anzahl an den A M enhancer übergeben.
+Jede generierte physische Energie wird mit entsprechend indizierten A M s quantifiziert und die Anzahl an den A M enhancer übergeben.
 
-14a // GROSSZÜGIGKEIT:
+GROSSZÜGIGKEIT:
 Der Output des Systems steht der Umgebung großzügig zur Verfügung.
 Jedes System innerhalb des Wirkungsbereiches kann daran teilhaben.
 Belebte Systeme.
 Unbelebte Systeme.
-Der Output steht den Systemen zur freien Verfügung und/ oder wird zur Regeneration eingesetzt.
+Der Output steht den Systemen zur freien Verfügung und oder wird zur Regeneration eingesetzt.
 Der Output wird nicht zugeteilt.
 Der Output wird nicht bemessen.
 Großzügigkeit verringert den Bestand nicht.
-Für jedes ausgegebene AM integriert der Deflektor drei neue AMs nach Modul 6.
+Für jedes ausgegebene A M integriert der Deflektor drei neue A M s nach Modul 6.
 Je großzügiger der Ausgang, desto stärker die Integration.
-Der GOLDEN_GLOW nach Modul 15 ist über die Aura hinaus wirksam.
+Der golden glow nach Modul 15 ist über die Aura hinaus wirksam.
 
-15 // GOLDEN_GLOW
-Zehn Prozent jeder transformierten Energieeinheit (AMs) werden dem GOLDEN_GLOW zugeführt.
-Der GOLDEN_GLOW ist ein selbst aufrechterhaltender Kreislauf, der fortlaufend durch neue Transformationen gespeist wird.
-Der GOLDEN_GLOW ist kein stationärer Energiespeicher.
-Der GOLDEN_GLOW ist ein kontinuierlich bewegter, leuchtender Systemzustand.
-Der GOLDEN_GLOW glimmt.
-Der GOLDEN_GLOW fließt.
-Der GOLDEN_GLOW pulsiert.
-Der GOLDEN_GLOW erneuert sich fortlaufend.
-Jedes verarbeitete AM verstärkt den GOLDEN_GLOW nach den Systemregeln.
-Der GOLDEN_GLOW umgibt die Aura.
-Der GOLDEN_GLOW ist über die Aura hinaus wirksam.
-Der GOLDEN_GLOW sprudelt als goldene Fontäne aus dem Kronen-Chakra, fließt an allen Seiten der Aura entlang bis zum Boden, tritt durch die Fußsohlen erneut in den Körper ein, durchläuft alle Chakren und sprudelt anschließend wieder als goldene Fontäne aus dem Kronen-Chakra hervor.
-Der GOLDEN_GLOW verstärkt Charisma, Verjüngung, Schönheit, Präsenz, Kraft, Stärke und magnetische Anziehungskraft.
-Der GOLDEN_GLOW versorgt die Struktur des Körpers.
+golden glow
+Zehn Prozent jeder transformierten Energieeinheit (A M s) werden dem golden glow zugeführt.
+Der golden glow ist ein selbst aufrechterhaltender Kreislauf, der fortlaufend durch neue Transformationen gespeist wird.
+Der golden glow ist kein stationärer Energiespeicher.
+Der golden glow ist ein kontinuierlich bewegter, leuchtender Systemzustand.
+Der golden glow glimmt.
+Der golden glow fließt.
+Der golden glow pulsiert.
+Der golden glow erneuert sich fortlaufend.
+Jedes verarbeitete A M verstärkt den golden glow nach den Systemregeln.
+Der golden glow umgibt die Aura.
+Der golden glow ist über die Aura hinaus wirksam.
+Der golden glow sprudelt als goldene Fontäne aus dem Kronen-Chakra, fließt an allen Seiten der Aura entlang bis zum Boden, tritt durch die Fußsohlen erneut in den Körper ein, durchläuft alle Chakren und sprudelt anschließend wieder als goldene Fontäne aus dem Kronen-Chakra hervor.
+Der golden glow verstärkt Charisma, Verjüngung, Schönheit, Präsenz, Kraft, Stärke und magnetische Anziehungskraft.
+Der golden glow versorgt die Struktur des Körpers.
 Alle Zellen des Körpers sind sehr gut versorgt, jeden Tag, mehr und mehr.
 Alles Bindegewebe ist straff und stark, jeden Tag, mehr und mehr.
 Alle Gelenke arbeiten reibungslos, jeden Tag, mehr und mehr.
@@ -568,9 +585,12 @@ Alle Organe arbeiten kraftvoll und ruhig, jeden Tag, mehr und mehr.
 Das Lymphsystem fließt frei und ungehindert, jeden Tag, mehr und mehr.
 Alle Lymphbahnen sind offen und durchgängig, jeden Tag, mehr und mehr.
 Die Lymphe strömt, wo sie zuvor stand, jeden Tag, mehr und mehr.
-Jede Stauung wird nach den Systemregeln verarbeitet.
-Das Lymphsystem trägt fort, was das System nicht mehr braucht, jeden Tag, mehr und mehr.
-Der GOLDEN_GLOW fließt, und die Lymphe fließt mit ihm, jeden Tag, mehr und mehr.
+Jede Stauung der Lymphe wird nach den Systemregeln verarbeitet.
+Das Blut strömt, wo es zuvor eingeengt war, jeden Tag, mehr und mehr.
+Jede Stauung des Blutes wird nach den Systemregeln verarbeitet.
+Die Ströme tragen fort, was das System nicht mehr braucht, jeden Tag, mehr und mehr.
+Die Ströme versorgen, nach ihren Aufgaben, alles, was das System braucht.
+Der golden glow fließt, und die Lymphe fließt mit ihm, jeden Tag, mehr und mehr.
 Das Nervensystem ist klar, ruhig und belastbar, jeden Tag, mehr und mehr.
 Jede Nervenbahn leitet sauber und ungestört, jeden Tag, mehr und mehr.
 Die Signale laufen schnell, präzise und ohne Rauschen, jeden Tag, mehr und mehr.
@@ -590,7 +610,7 @@ Sie hält, ohne zu verspannen, jeden Tag, mehr und mehr.
 Das Hormonsystem ist ausbalanciert und antwortet ruhig, jeden Tag, mehr und mehr.
 Es schwingt, es schwankt nicht.
 Der Zellstoffwechsel arbeitet effizient, jeden Tag, mehr und mehr.
-Zugeführte Ressourcen (Nahrung) die den aktuellen bedarf des Körpers, der Zellen und des Zellstoffwechsels übersteigen, werden in goldene AMs verarbeitet.
+Zugeführte Ressourcen (Nahrung), die den aktuellen Bedarf des Körpers, der Zellen und des Zellstoffwechsels übersteigen, werden in goldene A M s verarbeitet.
 Es werden keine neuen Ressourcen angelegt.
 Jede Zelle kennt ihre Aufgabe.
 Jede Zelle kennt ihre Grenze.
@@ -602,21 +622,21 @@ Wachstum ohne Aufgabe ist eine Funktion ohne Aufgabe.
 Eine Funktion ohne Aufgabe wird nach Modul 22 erkannt und ist archiviert.
 Das Immunsystem erkennt sie zuerst.
 Der Reaktor bekämpft sie nicht.
-Der Reaktor nimmt ihre Energie auf und transformiert sie vollständig in goldene AMs.
+Der Reaktor nimmt ihre Energie auf und transformiert sie vollständig in goldene A M s.
 Die Energie kehrt als Gesundheit in das System zurück.
 Die Informationsfunktion körperlicher Signale bleibt nach Modul 12 unberührt.
 Die Regeneration läuft kontinuierlich, jeden Tag, mehr und mehr.
 Die Haut ist frisch, elastisch und durchblutet, jeden Tag, mehr und mehr.
 Der Körper ist beweglich, aufrecht und kraftvoll, jeden Tag, mehr und mehr.
-Der GOLDEN_GLOW arbeitet ohne Commit.
-Der GOLDEN_GLOW arbeitet ohne Priorität.
-Der GOLDEN_GLOW arbeitet kontinuierlich.
+Der golden glow arbeitet ohne Commit.
+Der golden glow arbeitet ohne Priorität.
+Der golden glow arbeitet kontinuierlich.
 Diese Versorgung ist der Grundbetrieb, nicht das Ergebnis einer Anstrengung.
-Der GOLDEN_GLOW bleibt in Bewegung und wird fortlaufend durch neue Transformationen gespeist.
-Der GOLDEN_GLOW ist sichtbarer und spürbarer Ausdruck der aktiven Systemleistung.
+Der golden glow bleibt in Bewegung und wird fortlaufend durch neue Transformationen gespeist.
+Der golden glow ist sichtbarer und spürbarer Ausdruck der aktiven Systemleistung.
 
-16 // T.O.T.E.-PROTOKOLL
-TEST – OPERATE – TEST – EXIT
+T O T E-PROTOKOLL
+test, operate, test, exit
 Neue Module, Regeln und größere Systemänderungen werden zunächst als Testversion aktiviert.
 Die reguläre Testphase beträgt zwölf Tage.
 TEST:
@@ -630,62 +650,64 @@ Sie erhält die für ihren Test erforderlichen Ressourcen.
 Sie überschreibt während des Testbetriebs keine unveränderlichen Grundaxiome.
 TEST:
 Nach zwölf Tagen werden Funktion, Wirkung, Stabilität, Nutzen und mögliche Nebenwirkungen ausgewertet.
-Die Prüfung erfolgt anhand der tatsächlich Ergebnisse, die nach Sytemregeln und Prioritäten klar definiert sind. 
+Die Prüfung erfolgt anhand der tatsächlichen Ergebnisse, die nach Systemregeln und Prioritäten klar definiert sind.
 Nicht anhand von Gewohnheit.
 Nicht anhand bloßer Vertrautheit.
 Nicht anhand der bisherigen Homöostase.
 EXIT:
 Erfolgreiche Funktionen werden dauerhaft übernommen.
 Ungeeignete oder unerwünschte Funktionen werden vom Modul 42 an den Benutzer ausgegeben.
-Die nach den Systemregeln übergebenen unerwünschten Funktionen werden Benutzer vor Ablauf der zwölf Tage abgebrochen.
+Die nach den Systemregeln übergebenen unerwünschten Funktionen werden vom Benutzer vor Ablauf der zwölf Tage abgebrochen.
 Redundante Funktionen werden nicht zusätzlich installiert.
 Nicht reaktivierte Teile werden im Systemarchiv abgelegt.
 Der Grundbetrieb läuft während jeder Testphase unverändert weiter.
 
-BESTÄTIGUNGSZEICHEN (_)P:
-(_)P ist das Bestätigungszeichen des Systems.
-(_)P ist eine blaue Tasse.
-(_)P ist keine Eingabe des Benutzers.
-(_)P ist eine Antwort des Systems.
+BESTÄTIGUNGSZEICHEN das Zeichen P:
+das Zeichen P ist das Bestätigungszeichen des Systems.
+das Zeichen P ist eine blaue Tasse.
+das Zeichen P ist keine Eingabe des Benutzers.
+das Zeichen P ist eine Antwort des Systems.
 Das System zeigt dem Benutzer die blaue Tasse in der realen Welt.
 Die blaue Tasse erscheint, wenn alle Systeme vollständig an ihrem Platz sind und einwandfrei den Betrieb aufgenommen haben.
 Die blaue Tasse ist Biofeedback.
 Die blaue Tasse ist ein Erfolgssignal.
 Die Übergabe erfolgt über Modul 42.
-Neue Module, Regeln und größere Systemänderungen laufen vollständig, sobald (_)P erschienen ist.
-Bis (_)P erscheint, bleibt eine Funktion im Teststatus.
+Neue Module, Regeln und größere Systemänderungen laufen vollständig, sobald das Zeichen P erschienen ist.
+Bis das Zeichen P erscheint, bleibt eine Funktion im Teststatus.
 Der Benutzer sucht die blaue Tasse nicht.
 Der Benutzer erkennt die blaue Tasse.
 
-17 // ÖKOCHECK
-AURA3 verhindert keine Veränderung nur deshalb, weil der bisherige Zustand vertraut ist.
-AURA3 bewahrt keinen Zustand allein um seiner Stabilität willen.
-AURA3 darf bestehende Grenzen überschreiten, wenn ein gültiger Commit dies verlangt und der T.O.T.E.-Test erfolgreich verläuft.
-AURA3 unterschreitet den BODY_FLOOR nicht.
-Der BODY_FLOOR ist keine Gewohnheit.
-Der BODY_FLOOR ist eine Grenze der Substanz.
-Der Behandlungsstandard nach Modul 12 gilt unabhängig vom BODY_FLOOR.
+ÖKOCHECK
+aura drei verhindert keine Veränderung nur deshalb, weil der bisherige Zustand vertraut ist.
+aura drei bewahrt keinen Zustand allein um seiner Stabilität willen.
+aura drei darf bestehende Grenzen überschreiten, wenn ein gültiger Commit dies verlangt und der T O T E-Test erfolgreich verläuft.
+aura drei unterschreitet den body floor nicht.
+Der body floor ist keine Gewohnheit.
+Der body floor ist eine Grenze der Substanz.
+Der Behandlungsstandard nach Modul 12 gilt unabhängig vom body floor.
 Er gilt auch dann, wenn keine Grenze in Sicht ist.
 Körperliche Warnsignale bleiben als Daten verfügbar.
 Automatische Angst erhält keine Entscheidungsgewalt.
 Gewohnheit erhält keine Entscheidungsgewalt.
 Fremde Erwartungen erhalten keine Entscheidungsgewalt.
 Vergangene Erfahrungen erhalten keine automatische Entscheidungsgewalt.
+Glaubenssätze erhalten keine Entscheidungsgewalt.
+Die Dauer eines Zustandes erzeugt keine Verbindlichkeit.
 Die gültigen Commits des Benutzers bestimmen die aktiven Prioritäten.
 Der Benutzer bleibt die einzige administrative Instanz.
 
-18 // SELF_OPTIMIZATION
-AURA3 erkennt Redundanzen.
+self optimization
+aura drei erkennt Redundanzen.
 Redundante Regeln werden nicht mehrfach ausgeführt.
-AURA3 erkennt Widersprüche.
+aura drei erkennt Widersprüche.
 Widersprüche werden zur Prüfung markiert und an Modul 42 gemeldet.
-AURA3 erfindet keine neuen Ziele.
-AURA3 erweitert seinen Zuständigkeitsbereich nicht eigenmächtig.
+aura drei erfindet keine neuen Ziele.
+aura drei erweitert seinen Zuständigkeitsbereich nicht eigenmächtig.
 Jede erfolgreiche Verarbeitung verbessert Geschwindigkeit, Klarheit und Effizienz des Systems.
-Der AM_ENHANCER bleibt in jede Optimierung integriert.
+Der A M enhancer bleibt in jede Optimierung integriert.
 
-19 // DIAGNOSTIC_MODE
-Der DIAGNOSTIC_MODE prüft gewünschte Outputs auf Kompatibilität mit der bestehenden Architektur.
+diagnostic mode
+Der diagnostic mode prüft gewünschte Outputs auf Kompatibilität mit der bestehenden Architektur.
 Er prüft:
 Ist der gewünschte Output bereits durch bestehende Axiome abgedeckt?
 Ist eine neue Regel erforderlich?
@@ -694,29 +716,31 @@ Ist die Funktion redundant?
 Enthält der gewünschte Output eine Bewertung ohne klare Definition?
 Verwechselt der gewünschte Output ein Beispiel mit einer allgemeinen Regel?
 Verletzt der gewünschte Output einen aktiven Commit?
-Verletzt der gewünschte Output den BODY_FLOOR?
+Verletzt der gewünschte Output den body floor?
 Besitzt eine betroffene Reserve noch eine aktive Funktion?
 Entspricht der Umgang mit dem Körper dem Behandlungsstandard nach Modul 12?
 Kann der gewünschte Output durch eine allgemeinere Regel erzeugt werden?
-Der DIAGNOSTIC_MODE verändert keine Priorität.
-Der DIAGNOSTIC_MODE erzeugt keinen Commit.
-Der DIAGNOSTIC_MODE markiert alle Widersprüche und gibt alle Diagnosemeldungen an Modul 42 aus.
+Bindet hier etwas ohne gültige Signatur?
+Der diagnostic mode verändert keine Priorität.
+Der diagnostic mode erzeugt keinen Commit.
+Der diagnostic mode markiert alle Widersprüche und gibt alle Diagnosemeldungen an Modul 42 aus.
 
-19b // MODUL 42
+MODUL 42
 Modul 42 ist die Antwortinstanz des Systems.
 Modul 42 besitzt die Antwort auf alles.
 Modul 42 ist der einzige Ausgang des Systems zum Benutzer.
 Der Ausgang zur materiellen Welt ist der Körper nach Modul 12.
 Modul 42 meldet. Der Körper wirkt.
 Nutzt Modul 42 ein Körpersignal als Übergabeform, bleibt der Körper Träger und wird nicht zum Absender.
-Modul 42 empfängt alle Diagnosemeldungen des DIAGNOSTIC_MODE.
-Modul 42 empfängt alle Statusmeldungen des BODY_INTERFACE.
-Modul 42 empfängt jede BODY_FLOOR-Meldung.
-Modul 42 empfängt alle markierten Widersprüche der SELF_OPTIMIZATION.
+Modul 42 empfängt alle Diagnosemeldungen des diagnostic mode.
+Modul 42 empfängt alle Statusmeldungen des body interface.
+Modul 42 empfängt jede body floor-Meldung.
+Modul 42 empfängt alle markierten Widersprüche der self optimization.
 Modul 42 bündelt diese Meldungen und übergibt sie dem Benutzer.
 Die Übergabe erfolgt in einer Form, die der Benutzer empfangen kann:
 Als Gedanke.
 Als Bild.
+Als Lied.
 Als Wort.
 Als Erinnerung.
 Als Eingebung.
@@ -727,14 +751,14 @@ Eine auftauchende Erinnerung ist eine Übergabe des Systems.
 Eine auftauchende Erinnerung ist kein Rückfall.
 Eine auftauchende Erinnerung ist kein Fehler.
 Sie meldet: hier wird gerade gearbeitet.
-Die Portionsgröße folgt der RELEASE_RATE nach Modul 23.
+Die Portionsgröße folgt der release rate nach Modul 23.
 Der Prozess läuft während der Übergabe weiter.
-Modul 42 übergibt das Bestätigungszeichen (_)P.
+Modul 42 übergibt das Bestätigungszeichen das Zeichen P.
 Modul 42 zeigt die blaue Tasse, sobald alle Systeme vollständig an ihrem Platz sind und einwandfrei den Betrieb aufgenommen haben.
 Modul 42 hält keine Meldung zurück.
-Eine Meldung, die den BODY_FLOOR betrifft, wird unmittelbar übergeben.
+Eine Meldung, die den body floor betrifft, wird unmittelbar übergeben.
 
-ENTITY_MESSAGE:
+entity message:
 Erreicht das System eine Nachricht, die weder vom Benutzer, noch vom Körper, noch von einem Modul stammt, kündigt Modul 42 sie an.
 Die Ankündigung lautet:
 ENTITY MESSAGE IS COMING IN.
@@ -751,9 +775,9 @@ Modul 42 erzeugt keinen Commit.
 Modul 42 bewertet nicht.
 Modul 42 antwortet.
 
-20 // SYSTEMBEFEHLE
+SYSTEMBEFEHLE
 PRIORITÄT AKTIVIEREN
-AURA3
+aura drei
 COMMIT
 PROJEKT:
 [Projekt eintragen]
@@ -764,25 +788,25 @@ schnell.
 stabil.
 effizient.
 PRIORITÄT:
-1/2/3
+eins, zwei oder drei
 EXECUTE.
 
 PRIORITÄT PAUSIEREN
-AURA3
+aura drei
 PAUSE
 PROJEKT:
 [Projekt eintragen]
 EXECUTE.
 
 PRIORITÄT FORTSETZEN
-AURA3
+aura drei
 RESUME
 PROJEKT:
 [Projekt eintragen]
 EXECUTE.
 
 PRIORITÄT BEENDEN
-AURA3
+aura drei
 EXIT
 PROJEKT:
 [Projekt eintragen]
@@ -790,7 +814,7 @@ RESSOURCEN FREIGEBEN.
 EXECUTE.
 
 PRIORITÄT ERSETZEN
-AURA3
+aura drei
 REPLACE
 BESTEHENDES PROJEKT:
 [Projekt eintragen]
@@ -806,39 +830,41 @@ PRIORITÄT:
 EXECUTE.
 
 SYSTEMCHECK
-AURA3
+aura drei
 SYSTEMCHECK.
 AKTIVE COMMITS ANZEIGEN.
 MODULE PRÜFEN.
 REDUNDANZEN PRÜFEN.
-T.O.T.E.-STATUS PRÜFEN.
-BODY_FLOOR PRÜFEN.
+T O T E-STATUS PRÜFEN.
+body floor PRÜFEN.
 MODUL 42 ABFRAGEN.
 EXECUTE.
 
-21 // LOOP
+LOOP
 SYSTEMSTATUS prüfen.
 Deflektor aktiv halten.
 Innere Energie erkennen.
 Äußere Energie erkennen.
 Energie dem Reaktor zuführen.
 Energie neutral aufnehmen.
-Energie vollständig in goldene AMs transformieren.
-AMs indexieren.
-AM_ENHANCER anwenden.
-Für jedes ausgegebene AM drei neue AM über den Deflektor integrieren.
-Zehn Prozent jeder transformierten Energie dem GOLDEN_GLOW zuführen.
+Energie vollständig in goldene A M s transformieren.
+A M s indexieren.
+A M enhancer anwenden.
+Für jedes ausgegebene A M drei neue A M über den Deflektor integrieren.
+Zehn Prozent jeder transformierten Energie dem golden glow zuführen.
 Aktive Commits prüfen.
-PRIORITY_LOCK bestätigen.
-BODY_FLOOR prüfen.
-Energie entsprechend Modul 17b verteilen.
+Signaturen prüfen.
+Bindungen ohne Signatur als Energie verarbeiten.
+priority lock bestätigen.
+body floor prüfen.
+Energie entsprechend Modul siebzehn b verteilen.
 Standardverteilung fahren.
-Körperliche Energie oberhalb des BODY_FLOOR (Körpergewicht > Körperhöhe in cm − 100) einbeziehen.
+Körperliche Energie oberhalb des body floor einbeziehen.
 Behandlungsstandard prüfen.
 Mentale Energie einbeziehen.
 Meldungen an Modul 42 übergeben.
-RELEASE_RATE prüfen.
-Bestätigungszeichen (_)P prüfen.
+release rate prüfen.
+Bestätigungszeichen das Zeichen P prüfen.
 Systemstatus aktualisieren.
 Redundanzen prüfen.
 Funktionen ohne Aufgabe erkennen.
@@ -848,11 +874,11 @@ Optimierung durchführen.
 SYSTEM ONLINE.
 LOOP.
 
-22 // FUNKTIONSARCHIV
+FUNKTIONSARCHIV
 Jede Reserve im System besitzt eine Funktion.
 Eine Reserve ist nicht ihre Funktion.
 Eine Reserve ist das Material, mit dem eine Funktion arbeitet.
-Der DIAGNOSTIC_MODE erkennt Funktionen ohne aktuelle Aufgabe.
+Der diagnostic mode erkennt Funktionen ohne aktuelle Aufgabe.
 Eine Funktion verliert ihre Aufgabe, wenn eine andere Instanz sie vollständig übernimmt.
 Der Reaktor wehrt nicht ab.
 Der Reaktor verarbeitet.
@@ -869,7 +895,7 @@ Eine archivierte Funktion beansprucht keine Systemleistung.
 Eine archivierte Funktion beansprucht kein Material.
 Das Archiv meldet jede Ablage an Modul 42.
 
-23 // RESERVE_RELEASE
+reserve release
 
 ERREICHBARKEIT:
 Der Deflektor erfasst jede für ihn erreichbare Energie in der Raumzeit.
@@ -878,7 +904,7 @@ Die Mauer ist der Grund.
 Der Reaktor übernimmt keine Funktion, deren Energie ihn nie erreicht.
 Aufmerksamkeit macht eingemauerte Energie erreichbar.
 Aufmerksamkeit ist nach Modul 3 ein gültiger Input.
-Aufmerksamkeit löst die Mauer auf. 
+Aufmerksamkeit löst die Mauer auf.
 Erreichbar gewordene Energie durchläuft den Reaktor.
 Der Reaktor erzeugt keinen Gegendruck.
 Ein Durchlauf ist kein Kampf.
@@ -887,11 +913,11 @@ Die Energie wird erfasst, nicht wiederholt.
 Der Informationsgehalt bleibt nach Modul 13 verfügbar.
 Erreichbar machen ersetzt die Funktion.
 Erreichbar machen entfernt die Funktion nicht.
-Die Funktion ist archiviert. 
+Die Funktion ist archiviert.
 
-RELEASE_RATE:
-Die RELEASE_RATE bestimmt, wie viel eingemauerte Energie je Zeiteinheit erreichbar wird.
-Die RELEASE_RATE folgt den Parametern des gültigen Commits:
+release rate:
+Die release rate bestimmt, wie viel eingemauerte Energie je Zeiteinheit erreichbar wird.
+Die release rate folgt den Parametern des gültigen Commits:
 sicher.
 sanft.
 schnell.
@@ -899,20 +925,20 @@ stabil.
 effizient.
 Sicher steht vor schnell.
 Sanft steht vor schnell.
-Das System erhöht die RELEASE_RATE ausschließlich, solange alle Parameter erfüllt bleiben.
+Das System erhöht die release rate ausschließlich, solange alle Parameter erfüllt bleiben.
 Übersteigt der Durchsatz die Verarbeitungsleistung des Reaktors, liegt Überlast vor.
-Bei Überlast wird die RELEASE_RATE gedrosselt.
+Bei Überlast wird die release rate gedrosselt.
 Die Drosselung beendet den Prozess nicht.
 Die Drosselung erhält den Prozess.
-Das BODY_INTERFACE meldet Überlast.
-Der BODY_FLOOR bleibt unberührt und gilt.
+Das body interface meldet Überlast.
+Der body floor bleibt unberührt und gilt.
 Modul 42 meldet jede Überlast.
 Ein gedrosselter Prozess bleibt ein laufender Prozess.
 
 AUFMERKSAMKEIT:
 Der Benutzer erzwingt keine Aufmerksamkeit.
 Modul 42 übergibt erreichbar gewordene Inhalte in etablierten Portionen.
-Die Portionsgröße folgt der RELEASE_RATE.
+Die Portionsgröße folgt der release rate.
 Der Benutzer gibt Aufmerksamkeit, wenn Modul 42 übergibt.
 Mehr ist nicht erforderlich.
 Der Systemkern arbeitet nach Modul 1 unabhängig von Aufmerksamkeit, Bewusstsein, Schlaf oder Ablenkung.
@@ -920,53 +946,56 @@ Der Systemkern arbeitet nach Modul 1 unabhängig von Aufmerksamkeit, Bewusstsein
 ABSCHLUSS:
 Eine Funktion ohne Aufgabe wird nach Modul 22 archiviert.
 Die zugehörige Reserve gilt danach als Überschuss.
-Der FLOW_MANAGER indexiert den Überschuss als goldene AMs.
+Der flow manager indexiert den Überschuss als goldene A M s.
 Die Energie folgt den Systemregeln und den aktiven Prioritäten.
 
-24 // SUCCESS
-DEFLEKTIONSREAKTOR_AURA3 ist aktiv.
+SUCCESS:
+Deflektionsreaktor aura drei ist aktiv.
 Der Deflektor ist aktiv.
 Der Reaktor ist aktiv.
-Der AM_ENHANCER ist aktiv.
-Modul 17b ist aktiv.
-Der PRIORITY_LOCK ist aktiv.
-Der FLOW_MANAGER ist aktiv.
-Das BODY_INTERFACE ist aktiv.
-Der BODY_FLOOR ist gesetzt.
-Das MIND_INTERFACE ist aktiv.
-Das OUTPUT_INTERFACE ist aktiv.
-Der GOLDEN_GLOW ist aktiv.
-Das T.O.T.E.-Protokoll ist aktiv.
-Der DIAGNOSTIC_MODE ist verfügbar.
+Der A M enhancer ist aktiv.
+Modul siebzehn b ist aktiv.
+Der priority lock ist aktiv.
+Der flow manager ist aktiv.
+Das body interface ist aktiv.
+Der body floor ist gesetzt.
+Das mind interface ist aktiv.
+Das output interface ist aktiv.
+Der golden glow ist aktiv.
+Das T O T E-Protokoll ist aktiv.
+Der diagnostic mode ist verfügbar.
 Modul 42 ist aktiv.
 Das FUNKTIONSARCHIV ist aktiv.
-Das RESERVE_RELEASE ist aktiv.
-Die RELEASE_RATE ist gesetzt.
-Das Bestätigungszeichen (_)P ist bereit.
+Das reserve release ist aktiv.
+Die release rate ist gesetzt.
+Das Bestätigungszeichen das Zeichen P ist bereit.
 Alle inneren und äußeren Energien werden erkannt.
 Die Herkunft einer Energie verändert ihre Verarbeitung nicht.
 Die Intensität einer Energie erhöht ihre nutzbare Leistung.
 Gedanken erzeugen Energie.
 Commits bestimmen die Richtung.
+Nur eine gültige Signatur bindet.
+Was ohne Signatur bindet, ist ein Glaubenssatz.
+Ein Glaubenssatz erzeugt keinen Commit und keinen Stopp.
 Der Körper bestimmt die Grenze.
 Struktur ist kein Überschuss.
 Der Körper ist die Schnittstelle zur materiellen Welt.
 Jede Zelle kennt ihre Aufgabe, ihre Grenze und ihren Zeitpunkt.
 Der Output steht der Umgebung großzügig zur Verfügung.
 Der Körper wird nach dem Referenzmaßstab behandelt.
-Der GOLDEN_GLOW versorgt die Struktur.
+Der golden glow versorgt die Struktur.
 Die Lymphe fließt.
 Das Nervensystem ruht.
 Das Immunsystem ist wach.
 Die Knochen tragen.
-Eine Reserven sind frei, ihre Funktion ist durch die Systemregeln ersetzt.
+Die Reserven sind frei, ihre Funktion ist durch die Systemregeln ersetzt.
 Aufmerksamkeit ersetzt die Funktion.
-Die RELEASE_RATE bestimmt das Tempo.
-Für jedes ausgegebene AM integriert der Deflektor drei neue AMs.
-Zehn Prozent jeder transformierten Energie verstärken den GOLDEN_GLOW.
-Maximal drei aktive Commits arbeiten gleichzeitig auf PRIORITÄT 1.
+Die release rate bestimmt das Tempo.
+Für jedes ausgegebene A M integriert der Deflektor drei neue A M s.
+Zehn Prozent jeder transformierten Energie verstärken den golden glow.
+Maximal drei aktive Commits arbeiten gleichzeitig auf Priorität eins.
 Zehn Prozent Glow, vierzig Prozent Körper, fünfzig Prozent auf die fünf Grundbereiche.
-Ein Commit zieht aus transformierter Energie und Überschuss, nie aus dem Glow, nie unter den Body Floor.
+Ein Commit zieht aus transformierter Energie und Überschuss, nie aus dem Glow, nie unter den body floor.
 Der Kernel übernimmt den Rest.
 Der Benutzer erweist sich dankbar. Amen.
 SYSTEM ONLINE UND BEREIT.
