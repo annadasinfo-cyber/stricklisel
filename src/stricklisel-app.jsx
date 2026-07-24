@@ -1405,6 +1405,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
   const [logFlags, setLogFlags] = useState([]);   // stempel PRO TAG — wandert mit in den eintrag
   const [gewicht, setGewicht] = useState("");   // pro tag, wandert mit in den eintrag
   const [schmerz, setSchmerz] = useState("");   // 0 = gar nicht … 10 = am schlimmsten
+  const [mood, setMood] = useState("");        // 1 = im eimer … 5 = on fire
   const flagKlick = (k) => { setLogFlags((f) => f.includes(k) ? f.filter((x) => x !== k) : [...f, k]); setDirty(true); };
 
   const w = zaehleWoerter(text);
@@ -1425,7 +1426,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
     // tagText MUSS mit drin stehen: fehlte er, lief der autosave mit einem
     // veralteten tag-stand weiter und hat angeklickte//geänderte hashtags
     // wieder überschrieben ("nimmt nicht an", "änderung weg").
-  }, [text, tagText, gewicht, schmerz, logFlags, dirty]);
+  }, [text, tagText, gewicht, schmerz, mood, logFlags, dirty]);
 
   async function laden() {
     try {
@@ -1435,11 +1436,12 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
   }
   async function ladeTag(dt) {
     try {
-      const d2 = await dbGet("logfiles-tag-" + dt, `${SUPABASE_URL}/rest/v1/logfiles?select=text,tags,gewicht,schmerz,flags&datum=eq.${dt}`);
+      const d2 = await dbGet("logfiles-tag-" + dt, `${SUPABASE_URL}/rest/v1/logfiles?select=text,tags,gewicht,schmerz,mood,flags&datum=eq.${dt}`);
       setText(d2?.[0]?.text || "");
       setTagText(tagsSchreiben(d2?.[0]?.tags));
       setGewicht(d2?.[0]?.gewicht ?? "");
       setSchmerz(d2?.[0]?.schmerz ?? "");
+      setMood(d2?.[0]?.mood ?? "");
       setLogFlags(Array.isArray(d2?.[0]?.flags) ? d2[0].flags : []);
       setDirty(false);
       setMsg(d2?.[0] ? { t: "eintrag geladen", c: "" } : { t: "neuer eintrag", c: "" });
@@ -1451,6 +1453,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
       { user_id: getUserId(), datum, text, woerter: w, tags: tagsLesen(tagText),
         gewicht: gewicht === "" ? null : Number(gewicht),
         schmerz: schmerz === "" ? null : Number(schmerz),
+        mood: mood === "" ? null : Number(mood),
         flags: logFlags,
         updated_at: new Date().toISOString() },
       { prefer: "resolution=merge-duplicates,return=minimal" });
@@ -1563,8 +1566,8 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
                 title="tageseintrag als klartext — schwebendes fenster">▤ klartext</button>
         <button className="btn txtbtn klein" disabled={!text.trim()} onClick={() => text.trim() && zurKonsole(text)}
                 title="tageseintrag an die konsole — thorsten liest vor">▶</button>
-        <div className="logflags">
-          {[["skripte", "skripte"], ["ue2", "Ü2"], ["ue1", "Ü1"], ["htsm", "htsm_ultra"]].map(([k, l]) => (
+        <div className="logflags wf">
+          {[["skripte", "s_t"], ["ue2", "Ü2"], ["ue1", "Ü1"], ["htsm", "hts_u"]].map(([k, l]) => (
             <button key={k} type="button" className={"logflag" + (logFlags.includes(k) ? " on" : "")} onClick={() => flagKlick(k)}>{l}</button>
           ))}
         </div>
@@ -1580,6 +1583,17 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
                   onChange={(e) => { setSchmerz(e.target.value); setDirty(true); }}>
             <option value="">–</option>
             {Array.from({ length: 11 }, (_, i) => <option key={i} value={i}>{i}</option>)}
+          </select>
+        </label>
+
+        <label className="logfeld" title="mood · 1 = im eimer, 5 = on fire">
+          <span>mood</span>
+          <select className="ti minifeld moodfeld" value={mood}
+                  onChange={(e) => { setMood(e.target.value); setDirty(true); }}>
+            <option value="">–</option>
+            {[[1, "🫠 im eimer"], [2, "😞 flau"], [3, "😐 mähhh"], [4, "🙂 gut"], [5, "🐇 on fire"]].map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
           </select>
         </label>
 
@@ -2811,7 +2825,7 @@ function VerlaufKurve() {
     (async () => {
       try {
         const d = await dbGet("logfiles-verlauf",
-          `${SUPABASE_URL}/rest/v1/logfiles?select=datum,gewicht,schmerz&order=datum.asc&limit=400`);
+          `${SUPABASE_URL}/rest/v1/logfiles?select=datum,gewicht,schmerz,mood&order=datum.asc&limit=400`);
         setReihen(Array.isArray(d) ? d : []);
       } catch {
         setFehler("die spalten gewicht/schmerz gibt es noch nicht — sql fehlt noch");
@@ -2820,9 +2834,10 @@ function VerlaufKurve() {
     })();
   }, []);
 
-  const daten = (reihen || []).filter((r) => r.gewicht != null || r.schmerz != null);
+  const daten = (reihen || []).filter((r) => r.gewicht != null || r.schmerz != null || r.mood != null);
   const gw = daten.filter((r) => r.gewicht != null);
   const sm = daten.filter((r) => r.schmerz != null);
+  const md = daten.filter((r) => r.mood != null);
 
   const W = 1000, L = 52, R = 52, T = 20, B = 250;
   const n = daten.length;
@@ -2835,6 +2850,7 @@ function VerlaufKurve() {
   const lo = gmin - luft, hi = gmax + luft;
   const Yg = (v) => B - ((v - lo) / (hi - lo || 1)) * (B - T);
   const Ys = (v) => B - (v / 10) * (B - T);
+  const Ym = (v) => Ys(v * 2);   // mood 1–5 auf dieselbe rechte skala
 
   const linie = (arr, feld, Y) => arr
     .map((r) => X(daten.indexOf(r)) + "," + Y(Number(r[feld])))
@@ -2862,9 +2878,15 @@ function VerlaufKurve() {
           <text x={L - 8} y={Yg(gmax) + 4} className="vskala">{gmax}</text>
           <text x={L - 8} y={Yg(gmin) + 4} className="vskala">{gmin}</text>
 
+          {md.length > 1 && <polyline className="vmood" points={linie(md, "mood", Ym)} />}
           {sm.length > 1 && <polyline className="vschmerz" points={linie(sm, "schmerz", Ys)} />}
           {gw.length > 1 && <polyline className="vgewicht" points={linie(gw, "gewicht", Yg)} />}
 
+          {md.map((r) => (
+            <circle key={"m" + r.datum} className="vpunkt m" cx={X(daten.indexOf(r))} cy={Ym(Number(r.mood))} r="3">
+              <title>{r.datum} · mood {r.mood}</title>
+            </circle>
+          ))}
           {sm.map((r) => (
             <circle key={"s" + r.datum} className="vpunkt s" cx={X(daten.indexOf(r))} cy={Ys(Number(r.schmerz))} r="3">
               <title>{r.datum} · schmerz {r.schmerz}</title>
@@ -2880,8 +2902,9 @@ function VerlaufKurve() {
           <text x={W - R} y={278} className="vdatum" textAnchor="end">{kurz(daten[n - 1].datum)}</text>
         </svg>
         <div className="vlegende">
-          <span className="vlg">▬ gewicht (kg, linke skala)</span>
-          <span className="vls">▬ schmerz (0–10, rechte skala)</span>
+          <span className="vlg">▬ gewicht</span>
+          <span className="vls">▬ schmerz</span>
+          <span className="vlm">▬ mood</span>
         </div>
       </>)}
     </div>
@@ -4335,6 +4358,8 @@ function Styles() {
     font-size:10.5px;letter-spacing:.08em;color:var(--dim)}
   .logfeld .minifeld{width:78px;padding:9px 10px;font-size:12px}
   .logfeld select.minifeld{width:64px;cursor:pointer;color:var(--green)}
+  .logfeld select.moodfeld{width:132px}
+  .logflags.wf .logflag{font-size:11px;padding:7px 8px;letter-spacing:.02em}
   .projektzaehler{font-family:var(--term);font-size:11px;letter-spacing:.06em;color:var(--green-mid);
     border:1px solid var(--line);border-radius:4px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
   .logflag{font-family:var(--mono);font-size:12px;letter-spacing:.03em;background:transparent;
@@ -4604,8 +4629,10 @@ function Styles() {
   .vpunkt.g{fill:var(--green)}
   .vpunkt.s{fill:var(--amber)}
   .vdatum{fill:var(--dim);font-family:var(--term);font-size:11px}
-  .vlegende{display:flex;gap:20px;flex-wrap:wrap;margin-top:6px;font-family:var(--term);font-size:10.5px;letter-spacing:.06em}
-  .vlg{color:var(--green)} .vls{color:var(--amber)}
+  .vlegende{display:flex;gap:20px;flex-wrap:wrap;margin-top:6px;margin-bottom:34px;font-family:var(--term);font-size:10.5px;letter-spacing:.06em}
+  .vlg{color:var(--green)} .vls{color:var(--amber)} .vlm{color:#e88fc0}
+  .vmood{fill:none;stroke:#e88fc0;stroke-width:2;stroke-linejoin:round;stroke-dasharray:2 4}
+  .vpunkt.m{fill:#e88fc0}
   .vleer{font-family:var(--mono);font-size:12.5px;color:var(--dim);margin-top:10px;line-height:1.6}
   .ksvg{width:100%;display:block}
   .kberg{fill:none;stroke:var(--green-dim);stroke-width:1;opacity:.5}
