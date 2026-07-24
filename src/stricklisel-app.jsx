@@ -1155,6 +1155,160 @@ function Abteilung17b({ say }) {
 }
 
 // ============================================================
+// SK_ULTRA · projektseite. zwei boxen nebeneinander:
+// links die gegenzeichnung DES PROJEKTS (name, prämisse, signatur) —
+// das projekt stimmt der zusammenarbeit zu, ohne administrative rechte.
+// rechts DEIN commit im format des prio-datenblatts, aber ohne prio-platz.
+// die signatur verortet das projekt (siehe remote viewing): es lässt sich wiederfinden.
+// ============================================================
+function SkUltra() {
+  const [id, setId] = useState(null);
+  const [pName, setPName] = useState("");
+  const [pPraem, setPPraem] = useState("");
+  const [pSig, setPSig] = useState("");
+  const [pDatum, setPDatum] = useState("");
+  const [cProjekt, setCProjekt] = useState("");
+  const [cUmfang, setCUmfang] = useState("");
+  const [cParam, setCParam] = useState([...PARAM_STD]);
+  const [cStart, setCStart] = useState("");
+  const [cZiel, setCZiel] = useState("");
+  const [cSig, setCSig] = useState("");
+  const [cDatum, setCDatum] = useState("");
+  const [msg, setMsg] = useState({ t: "bereit", c: "" });
+  const [dirty, setDirty] = useState(false);
+  const tRef = useRef(null);
+  const idRef = useRef(null);
+  useEffect(() => { idRef.current = id; }, [id]);
+
+  useEffect(() => { laden(); }, []);
+  useEffect(() => {
+    if (!dirty) return;
+    if (tRef.current) clearTimeout(tRef.current);
+    tRef.current = setTimeout(() => speichern(true), 2000);
+    return () => clearTimeout(tRef.current);
+  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, dirty]);
+
+  const aend = (fn) => { fn(); setDirty(true); };
+
+  async function laden() {
+    try {
+      const d = await dbGet("skultra", `${SUPABASE_URL}/rest/v1/skultra?select=*&limit=1`);
+      const r = Array.isArray(d) ? d[0] : null;
+      if (!r) return;
+      setId(r.id);
+      setPName(r.p_name || ""); setPPraem(r.p_praemisse || "");
+      setPSig(r.p_sig || ""); setPDatum(r.p_datum || "");
+      setCProjekt(r.c_projekt || ""); setCUmfang(r.c_umfang || "");
+      setCParam(Array.isArray(r.c_param) ? r.c_param : [...PARAM_STD]);
+      setCStart(r.c_start || ""); setCZiel(r.c_ziel || "");
+      setCSig(r.c_sig || ""); setCDatum(r.c_datum || "");
+    } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
+  }
+
+  async function speichern(still) {
+    const cur = idRef.current;
+    const eigene = cur || neueId();
+    const body = {
+      ...(cur ? {} : { id: eigene }),
+      user_id: getUserId(),
+      p_name: pName, p_praemisse: pPraem, p_sig: pSig, p_datum: pDatum,
+      c_projekt: cProjekt, c_umfang: cUmfang, c_param: cParam,
+      c_start: cStart || null, c_ziel: cZiel || null, c_sig: cSig, c_datum: cDatum,
+      updated_at: new Date().toISOString(),
+    };
+    if (!still) setMsg({ t: "speichere …", c: "work" });
+    const { ok } = cur
+      ? await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/skultra?id=eq.${cur}`, body)
+      : await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/skultra`, body);
+    if (!cur) setId(eigene);
+    setDirty(false);
+    if (!still) setMsg({ t: ok ? "gespeichert" : "offline gespeichert — sync folgt", c: ok ? "ok" : "work" });
+  }
+
+  const heute = () => new Date().toLocaleDateString("de-DE");
+  const gegenzeichnen = () => aend(() => { setPSig(signaturErzeugen()); setPDatum(heute()); });
+  const execute = () => {
+    if (!cProjekt.trim()) { setMsg({ t: "» kein projekt eingetragen", c: "err" }); return; }
+    if (!cSig) { setMsg({ t: "» ohne signatur kein commit", c: "err" }); return; }
+    aend(() => setCDatum(heute()));
+    setMsg({ t: "» COMMAND ACCEPTED · commit aktiv", c: "ok" });
+  };
+
+  return (
+    <>
+      <div className="grouphead">SK_ULTRA<span className="rule" /></div>
+
+      <div className="skgrid">
+        <Panel id="sk-projekt" title="DAS PROJEKT" sub="gegenzeichnung · ohne administrative rechte">
+          <div className="field">
+            <label className="cap">name</label>
+            <input className="ti" value={pName} onChange={(e) => aend(() => setPName(e.target.value))}
+              placeholder="arbeitstitel des projekts" />
+          </div>
+          <div className="field" style={{ marginTop: 14 }}>
+            <label className="cap">prämisse</label>
+            <textarea className="ta" value={pPraem} onChange={(e) => aend(() => setPPraem(e.target.value))}
+              placeholder="worum es geht — ein satz" style={{ minHeight: 90 }} />
+          </div>
+          <div className="field" style={{ marginTop: 14 }}>
+            <label className="cap">signatur des projekts</label>
+            <div className="rezrow">
+              <input className="ti sig" value={pSig} readOnly placeholder="noch nicht gegengezeichnet" />
+              <button className="btn" onClick={gegenzeichnen}>⟳ gegenzeichnen</button>
+            </div>
+            {pDatum && <p className="hint">gegengezeichnet am {pDatum}</p>}
+            <p className="hint">das projekt stimmt der zusammenarbeit zu. es erhält keine administrativen rechte.</p>
+          </div>
+        </Panel>
+
+        <Panel id="sk-commit" title="AURA3_COMMIT" sub="dein commit · belegt keinen prio-platz">
+          <div className="field">
+            <label className="cap">projekt</label>
+            <input className="ti" value={cProjekt} onChange={(e) => aend(() => setCProjekt(e.target.value))}
+              placeholder="roman fertigstellen." />
+          </div>
+          <div className="field" style={{ marginTop: 14 }}>
+            <label className="cap">umfang</label>
+            <input className="ti" value={cUmfang} onChange={(e) => aend(() => setCUmfang(e.target.value))}
+              placeholder="szene 1 bis 63, je mindestens 1600 wörter." />
+          </div>
+          <div className="field" style={{ marginTop: 14 }}>
+            <label className="cap">parameter</label>
+            <div className="parambox">
+              {PARAM_STD.map((x) => (
+                <label key={x} className={"parambtn" + (cParam.includes(x) ? " on" : "")}
+                  onClick={() => aend(() => setCParam(cParam.includes(x) ? cParam.filter((y) => y !== x) : [...cParam, x]))}>
+                  {cParam.includes(x) ? "▪" : "▫"} {x}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="row" style={{ marginTop: 14 }}>
+            <div className="field"><label className="cap">start</label>
+              <input className="ti" type="date" value={cStart} onChange={(e) => aend(() => setCStart(e.target.value))} /></div>
+            <div className="field"><label className="cap">ziel</label>
+              <input className="ti" type="date" value={cZiel} onChange={(e) => aend(() => setCZiel(e.target.value))} /></div>
+          </div>
+          <div className="field" style={{ marginTop: 14 }}>
+            <label className="cap">commit-signatur</label>
+            <div className="rezrow">
+              <input className="ti sig" value={cSig} readOnly placeholder="noch keine signatur" />
+              <button className="btn" onClick={() => aend(() => setCSig(signaturErzeugen()))}>⟳ signatur erzeugen</button>
+            </div>
+            {cDatum && <p className="hint">execute am {cDatum}</p>}
+            <p className="hint">was ohne signatur bindet, ist ein glaubenssatz.</p>
+          </div>
+          <div className="actions" style={{ marginTop: 16 }}>
+            <button className="btn primary big" onClick={execute}>⏺ commit · execute</button>
+            <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
+          </div>
+        </Panel>
+      </div>
+    </>
+  );
+}
+
+// ============================================================
 // LOG-FILES · Operator-Logbuch
 // ============================================================
 const ZIEL_WOERTER = 750;
@@ -1567,7 +1721,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
         <button className="btn txtbtn klein" disabled={!text.trim()} onClick={() => text.trim() && zurKonsole(text)}
                 title="tageseintrag an die konsole — thorsten liest vor">▶</button>
         <div className="logflags wf">
-          {[["skripte", "s_t"], ["ue2", "Ü2"], ["ue1", "Ü1"], ["htsm", "hts_u"]].map(([k, l]) => (
+          {[["skripte", "s_t"], ["ue2", "Ü2"], ["ue1", "Ü1"], ["htsm", "hts_max"]].map(([k, l]) => (
             <button key={k} type="button" className={"logflag" + (logFlags.includes(k) ? " on" : "")} onClick={() => flagKlick(k)}>{l}</button>
           ))}
         </div>
@@ -2031,7 +2185,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
     if (ok) laden();
   }
 
-  // hook in den henkeltassen-schrank (hts_ultra) im denkbrett schicken
+  // hook in den henkeltassen-schrank (hts_max) im denkbrett schicken
   async function htsSenden() {
     const t = hook.trim();
     if (!t) return;
@@ -3216,7 +3370,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     setWendung((w) => (w ? w : wendungen[Math.floor(Math.random() * wendungen.length)]));
   }, [wendungen]);
 
-  // hts_ultra · henkeltassen-schrank — gesendete hooks, zieht wie das orakel (king-konzept)
+  // hts_max · henkeltassen-schrank — gesendete hooks, zieht wie das orakel (king-konzept)
   const [htsListe, setHtsListe] = useState([]); // {id, hook}
   const htsHooks = htsListe.map((h) => h.hook);
   const [htsAktuell, setHtsAktuell] = useState(null);
@@ -3366,8 +3520,8 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
             <span className="radkopf">📟 orakel</span>
             <span className="radtext" key={"o" + spruch}>{zitate.length ? (spruch || "…") : "— leer —"}</span>
           </button>
-          <button className={"rad" + (htsDreht ? " dreht" : "")} onClick={htsDrehen} disabled={!htsHooks.length} title="hts_ultra · henkeltassen-schrank">
-            <span className="radkopf">☕ hts_ultra</span>
+          <button className={"rad" + (htsDreht ? " dreht" : "")} onClick={htsDrehen} disabled={!htsHooks.length} title="hts_max · henkeltassen-schrank">
+            <span className="radkopf">☕ hts_max</span>
             <span className="radtext" key={"h" + htsAktuell}>{htsHooks.length ? (htsAktuell || "…") : "— leer —"}</span>
           </button>
         </div>
@@ -3531,7 +3685,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
           wert={neuerSpruch} setWert={setNeuerSpruch} onAdd={spruchAdd} onWeg={spruchWeg} onEdit={spruchEdit}
           platzhalter="neuer impuls / spruch …" />
 
-        <VerwaltKarte titel="hts_ultra · henkeltassen-schrank" leer="noch keine hooks — schick welche per ☕ rein oder trag hier ein."
+        <VerwaltKarte titel="hts_max · henkeltassen-schrank" leer="noch keine hooks — schick welche per ☕ rein oder trag hier ein."
           liste={htsListe} label={(h) => h.hook} keyOf={(h) => h.id}
           wert={neuerHook} setWert={setNeuerHook} onAdd={htsAdd} onWeg={htsWeg} onEdit={htsEdit}
           platzhalter="neuer hook …" hinweis="hooks aus den skripten landen automatisch hier. antippen zum kürzen, ✕ zum entfernen." />
@@ -3909,6 +4063,7 @@ export default function StricklieselApp() {
           <button aria-pressed={tab === "m42"} onClick={() => setTab("m42")}>m42</button>
           <button aria-pressed={tab === "think"} onClick={() => setTab("think")}>denkbrett</button>
           <button aria-pressed={tab === "log"} onClick={() => setTab("log")}>log-files</button>
+          <button aria-pressed={tab === "skultra"} onClick={() => setTab("skultra")}>sk_ultra</button>
           <button aria-pressed={tab === "skripte"} onClick={() => setTab("skripte")}>skripte</button>
           <button aria-pressed={tab === "things"} onClick={() => setTab("things")}>things</button>
         </div>
@@ -3918,6 +4073,7 @@ export default function StricklieselApp() {
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "m42" && <M42 />}
         {tab === "log" && <LogFiles zeigeAbschreib={zeigeAbschreib} zurKonsole={zurKonsole} />}
+        {tab === "skultra" && <SkUltra />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} zeigeAbschreib={zeigeAbschreib} kette={cfg.ketteText} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} sprungPerson={sprungPerson} setSprungPerson={setSprungPerson} />}
         {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuM42={() => setTab("m42")} zurPerson={(id) => { setSprungPerson(id); setTab("things"); }} />}
@@ -4352,6 +4508,8 @@ function Styles() {
     background:linear-gradient(135deg,transparent 46%,var(--green-mid) 46%,var(--green-mid) 56%,transparent 56%,transparent 68%,var(--green-mid) 68%,var(--green-mid) 78%,transparent 78%);opacity:.55}
   .schweberesize:hover{opacity:1}
   .logextra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+  .skgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  @media(max-width:820px){.skgrid{grid-template-columns:1fr}}
   .logflags{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .logAs{margin-left:auto}
   .logfeld{display:inline-flex;align-items:center;gap:7px;font-family:var(--term);
