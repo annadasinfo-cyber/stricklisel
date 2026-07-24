@@ -1258,13 +1258,28 @@ const ERMITTLUNG = [
   "Wer oder was versucht den Held zu stoppen?",
   "Was passiert, wenn der Held sein Ziel nicht erreicht?",
 ];
-// dünner beispieltext unter jeder frage. PLATZHALTER — dein bild kam nicht mit an,
-// sag mir die vier zeilen, dann tausch ich sie hier aus.
+// beispiel-antwort als platzhalter im kästchen (verschwindet beim schreiben, wie in den log-files).
 const ERM_BEISPIEL = [
   "z.B. eine junge Bäckerin aus einem verschlafenen Dorf.",
   "z.B. sie will ihren verschwundenen Bruder wiederfinden.",
   "z.B. der Bürgermeister, der das Verschwinden vertuscht.",
   "z.B. der Bruder bleibt verschollen — das Dorf schweigt weiter.",
+];
+
+// zweites akkordeon: die 4 archetypen (opfer · suchender · krieger · märtyrer).
+// die prompt-texte stehen als platzhalter im kästchen und verschwinden beim schreiben.
+const ARCHETYP = [
+  "Wodurch wird der Held zum Opfer in Teil 1?",
+  "Was macht den Held zu einem Suchenden in Akt 2?",
+  "Wodurch wird der Held zum Krieger in Akt 2?",
+  "Wodurch wird der Held zum Märtyrer in Akt 3?",
+];
+const ARCHETYP_NAME = ["das opfer", "der suchende", "der krieger", "der märtyrer"];
+const ARCHETYP_BEISPIEL = [
+  "Der Held muß seinen alten Standpunkt aufgeben, also opfert er seine gewohnte Lebensweise. Er verlässt seine Komfortzone, weil er von seinem Schicksal oder seinem Nachbarn dazu gezwungen wird. Er macht das wahrlich nicht zu seinem Vergnügen!!!",
+  "Der Held hat sich also grade aus seiner Komfortzone heraus bewegt und sucht sich seinen Weg in der neuen Situation. Ganz vorsichtig und jungfräulich. Er muß den richtigen Weg erst suchen, einiges ausprobieren und durch Versuch und Fehler auf die rechte Spur gelangen.",
+  "Nachdem der Held wie ein Blinder im Dunkeln tappte, wird er nun zum Kämpfer für Recht und Gerechtigkeit. So langsam kennt er alle Regeln in der neuen Welt und erkennt, was Recht und was Unrecht ist. Was muß nun passieren, damit der Held über seinen eigenen Schatten springt? Das will er ja nicht! Er ist ja ein ganz normaler Mensch, darum muß es wirklich entsetzlich sein oder unrecht, damit sich unser Held bewegt. Also: Was gibt ihm neuen Mut? Was ist die Initialzündung? Beschreibe die Situation, die den Held neu durchstarten lässt.",
+  "Am Ende muß der Held bereit sein, sich selbst oder zumindest seine eigenen Ziele aufzugeben. Das ist wirklich wichtig, denn sonst entwickelt sich unser Held nicht zum Helden. Er ist ein Mensch wie du und ich (Identifikation des Lesers), dann muss er zum Helden werden, damit uns das Herz aufgeht! Wie erreichst du das? Was bringt deinen Helden dazu? Hier muss es so richtig emotional werden. Das ist der Grund, warum der Leser dein Buch lesen will! der OMG Moment!!!",
 ];
 
 function SkUltra({ springe }) {
@@ -1281,6 +1296,7 @@ function SkUltra({ springe }) {
   const [cSig, setCSig] = useState("");
   const [cDatum, setCDatum] = useState("");
   const [fragen, setFragen] = useState(["", "", "", ""]);
+  const [arche, setArche] = useState(["", "", "", ""]);   // 4 archetypen-antworten
   const [cWurzel, setCWurzel] = useState("");   // gewähltes matrix-projekt (wurzel-id) für die szenenwand
   const [alle, setAlle] = useState([]);         // alle skripte, für projekt-auswahl + szenenwand
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
@@ -1305,7 +1321,7 @@ function SkUltra({ springe }) {
     if (tRef.current) clearTimeout(tRef.current);
     tRef.current = setTimeout(() => speichern(true), 2000);
     return () => clearTimeout(tRef.current);
-  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, cWurzel, dirty]);
+  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, arche, cWurzel, dirty]);
 
   const aend = (fn) => { fn(); setDirty(true); };
 
@@ -1322,6 +1338,7 @@ function SkUltra({ springe }) {
       setCStart(r.c_start || ""); setCZiel(r.c_ziel || "");
       setCSig(r.c_sig || ""); setCDatum(r.c_datum || "");
       setFragen([r.f1 || "", r.f2 || "", r.f3 || "", r.f4 || ""]);
+      setArche([r.a1 || "", r.a2 || "", r.a3 || "", r.a4 || ""]);
       setCWurzel(r.c_wurzel || "");
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
@@ -1336,6 +1353,7 @@ function SkUltra({ springe }) {
       c_projekt: cProjekt, c_umfang: cUmfang, c_param: cParam,
       c_start: cStart || null, c_ziel: cZiel || null, c_sig: cSig, c_datum: cDatum,
       f1: fragen[0], f2: fragen[1], f3: fragen[2], f4: fragen[3],
+      a1: arche[0], a2: arche[1], a3: arche[2], a4: arche[3],
       c_wurzel: cWurzel || null,
       updated_at: new Date().toISOString(),
     };
@@ -1445,10 +1463,21 @@ function SkUltra({ springe }) {
           <div className="ermfrage" key={i}>
             <div className="ermnr">{i + 1}. von 4 fragen</div>
             <div className="ermtext">{f}</div>
-            {ERM_BEISPIEL[i] && <div className="ermbsp">{ERM_BEISPIEL[i]}</div>}
             <AutoTa className="ta" value={fragen[i]}
               onChange={(e) => aend(() => setFragen((v) => v.map((x, n) => (n === i ? e.target.value : x))))}
-              placeholder="—" />
+              placeholder={ERM_BEISPIEL[i] || "—"} />
+          </div>
+        ))}
+      </Panel>
+
+      <Panel id="sk-archetypen" title="ARCHETYPEN" sub="4 archetypen">
+        {ARCHETYP.map((f, i) => (
+          <div className="ermfrage" key={i}>
+            <div className="ermnr">{i + 1} · {ARCHETYP_NAME[i]}</div>
+            <div className="ermtext">{f}</div>
+            <AutoTa className="ta" value={arche[i]} style={{ minHeight: 150 }}
+              onChange={(e) => aend(() => setArche((v) => v.map((x, n) => (n === i ? e.target.value : x))))}
+              placeholder={ARCHETYP_BEISPIEL[i] || "—"} />
           </div>
         ))}
       </Panel>
@@ -4678,7 +4707,6 @@ function Styles() {
   .ermfrage:last-child{margin-bottom:0}
   .ermnr{font-family:var(--term);font-size:10.5px;letter-spacing:.14em;color:var(--green-mid);margin-bottom:3px}
   .ermtext{font-family:var(--mono);font-size:14px;color:var(--muted);margin-bottom:7px}
-  .ermbsp{font-family:var(--mono);font-size:12px;font-style:italic;color:var(--dim);opacity:.7;margin-bottom:7px}
   .szwand{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:7px;margin-top:4px}
   .szbox{position:relative;aspect-ratio:1;border:1px solid var(--line);border-radius:5px;
     background:var(--panel-2);color:var(--dim);font-family:var(--term);font-size:12px;
