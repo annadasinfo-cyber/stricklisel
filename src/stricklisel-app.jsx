@@ -1155,26 +1155,26 @@ function Abteilung17b({ say }) {
 }
 
 // ============================================================
-// SZENENWAND · 63 kästchen, kings papierstapel ohne papier.
-// die nummer kommt aus der REIHENFOLGE der matrix: erzählreihenfolge,
-// tiefensuche, jedes nicht weiter aufgefächerte kästchen ist eine szene.
+// SZENENWAND · 63 kacheln, wie die tage in den log-files — nur 63 statt 30/31.
+// die 63 szenen liegen fest auf E2 (rosa): 8 stationen × 8 positionen − pay-off×pay-off.
 // farbe = fortschritt in der matrix (schönschrift).
-// pinker punkt = für diese szene liegt rohmaterial in den log-files (schmierheft).
+// pinker punkt = für diese szene liegt rohmaterial in den log_files.
+// darunter: die rohmaterial-liste (datum · szene · erste 3 sätze), sprung + P-marker löschen.
 // ============================================================
 const SZ_ZIEL = 1600;               // wörter je szene, aus dem commit
 const SZ_ANZAHL = 63;
+const dkurz = (s) => { const t = String(s || "").split("-"); return t.length === 3 ? `${t[2]}.${t[1]}.` : s; };
 
-function SzenenWand({ alle, wurzelId, springe }) {
+function SzenenWand({ alle, wurzelId, springe, zuLog }) {
   const [entw, setEntw] = useState([]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const l = await dbGet("logfiles-szenen", `${SUPABASE_URL}/rest/v1/logfiles?select=datum,szene&szene=not.is.null`);
-        if (Array.isArray(l)) setEntw(l);
-      } catch {}
-    })();
-  }, []);
+  const ladeEntw = async () => {
+    try {
+      const l = await dbGet("logfiles-szenen", `${SUPABASE_URL}/rest/v1/logfiles?select=datum,szene,text,flags&szene=not.is.null&order=datum.desc`);
+      if (Array.isArray(l)) setEntw(l);
+    } catch {}
+  };
+  useEffect(() => { ladeEntw(); }, []);
 
   const wurzeln = (alle || []).filter((s) => !s.eltern_id);
   const wurzel = wurzeln.find((s) => s.id === wurzelId) || wurzeln[0] || null;
@@ -1202,22 +1202,40 @@ function SzenenWand({ alle, wurzelId, springe }) {
   })();
 
   const entwurfFuer = (n) => entw.filter((e) => Number(e.szene) === n).length;
-  const stufe = (w) => (w >= SZ_ZIEL ? "voll" : w >= SZ_ZIEL / 2 ? "halb" : w > 0 ? "an" : "leer");
   const fertig = szenen.filter((x) => x.node && zaehleWoerter(x.text) >= SZ_ZIEL).length;
   const begonnen = szenen.filter((x) => x.node && zaehleWoerter(x.text) > 0).length;
+
+  // rohmaterial-liste: alle log_files-einträge mit gesetzter szene, sortiert nach szene, dann datum
+  const roh = [...entw].sort((a, b) => (Number(a.szene) - Number(b.szene)) || (a.datum < b.datum ? 1 : -1));
+
+  // P-marker eines eintrags löschen: szene lösen + "p" aus den flags — versinkt zurück in log_files
+  const pWeg = async (row) => {
+    const neueFlags = (Array.isArray(row.flags) ? row.flags : []).filter((f) => f !== "p");
+    setEntw((es) => es.filter((e) => e.datum !== row.datum));   // sofort aus der liste
+    try {
+      await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/logfiles?datum=eq.${row.datum}`,
+        { szene: null, flags: neueFlags, updated_at: new Date().toISOString() },
+        { prefer: "return=minimal" });
+    } catch { ladeEntw(); }
+  };
 
   return (
     <Panel id="sk-wand" title="SZENEN" sub={`${fertig} von ${SZ_ANZAHL} fertig · ${begonnen} begonnen`}>
       {!wurzel && <p className="hint">noch kein projekt gewählt — oben im commit eins aussuchen, dann füllt sich die wand.</p>}
 
-      <div className="szwand">
+      <div className="mgrid szgrid">
         {Array.from({ length: SZ_ANZAHL }, (_, n) => {
           const sz = szenen[n];
           const da = !!(sz && sz.node);            // station aufgeklappt → echte szene
           const w = da ? zaehleWoerter(sz.text) : 0;
-          const roh = entwurfFuer(n + 1);
+          const r = entwurfFuer(n + 1);
+          const cls = ["kasten", "szkachel"];
+          if (w >= SZ_ZIEL) cls.push("voll");
+          else if (w >= SZ_ZIEL / 2) cls.push("halb");
+          else if (w > 0) cls.push("teil");
+          if (!da) cls.push("fehlt");
           return (
-            <button key={n} className={"szbox " + stufe(w) + (da ? "" : " fehlt")}
+            <button key={n} className={cls.join(" ")}
               disabled={!wurzel}
               onClick={() => {
                 if (!sz || !springe) return;
@@ -1225,21 +1243,36 @@ function SzenenWand({ alle, wurzelId, springe }) {
                 else springe(wurzel.id, sz.st);               // station noch zu → dorthin, wo man sie aufklappt
               }}
               title={da
-                ? `szene ${n + 1} · ${w} wörter${roh ? ` · ${roh}× rohmaterial im schmierheft` : ""}`
+                ? `szene ${n + 1} · ${w} wörter${r ? ` · ${r}× rohmaterial in log_files` : ""}`
                 : `szene ${n + 1} · station noch nicht aufgeklappt — klick springt hin`}>
-              <span className="sznr">{n + 1}</span>
-              {roh > 0 && <i className="szp" />}
+              {r > 0 && <i className="szp" />}
             </button>
           );
         })}
       </div>
 
       <div className="szlegende">
-        <span className="szl leer">▫ leer</span>
-        <span className="szl an">▫ angefangen</span>
-        <span className="szl halb">▫ über die hälfte</span>
+        <span className="szl teil">▪ angefangen</span>
+        <span className="szl halb">▪ über die hälfte</span>
         <span className="szl voll">▪ fertig</span>
-        <span className="szl roh">• rohmaterial im schmierheft</span>
+        <span className="szl roh">• rohmaterial in log_files</span>
+      </div>
+
+      <div className="rohkopf">rohmaterial · log_files</div>
+      <div className="rohliste">
+        {!roh.length && <div className="pleer">noch kein rohmaterial mit szene markiert. der magische P in den log_files legt's hier an.</div>}
+        {roh.map((row) => (
+          <div className="rohzeile" key={row.datum}>
+            <button className="rohgo" title="→ zum eintrag in den log_files"
+              onClick={() => zuLog && zuLog(row.datum)}>
+              <span className="ftag">{dkurz(row.datum)}</span>
+              <span className="ftag sz">szene {row.szene}</span>
+              <span className="rohtext">{ersteSaetze(row.text, 3) || "—"}</span>
+            </button>
+            <button className="rohweg" title="P-marker löschen — versinkt zurück in die normalen log_files"
+              onClick={() => pWeg(row)}>P ✕</button>
+          </div>
+        ))}
       </div>
     </Panel>
   );
@@ -1282,7 +1315,7 @@ const ARCHETYP_BEISPIEL = [
   "Am Ende muß der Held bereit sein, sich selbst oder zumindest seine eigenen Ziele aufzugeben. Das ist wirklich wichtig, denn sonst entwickelt sich unser Held nicht zum Helden. Er ist ein Mensch wie du und ich (Identifikation des Lesers), dann muss er zum Helden werden, damit uns das Herz aufgeht! Wie erreichst du das? Was bringt deinen Helden dazu? Hier muss es so richtig emotional werden. Das ist der Grund, warum der Leser dein Buch lesen will! der OMG Moment!!!",
 ];
 
-function SkUltra({ springe }) {
+function SkUltra({ springe, zuLog }) {
   const [id, setId] = useState(null);
   const [pName, setPName] = useState("");
   const [pPraem, setPPraem] = useState("");
@@ -1482,7 +1515,7 @@ function SkUltra({ springe }) {
         ))}
       </Panel>
 
-      <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} />
+      <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} zuLog={zuLog} />
     </>
   );
 }
@@ -1720,7 +1753,7 @@ function MonatsGitter({ liste, datum, setDatum, monat, setMonat, children }) {
   );
 }
 
-function LogFiles({ zeigeAbschreib, zurKonsole }) {
+function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
   const [datum, setDatum] = useState(heute());
   const [monat, setMonat] = useState(() => heute().slice(0, 7));
   const [text, setText] = useState("");
@@ -1750,6 +1783,13 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
 
   useEffect(() => { laden(); }, []);
   useEffect(() => { ladeTag(datum); setMonat(datum.slice(0, 7)); }, [datum]);
+
+  // sprung aus sk_ultra: ziel-datum öffnen, dann marker zurücksetzen
+  useEffect(() => {
+    if (!sprungLog) return;
+    gehZuDatum(sprungLog);
+    setSprungLog && setSprungLog(null);
+  }, [sprungLog]);
 
   // still speichern, 2 s nach dem letzten tastendruck
   useEffect(() => {
@@ -3918,6 +3958,7 @@ export default function StricklieselApp() {
   useEffect(() => { offSchreibenCache("tab", tab); }, [tab]);
   const [sprung, setSprung] = useState(null);
   const [sprungPerson, setSprungPerson] = useState(null);
+  const [sprungLog, setSprungLog] = useState(null);   // ziel-datum für sprung in die log-files
   // welches projekt gerade dran ist — teilen sich skripte und things
   const [projekt, setProjekt] = useState(() => { try { return localStorage.getItem("projekt") || ""; } catch { return ""; } });
   const setzeProjekt = (v) => { setProjekt(v); try { localStorage.setItem("projekt", v); } catch {} };
@@ -4267,8 +4308,8 @@ export default function StricklieselApp() {
         {tab === "handbuch" && <Handbuch />}
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "m42" && <M42 />}
-        {tab === "log" && <LogFiles zeigeAbschreib={zeigeAbschreib} zurKonsole={zurKonsole} />}
-        {tab === "skultra" && <SkUltra springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} />}
+        {tab === "log" && <LogFiles zeigeAbschreib={zeigeAbschreib} zurKonsole={zurKonsole} sprungLog={sprungLog} setSprungLog={setSprungLog} />}
+        {tab === "skultra" && <SkUltra springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuLog={(dt) => { setSprungLog(dt); setTab("log"); }} />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} zeigeAbschreib={zeigeAbschreib} kette={cfg.ketteText} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} sprungPerson={sprungPerson} setSprungPerson={setSprungPerson} />}
         {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuM42={() => setTab("m42")} zurPerson={(id) => { setSprungPerson(id); setTab("things"); }} />}
@@ -4707,23 +4748,32 @@ function Styles() {
   .ermfrage:last-child{margin-bottom:0}
   .ermnr{font-family:var(--term);font-size:10.5px;letter-spacing:.14em;color:var(--green-mid);margin-bottom:3px}
   .ermtext{font-family:var(--mono);font-size:14px;color:var(--muted);margin-bottom:7px}
-  .szwand{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:7px;margin-top:4px}
-  .szbox{position:relative;aspect-ratio:1;border:1px solid var(--line);border-radius:5px;
-    background:var(--panel-2);color:var(--dim);font-family:var(--term);font-size:12px;
-    cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center}
-  .szbox:hover{border-color:var(--line-hot)}
-  .szbox.fehlt{opacity:.3}
-  .szbox:disabled{cursor:default}
-  .szbox.an{border-color:var(--green);color:var(--green)}
-  .szbox.halb{border-color:var(--amber);color:var(--amber);box-shadow:0 0 8px rgba(224,178,106,.25)}
-  .szbox.voll{border-color:var(--green);background:var(--green-mid);color:var(--void);
-    box-shadow:0 0 12px var(--green-dim)}
-  .szp{position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;
-    background:#e88fc0;box-shadow:0 0 6px rgba(232,143,192,.8)}
+  .szgrid{margin-top:4px}
+  .szkachel{position:relative}
+  .szkachel .szp{position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;
+    background:#e88fc0;box-shadow:0 0 6px rgba(232,143,192,.85)}
+  .kasten.fehlt{opacity:.28}
   .szlegende{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-family:var(--term);
     font-size:10.5px;letter-spacing:.06em;color:var(--dim)}
-  .szl.an{color:var(--green)} .szl.halb{color:var(--amber)}
+  .szl.teil{color:var(--green)} .szl.halb{color:var(--amber)}
   .szl.voll{color:var(--green)} .szl.roh{color:#e88fc0}
+
+  /* rohmaterial-liste (offene-fäden-stil) */
+  .rohkopf{margin-top:22px;margin-bottom:8px;font-family:var(--term);font-size:10.5px;
+    letter-spacing:.14em;color:var(--green-mid);text-transform:uppercase}
+  .rohliste{display:flex;flex-direction:column;gap:4px}
+  .rohzeile{display:flex;align-items:center;gap:8px;border-bottom:1px dotted var(--line)}
+  .rohgo{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:9px;text-align:left;
+    background:transparent;border:0;padding:7px 2px;font-family:var(--mono);font-size:12.5px;
+    color:var(--ink);cursor:pointer;transition:.12s}
+  .rohgo:hover{color:var(--green)}
+  .rohgo .ftag.sz{color:#e88fc0;border-color:rgba(232,143,192,.4)}
+  .rohtext{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .rohgo:hover .rohtext{color:var(--ink)}
+  .rohweg{flex:0 0 auto;font-family:var(--term);font-size:10px;letter-spacing:.08em;
+    background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:3px;
+    padding:3px 7px;cursor:pointer;transition:.12s}
+  .rohweg:hover{border-color:#e88fc0;color:#e88fc0}
   .skgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
   @media(max-width:820px){.skgrid{grid-template-columns:1fr}}
   .logflags{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
