@@ -1163,9 +1163,9 @@ function Abteilung17b({ say }) {
 // ============================================================
 const SZ_ZIEL = 1600;               // wörter je szene, aus dem commit
 const SZ_ANZAHL = 63;
-const SZ_ORDER = SCHREIB_ORDER.filter((i) => i !== 4);   // mainstate ist keine szene
 
 function SzenenWand({ springe }) {
+  const SZ_ORDER = SCHREIB_ORDER.filter((i) => i !== 4);   // mainstate ist keine szene
   const [alle, setAlle] = useState([]);
   const [entw, setEntw] = useState([]);
   const [wurzelId, setWurzelId] = useState("");
@@ -1257,6 +1257,13 @@ function SzenenWand({ springe }) {
 // rechts DEIN commit im format des prio-datenblatts, aber ohne prio-platz.
 // die signatur verortet das projekt (siehe remote viewing): es lässt sich wiederfinden.
 // ============================================================
+const ERMITTLUNG = [
+  "Wer ist der Held?",
+  "Was will der Held erreichen?",
+  "Wer oder was versucht den Held zu stoppen?",
+  "Was passiert, wenn der Held sein Ziel nicht erreicht?",
+];
+
 function SkUltra({ springe }) {
   const [id, setId] = useState(null);
   const [pName, setPName] = useState("");
@@ -1270,6 +1277,7 @@ function SkUltra({ springe }) {
   const [cZiel, setCZiel] = useState("");
   const [cSig, setCSig] = useState("");
   const [cDatum, setCDatum] = useState("");
+  const [fragen, setFragen] = useState(["", "", "", ""]);
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
   const [dirty, setDirty] = useState(false);
   const tRef = useRef(null);
@@ -1282,7 +1290,7 @@ function SkUltra({ springe }) {
     if (tRef.current) clearTimeout(tRef.current);
     tRef.current = setTimeout(() => speichern(true), 2000);
     return () => clearTimeout(tRef.current);
-  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, dirty]);
+  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, dirty]);
 
   const aend = (fn) => { fn(); setDirty(true); };
 
@@ -1298,6 +1306,7 @@ function SkUltra({ springe }) {
       setCParam(Array.isArray(r.c_param) ? r.c_param : [...PARAM_STD]);
       setCStart(r.c_start || ""); setCZiel(r.c_ziel || "");
       setCSig(r.c_sig || ""); setCDatum(r.c_datum || "");
+      setFragen([r.f1 || "", r.f2 || "", r.f3 || "", r.f4 || ""]);
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
 
@@ -1310,6 +1319,7 @@ function SkUltra({ springe }) {
       p_name: pName, p_praemisse: pPraem, p_sig: pSig, p_datum: pDatum,
       c_projekt: cProjekt, c_umfang: cUmfang, c_param: cParam,
       c_start: cStart || null, c_ziel: cZiel || null, c_sig: cSig, c_datum: cDatum,
+      f1: fragen[0], f2: fragen[1], f3: fragen[2], f4: fragen[3],
       updated_at: new Date().toISOString(),
     };
     if (!still) setMsg({ t: "speichere …", c: "work" });
@@ -1400,6 +1410,18 @@ function SkUltra({ springe }) {
           </div>
         </Panel>
       </div>
+
+      <Panel id="sk-ermittlungen" title="ERMITTLUNGEN" sub="4 fragen">
+        {ERMITTLUNG.map((f, i) => (
+          <div className="ermfrage" key={i}>
+            <div className="ermnr">{i + 1}. von 4 fragen</div>
+            <div className="ermtext">{f}</div>
+            <AutoTa className="ta" value={fragen[i]}
+              onChange={(e) => aend(() => setFragen((v) => v.map((x, n) => (n === i ? e.target.value : x))))}
+              placeholder="—" />
+          </div>
+        ))}
+      </Panel>
 
       <SzenenWand springe={springe} />
     </>
@@ -4622,6 +4644,10 @@ function Styles() {
     background:linear-gradient(135deg,transparent 46%,var(--green-mid) 46%,var(--green-mid) 56%,transparent 56%,transparent 68%,var(--green-mid) 68%,var(--green-mid) 78%,transparent 78%);opacity:.55}
   .schweberesize:hover{opacity:1}
   .logextra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+  .ermfrage{margin-bottom:20px}
+  .ermfrage:last-child{margin-bottom:0}
+  .ermnr{font-family:var(--term);font-size:10.5px;letter-spacing:.14em;color:var(--green-mid);margin-bottom:3px}
+  .ermtext{font-family:var(--mono);font-size:14px;color:var(--muted);margin-bottom:7px}
   .szwand{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:7px;margin-top:4px}
   .szbox{position:relative;aspect-ratio:1;border:1px solid var(--line);border-radius:5px;
     background:var(--panel-2);color:var(--dim);font-family:var(--term);font-size:12px;
