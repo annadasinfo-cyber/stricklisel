@@ -1164,18 +1164,11 @@ function Abteilung17b({ say }) {
 const SZ_ZIEL = 1600;               // wörter je szene, aus dem commit
 const SZ_ANZAHL = 63;
 
-function SzenenWand({ springe }) {
-  const SZ_ORDER = SCHREIB_ORDER.filter((i) => i !== 4);   // mainstate ist keine szene
-  const [alle, setAlle] = useState([]);
+function SzenenWand({ alle, wurzelId, springe }) {
   const [entw, setEntw] = useState([]);
-  const [wurzelId, setWurzelId] = useState("");
 
   useEffect(() => {
     (async () => {
-      try {
-        const d = await dbGet("skripte", `${SUPABASE_URL}/rest/v1/skripte?select=*&order=updated_at.desc`);
-        if (Array.isArray(d)) setAlle(d);
-      } catch {}
       try {
         const l = await dbGet("logfiles-szenen", `${SUPABASE_URL}/rest/v1/logfiles?select=datum,szene&szene=not.is.null`);
         if (Array.isArray(l)) setEntw(l);
@@ -1183,55 +1176,57 @@ function SzenenWand({ springe }) {
     })();
   }, []);
 
-  const wurzeln = alle.filter((s) => !s.eltern_id);
+  const wurzeln = (alle || []).filter((s) => !s.eltern_id);
   const wurzel = wurzeln.find((s) => s.id === wurzelId) || wurzeln[0] || null;
 
-  // tiefensuche in erzählreihenfolge — blätter sind die szenen
+  // die 63 szenen liegen FEST auf E2 (rosa): 8 stationen × 8 positionen − pay-off×pay-off.
+  // projekt › station (E1-kind) › position (zelle in der station) = eine szene.
+  // z.b.  anfang › anfang = szene 1  ·  anfang › 1. katastrophe = szene 2 …
+  const ST_ORDER = SCHREIB_ORDER.filter((i) => i !== 4);   // 8 stationen, erzählreihenfolge
   const szenen = (() => {
     const raus = [];
-    const kind = (pid, pos) => alle.find((s) => s.eltern_id === pid && s.eltern_pos === pos);
-    const geh = (k, tiefe) => {
-      if (!k || tiefe > 6 || raus.length > 400) return;
-      for (const i of SZ_ORDER) {
-        const kk = kind(k.id, i);
-        if (kk) geh(kk, tiefe + 1);
-        else raus.push({ id: k.id, i, text: (Array.isArray(k.texte) ? k.texte[i] : "") || "" });
+    if (!wurzel) return raus;
+    const kind = (pid, pos) => (alle || []).find((s) => s.eltern_id === pid && s.eltern_pos === pos);
+    for (const st of ST_ORDER) {                 // E1 · die 8 stationen
+      const station = kind(wurzel.id, st);       // kann noch fehlen (nicht aufgeklappt)
+      for (const p of ST_ORDER) {                // E2 · die 8 szenen je station
+        if (st === 1 && p === 1) continue;        // KEINE pay-off × pay-off szene → 63
+        raus.push({
+          node: station || null,
+          st, i: p,
+          text: (station && Array.isArray(station.texte) ? station.texte[p] : "") || "",
+        });
       }
-    };
-    geh(wurzel, 0);
+    }
     return raus;
   })();
 
   const entwurfFuer = (n) => entw.filter((e) => Number(e.szene) === n).length;
   const stufe = (w) => (w >= SZ_ZIEL ? "voll" : w >= SZ_ZIEL / 2 ? "halb" : w > 0 ? "an" : "leer");
-  const fertig = szenen.filter((x) => zaehleWoerter(x.text) >= SZ_ZIEL).length;
-  const begonnen = szenen.filter((x) => zaehleWoerter(x.text) > 0).length;
+  const fertig = szenen.filter((x) => x.node && zaehleWoerter(x.text) >= SZ_ZIEL).length;
+  const begonnen = szenen.filter((x) => x.node && zaehleWoerter(x.text) > 0).length;
 
   return (
     <Panel id="sk-wand" title="SZENEN" sub={`${fertig} von ${SZ_ANZAHL} fertig · ${begonnen} begonnen`}>
-      {wurzeln.length > 1 && (
-        <div className="field" style={{ marginBottom: 14 }}>
-          <label className="cap">projekt</label>
-          <select className="ti" value={wurzel ? wurzel.id : ""} onChange={(e) => setWurzelId(e.target.value)}>
-            {wurzeln.map((w) => <option key={w.id} value={w.id}>{w.name || "unbenannt"}</option>)}
-          </select>
-        </div>
-      )}
-
-      {!wurzel && <p className="hint">noch kein skript in der matrix — die wand füllt sich, sobald dort geschrieben wird.</p>}
+      {!wurzel && <p className="hint">noch kein projekt gewählt — oben im commit eins aussuchen, dann füllt sich die wand.</p>}
 
       <div className="szwand">
         {Array.from({ length: SZ_ANZAHL }, (_, n) => {
           const sz = szenen[n];
-          const w = sz ? zaehleWoerter(sz.text) : 0;
+          const da = !!(sz && sz.node);            // station aufgeklappt → echte szene
+          const w = da ? zaehleWoerter(sz.text) : 0;
           const roh = entwurfFuer(n + 1);
           return (
-            <button key={n} className={"szbox " + stufe(w) + (sz ? "" : " fehlt")}
-              disabled={!sz}
-              onClick={() => sz && springe && springe(sz.id, sz.i)}
-              title={sz
+            <button key={n} className={"szbox " + stufe(w) + (da ? "" : " fehlt")}
+              disabled={!wurzel}
+              onClick={() => {
+                if (!sz || !springe) return;
+                if (sz.node) springe(sz.node.id, sz.i);       // → direkt in die szene
+                else springe(wurzel.id, sz.st);               // station noch zu → dorthin, wo man sie aufklappt
+              }}
+              title={da
                 ? `szene ${n + 1} · ${w} wörter${roh ? ` · ${roh}× rohmaterial im schmierheft` : ""}`
-                : `szene ${n + 1} · in der matrix noch nicht angelegt`}>
+                : `szene ${n + 1} · station noch nicht aufgeklappt — klick springt hin`}>
               <span className="sznr">{n + 1}</span>
               {roh > 0 && <i className="szp" />}
             </button>
@@ -1263,6 +1258,14 @@ const ERMITTLUNG = [
   "Wer oder was versucht den Held zu stoppen?",
   "Was passiert, wenn der Held sein Ziel nicht erreicht?",
 ];
+// dünner beispieltext unter jeder frage. PLATZHALTER — dein bild kam nicht mit an,
+// sag mir die vier zeilen, dann tausch ich sie hier aus.
+const ERM_BEISPIEL = [
+  "z.B. eine junge Bäckerin aus einem verschlafenen Dorf.",
+  "z.B. sie will ihren verschwundenen Bruder wiederfinden.",
+  "z.B. der Bürgermeister, der das Verschwinden vertuscht.",
+  "z.B. der Bruder bleibt verschollen — das Dorf schweigt weiter.",
+];
 
 function SkUltra({ springe }) {
   const [id, setId] = useState(null);
@@ -1278,6 +1281,8 @@ function SkUltra({ springe }) {
   const [cSig, setCSig] = useState("");
   const [cDatum, setCDatum] = useState("");
   const [fragen, setFragen] = useState(["", "", "", ""]);
+  const [cWurzel, setCWurzel] = useState("");   // gewähltes matrix-projekt (wurzel-id) für die szenenwand
+  const [alle, setAlle] = useState([]);         // alle skripte, für projekt-auswahl + szenenwand
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
   const [dirty, setDirty] = useState(false);
   const tRef = useRef(null);
@@ -1286,11 +1291,21 @@ function SkUltra({ springe }) {
 
   useEffect(() => { laden(); }, []);
   useEffect(() => {
+    (async () => {
+      try {
+        const d = await dbGet("skripte", `${SUPABASE_URL}/rest/v1/skripte?select=*&order=updated_at.desc`);
+        if (Array.isArray(d)) setAlle(d);
+      } catch {}
+    })();
+  }, []);
+  const wurzeln = alle.filter((s) => !s.eltern_id);
+  const wurzel = wurzeln.find((s) => s.id === cWurzel) || wurzeln[0] || null;
+  useEffect(() => {
     if (!dirty) return;
     if (tRef.current) clearTimeout(tRef.current);
     tRef.current = setTimeout(() => speichern(true), 2000);
     return () => clearTimeout(tRef.current);
-  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, dirty]);
+  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, cWurzel, dirty]);
 
   const aend = (fn) => { fn(); setDirty(true); };
 
@@ -1307,6 +1322,7 @@ function SkUltra({ springe }) {
       setCStart(r.c_start || ""); setCZiel(r.c_ziel || "");
       setCSig(r.c_sig || ""); setCDatum(r.c_datum || "");
       setFragen([r.f1 || "", r.f2 || "", r.f3 || "", r.f4 || ""]);
+      setCWurzel(r.c_wurzel || "");
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
 
@@ -1320,6 +1336,7 @@ function SkUltra({ springe }) {
       c_projekt: cProjekt, c_umfang: cUmfang, c_param: cParam,
       c_start: cStart || null, c_ziel: cZiel || null, c_sig: cSig, c_datum: cDatum,
       f1: fragen[0], f2: fragen[1], f3: fragen[2], f4: fragen[3],
+      c_wurzel: cWurzel || null,
       updated_at: new Date().toISOString(),
     };
     if (!still) setMsg({ t: "speichere …", c: "work" });
@@ -1369,6 +1386,18 @@ function SkUltra({ springe }) {
 
         <Panel id="sk-commit" title="AURA3_COMMIT" sub="dein commit · belegt keinen prio-platz">
           <div className="field">
+            <label className="cap">projekt · matrix</label>
+            {wurzeln.length > 0 ? (
+              <select className="ti" value={wurzel ? wurzel.id : ""}
+                onChange={(e) => aend(() => setCWurzel(e.target.value))}>
+                {wurzeln.map((w) => <option key={w.id} value={w.id}>{w.name || "unbenannt"}</option>)}
+              </select>
+            ) : (
+              <p className="hint">noch kein projekt in der matrix — in „skripte" eins anlegen.</p>
+            )}
+            <p className="hint">einmal gewählt — die szenenwand unten zeigt genau diese 63 szenen. keine ablenkung.</p>
+          </div>
+          <div className="field" style={{ marginTop: 14 }}>
             <label className="cap">projekt</label>
             <input className="ti" value={cProjekt} onChange={(e) => aend(() => setCProjekt(e.target.value))}
               placeholder="roman fertigstellen." />
@@ -1416,6 +1445,7 @@ function SkUltra({ springe }) {
           <div className="ermfrage" key={i}>
             <div className="ermnr">{i + 1}. von 4 fragen</div>
             <div className="ermtext">{f}</div>
+            {ERM_BEISPIEL[i] && <div className="ermbsp">{ERM_BEISPIEL[i]}</div>}
             <AutoTa className="ta" value={fragen[i]}
               onChange={(e) => aend(() => setFragen((v) => v.map((x, n) => (n === i ? e.target.value : x))))}
               placeholder="—" />
@@ -1423,7 +1453,7 @@ function SkUltra({ springe }) {
         ))}
       </Panel>
 
-      <SzenenWand springe={springe} />
+      <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} />
     </>
   );
 }
@@ -4648,12 +4678,14 @@ function Styles() {
   .ermfrage:last-child{margin-bottom:0}
   .ermnr{font-family:var(--term);font-size:10.5px;letter-spacing:.14em;color:var(--green-mid);margin-bottom:3px}
   .ermtext{font-family:var(--mono);font-size:14px;color:var(--muted);margin-bottom:7px}
+  .ermbsp{font-family:var(--mono);font-size:12px;font-style:italic;color:var(--dim);opacity:.7;margin-bottom:7px}
   .szwand{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:7px;margin-top:4px}
   .szbox{position:relative;aspect-ratio:1;border:1px solid var(--line);border-radius:5px;
     background:var(--panel-2);color:var(--dim);font-family:var(--term);font-size:12px;
     cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center}
   .szbox:hover{border-color:var(--line-hot)}
-  .szbox.fehlt{opacity:.3;cursor:default}
+  .szbox.fehlt{opacity:.3}
+  .szbox:disabled{cursor:default}
   .szbox.an{border-color:var(--green);color:var(--green)}
   .szbox.halb{border-color:var(--amber);color:var(--amber);box-shadow:0 0 8px rgba(224,178,106,.25)}
   .szbox.voll{border-color:var(--green);background:var(--green-mid);color:var(--void);
