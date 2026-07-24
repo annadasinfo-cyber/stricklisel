@@ -1402,10 +1402,10 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
   const [dirty, setDirty] = useState(false);
   const tRef = useRef(null);
   // vier leucht-toggles der rollenden überarbeitungs-routine — reine an/aus-lichter, bleiben an (localStorage)
-  const [logFlags, setLogFlags] = useState(() => offLesen("logflags") || {});
+  const [logFlags, setLogFlags] = useState([]);   // stempel PRO TAG — wandert mit in den eintrag
   const [gewicht, setGewicht] = useState("");   // pro tag, wandert mit in den eintrag
   const [schmerz, setSchmerz] = useState("");   // 0 = gar nicht … 10 = am schlimmsten
-  const flagKlick = (k) => setLogFlags((f) => { const n = { ...f, [k]: !f[k] }; offSchreibenCache("logflags", n); return n; });
+  const flagKlick = (k) => { setLogFlags((f) => f.includes(k) ? f.filter((x) => x !== k) : [...f, k]); setDirty(true); };
 
   const w = zaehleWoerter(text);
   const voll = w >= ZIEL_WOERTER;
@@ -1425,7 +1425,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
     // tagText MUSS mit drin stehen: fehlte er, lief der autosave mit einem
     // veralteten tag-stand weiter und hat angeklickte//geänderte hashtags
     // wieder überschrieben ("nimmt nicht an", "änderung weg").
-  }, [text, tagText, gewicht, schmerz, dirty]);
+  }, [text, tagText, gewicht, schmerz, logFlags, dirty]);
 
   async function laden() {
     try {
@@ -1435,11 +1435,12 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
   }
   async function ladeTag(dt) {
     try {
-      const d2 = await dbGet("logfiles-tag-" + dt, `${SUPABASE_URL}/rest/v1/logfiles?select=text,tags,gewicht,schmerz&datum=eq.${dt}`);
+      const d2 = await dbGet("logfiles-tag-" + dt, `${SUPABASE_URL}/rest/v1/logfiles?select=text,tags,gewicht,schmerz,flags&datum=eq.${dt}`);
       setText(d2?.[0]?.text || "");
       setTagText(tagsSchreiben(d2?.[0]?.tags));
       setGewicht(d2?.[0]?.gewicht ?? "");
       setSchmerz(d2?.[0]?.schmerz ?? "");
+      setLogFlags(Array.isArray(d2?.[0]?.flags) ? d2[0].flags : []);
       setDirty(false);
       setMsg(d2?.[0] ? { t: "eintrag geladen", c: "" } : { t: "neuer eintrag", c: "" });
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
@@ -1450,6 +1451,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
       { user_id: getUserId(), datum, text, woerter: w, tags: tagsLesen(tagText),
         gewicht: gewicht === "" ? null : Number(gewicht),
         schmerz: schmerz === "" ? null : Number(schmerz),
+        flags: logFlags,
         updated_at: new Date().toISOString() },
       { prefer: "resolution=merge-duplicates,return=minimal" });
     setDirty(false);
@@ -1563,7 +1565,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
                 title="tageseintrag an die konsole — thorsten liest vor">▶</button>
         <div className="logflags">
           {[["skripte", "skripte"], ["ue2", "Ü2"], ["ue1", "Ü1"], ["htsm", "htsm_ultra"]].map(([k, l]) => (
-            <button key={k} type="button" className={"logflag" + (logFlags[k] ? " on" : "")} onClick={() => flagKlick(k)}>{l}</button>
+            <button key={k} type="button" className={"logflag" + (logFlags.includes(k) ? " on" : "")} onClick={() => flagKlick(k)}>{l}</button>
           ))}
         </div>
 
@@ -1583,7 +1585,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
 
         <div className="logflags logAs">
           {Array.from({ length: 6 }, (_, i) => "a" + i).map((k) => (
-            <button key={k} type="button" className={"logflag" + (logFlags[k] ? " on" : "")} onClick={() => flagKlick(k)}>{k.toUpperCase()}</button>
+            <button key={k} type="button" className={"logflag" + (logFlags.includes(k) ? " on" : "")} onClick={() => flagKlick(k)}>{k.toUpperCase()}</button>
           ))}
         </div>
       </div>
