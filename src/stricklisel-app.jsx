@@ -1155,13 +1155,109 @@ function Abteilung17b({ say }) {
 }
 
 // ============================================================
+// SZENENWAND · 63 kästchen, kings papierstapel ohne papier.
+// die nummer kommt aus der REIHENFOLGE der matrix: erzählreihenfolge,
+// tiefensuche, jedes nicht weiter aufgefächerte kästchen ist eine szene.
+// farbe = fortschritt in der matrix (schönschrift).
+// pinker punkt = für diese szene liegt rohmaterial in den log-files (schmierheft).
+// ============================================================
+const SZ_ZIEL = 1600;               // wörter je szene, aus dem commit
+const SZ_ANZAHL = 63;
+const SZ_ORDER = SCHREIB_ORDER.filter((i) => i !== 4);   // mainstate ist keine szene
+
+function SzenenWand({ springe }) {
+  const [alle, setAlle] = useState([]);
+  const [entw, setEntw] = useState([]);
+  const [wurzelId, setWurzelId] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const d = await dbGet("skripte", `${SUPABASE_URL}/rest/v1/skripte?select=*&order=updated_at.desc`);
+        if (Array.isArray(d)) setAlle(d);
+      } catch {}
+      try {
+        const l = await dbGet("logfiles-szenen", `${SUPABASE_URL}/rest/v1/logfiles?select=datum,szene&szene=not.is.null`);
+        if (Array.isArray(l)) setEntw(l);
+      } catch {}
+    })();
+  }, []);
+
+  const wurzeln = alle.filter((s) => !s.eltern_id);
+  const wurzel = wurzeln.find((s) => s.id === wurzelId) || wurzeln[0] || null;
+
+  // tiefensuche in erzählreihenfolge — blätter sind die szenen
+  const szenen = (() => {
+    const raus = [];
+    const kind = (pid, pos) => alle.find((s) => s.eltern_id === pid && s.eltern_pos === pos);
+    const geh = (k, tiefe) => {
+      if (!k || tiefe > 6 || raus.length > 400) return;
+      for (const i of SZ_ORDER) {
+        const kk = kind(k.id, i);
+        if (kk) geh(kk, tiefe + 1);
+        else raus.push({ id: k.id, i, text: (Array.isArray(k.texte) ? k.texte[i] : "") || "" });
+      }
+    };
+    geh(wurzel, 0);
+    return raus;
+  })();
+
+  const entwurfFuer = (n) => entw.filter((e) => Number(e.szene) === n).length;
+  const stufe = (w) => (w >= SZ_ZIEL ? "voll" : w >= SZ_ZIEL / 2 ? "halb" : w > 0 ? "an" : "leer");
+  const fertig = szenen.filter((x) => zaehleWoerter(x.text) >= SZ_ZIEL).length;
+  const begonnen = szenen.filter((x) => zaehleWoerter(x.text) > 0).length;
+
+  return (
+    <Panel id="sk-wand" title="SZENEN" sub={`${fertig} von ${SZ_ANZAHL} fertig · ${begonnen} begonnen`}>
+      {wurzeln.length > 1 && (
+        <div className="field" style={{ marginBottom: 14 }}>
+          <label className="cap">projekt</label>
+          <select className="ti" value={wurzel ? wurzel.id : ""} onChange={(e) => setWurzelId(e.target.value)}>
+            {wurzeln.map((w) => <option key={w.id} value={w.id}>{w.name || "unbenannt"}</option>)}
+          </select>
+        </div>
+      )}
+
+      {!wurzel && <p className="hint">noch kein skript in der matrix — die wand füllt sich, sobald dort geschrieben wird.</p>}
+
+      <div className="szwand">
+        {Array.from({ length: SZ_ANZAHL }, (_, n) => {
+          const sz = szenen[n];
+          const w = sz ? zaehleWoerter(sz.text) : 0;
+          const roh = entwurfFuer(n + 1);
+          return (
+            <button key={n} className={"szbox " + stufe(w) + (sz ? "" : " fehlt")}
+              disabled={!sz}
+              onClick={() => sz && springe && springe(sz.id, sz.i)}
+              title={sz
+                ? `szene ${n + 1} · ${w} wörter${roh ? ` · ${roh}× rohmaterial im schmierheft` : ""}`
+                : `szene ${n + 1} · in der matrix noch nicht angelegt`}>
+              <span className="sznr">{n + 1}</span>
+              {roh > 0 && <i className="szp" />}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="szlegende">
+        <span className="szl leer">▫ leer</span>
+        <span className="szl an">▫ angefangen</span>
+        <span className="szl halb">▫ über die hälfte</span>
+        <span className="szl voll">▪ fertig</span>
+        <span className="szl roh">• rohmaterial im schmierheft</span>
+      </div>
+    </Panel>
+  );
+}
+
+// ============================================================
 // SK_ULTRA · projektseite. zwei boxen nebeneinander:
 // links die gegenzeichnung DES PROJEKTS (name, prämisse, signatur) —
 // das projekt stimmt der zusammenarbeit zu, ohne administrative rechte.
 // rechts DEIN commit im format des prio-datenblatts, aber ohne prio-platz.
 // die signatur verortet das projekt (siehe remote viewing): es lässt sich wiederfinden.
 // ============================================================
-function SkUltra() {
+function SkUltra({ springe }) {
   const [id, setId] = useState(null);
   const [pName, setPName] = useState("");
   const [pPraem, setPPraem] = useState("");
@@ -1239,7 +1335,7 @@ function SkUltra() {
       <div className="grouphead">SK_ULTRA<span className="rule" /></div>
 
       <div className="skgrid">
-        <Panel id="sk-projekt" title="DAS PROJEKT" sub="gegenzeichnung · ohne administrative rechte">
+        <Panel id="sk-projekt" title="PROJEKT" sub="gegenzeichnung · ohne administrative rechte">
           <div className="field">
             <label className="cap">name</label>
             <input className="ti" value={pName} onChange={(e) => aend(() => setPName(e.target.value))}
@@ -1304,6 +1400,8 @@ function SkUltra() {
           </div>
         </Panel>
       </div>
+
+      <SzenenWand springe={springe} />
     </>
   );
 }
@@ -1560,6 +1658,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
   const [gewicht, setGewicht] = useState("");   // pro tag, wandert mit in den eintrag
   const [schmerz, setSchmerz] = useState("");   // 0 = gar nicht … 10 = am schlimmsten
   const [mood, setMood] = useState("");        // 1 = im eimer … 5 = on fire
+  const [szene, setSzene] = useState("");      // 1–63, wenn der text zu einer projekt-szene gehört
   const flagKlick = (k) => { setLogFlags((f) => f.includes(k) ? f.filter((x) => x !== k) : [...f, k]); setDirty(true); };
 
   const w = zaehleWoerter(text);
@@ -1580,7 +1679,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
     // tagText MUSS mit drin stehen: fehlte er, lief der autosave mit einem
     // veralteten tag-stand weiter und hat angeklickte//geänderte hashtags
     // wieder überschrieben ("nimmt nicht an", "änderung weg").
-  }, [text, tagText, gewicht, schmerz, mood, logFlags, dirty]);
+  }, [text, tagText, gewicht, schmerz, mood, szene, logFlags, dirty]);
 
   async function laden() {
     try {
@@ -1590,12 +1689,13 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
   }
   async function ladeTag(dt) {
     try {
-      const d2 = await dbGet("logfiles-tag-" + dt, `${SUPABASE_URL}/rest/v1/logfiles?select=text,tags,gewicht,schmerz,mood,flags&datum=eq.${dt}`);
+      const d2 = await dbGet("logfiles-tag-" + dt, `${SUPABASE_URL}/rest/v1/logfiles?select=text,tags,gewicht,schmerz,mood,szene,flags&datum=eq.${dt}`);
       setText(d2?.[0]?.text || "");
       setTagText(tagsSchreiben(d2?.[0]?.tags));
       setGewicht(d2?.[0]?.gewicht ?? "");
       setSchmerz(d2?.[0]?.schmerz ?? "");
       setMood(d2?.[0]?.mood ?? "");
+      setSzene(d2?.[0]?.szene ?? "");
       setLogFlags(Array.isArray(d2?.[0]?.flags) ? d2[0].flags : []);
       setDirty(false);
       setMsg(d2?.[0] ? { t: "eintrag geladen", c: "" } : { t: "neuer eintrag", c: "" });
@@ -1608,6 +1708,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
         gewicht: gewicht === "" ? null : Number(gewicht),
         schmerz: schmerz === "" ? null : Number(schmerz),
         mood: mood === "" ? null : Number(mood),
+        szene: szene === "" ? null : Number(szene),
         flags: logFlags,
         updated_at: new Date().toISOString() },
       { prefer: "resolution=merge-duplicates,return=minimal" });
@@ -1716,10 +1817,19 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
       </MonatsGitter>
 
       <div className="logextra">
-        <button className="btn txtbtn klein" disabled={!text.trim()} onClick={() => zeigeAbschreib(text)}
-                title="tageseintrag als klartext — schwebendes fenster">▤ klartext</button>
-        <button className="btn txtbtn klein" disabled={!text.trim()} onClick={() => text.trim() && zurKonsole(text)}
-                title="tageseintrag an die konsole — thorsten liest vor">▶</button>
+        <button type="button" className={"logflag magisch" + (logFlags.includes("p") ? " on" : "")}
+                onClick={() => flagKlick("p")}
+                title="text zu einer projekt-szene">P</button>
+        {logFlags.includes("p") && (
+          <label className="logfeld" title="welcher szene gehört dieser text?">
+            <span>szene</span>
+            <select className="ti minifeld" value={szene}
+                    onChange={(e) => { setSzene(e.target.value); setDirty(true); }}>
+              <option value="">–</option>
+              {Array.from({ length: 63 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+        )}
         <div className="logflags wf">
           {[["skripte", "s_t"], ["ue2", "Ü2"], ["ue1", "Ü1"], ["htsm", "hts_max"]].map(([k, l]) => (
             <button key={k} type="button" className={"logflag" + (logFlags.includes(k) ? " on" : "")} onClick={() => flagKlick(k)}>{l}</button>
@@ -1762,6 +1872,10 @@ function LogFiles({ zeigeAbschreib, zurKonsole }) {
              sub={WOCHENTAG[d.getDay()] + " · " + d.toLocaleDateString("de-DE")}>
         <div className="rezrow" style={{ marginBottom: 12 }}>
           <input className="ti" type="date" value={datum} max={heute()} onChange={(e) => setDatum(e.target.value)} style={{ flex: "0 0 auto", minWidth: 150 }} />
+          <button className="btn txtbtn klein" disabled={!text.trim()} onClick={() => zeigeAbschreib(text)}
+                  title="tageseintrag als klartext — schwebendes fenster">▤ klartext</button>
+          <button className="btn txtbtn klein" disabled={!text.trim()} onClick={() => text.trim() && zurKonsole(text)}
+                  title="tageseintrag an die konsole — thorsten liest vor">▶</button>
           <div className="tagfeld">
             <input className="ti tags" value={tagText} placeholder="#hashtags"
               onChange={(e) => tagTippen(e.target.value)}
@@ -4073,7 +4187,7 @@ export default function StricklieselApp() {
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "m42" && <M42 />}
         {tab === "log" && <LogFiles zeigeAbschreib={zeigeAbschreib} zurKonsole={zurKonsole} />}
-        {tab === "skultra" && <SkUltra />}
+        {tab === "skultra" && <SkUltra springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} zeigeAbschreib={zeigeAbschreib} kette={cfg.ketteText} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} sprungPerson={sprungPerson} setSprungPerson={setSprungPerson} />}
         {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuM42={() => setTab("m42")} zurPerson={(id) => { setSprungPerson(id); setTab("things"); }} />}
@@ -4508,6 +4622,22 @@ function Styles() {
     background:linear-gradient(135deg,transparent 46%,var(--green-mid) 46%,var(--green-mid) 56%,transparent 56%,transparent 68%,var(--green-mid) 68%,var(--green-mid) 78%,transparent 78%);opacity:.55}
   .schweberesize:hover{opacity:1}
   .logextra{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px}
+  .szwand{display:grid;grid-template-columns:repeat(auto-fill,minmax(54px,1fr));gap:7px;margin-top:4px}
+  .szbox{position:relative;aspect-ratio:1;border:1px solid var(--line);border-radius:5px;
+    background:var(--panel-2);color:var(--dim);font-family:var(--term);font-size:12px;
+    cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center}
+  .szbox:hover{border-color:var(--line-hot)}
+  .szbox.fehlt{opacity:.3;cursor:default}
+  .szbox.an{border-color:var(--green);color:var(--green)}
+  .szbox.halb{border-color:var(--amber);color:var(--amber);box-shadow:0 0 8px rgba(224,178,106,.25)}
+  .szbox.voll{border-color:var(--green);background:var(--green-mid);color:var(--void);
+    box-shadow:0 0 12px var(--green-dim)}
+  .szp{position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;
+    background:#e88fc0;box-shadow:0 0 6px rgba(232,143,192,.8)}
+  .szlegende{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-family:var(--term);
+    font-size:10.5px;letter-spacing:.06em;color:var(--dim)}
+  .szl.an{color:var(--green)} .szl.halb{color:var(--amber)}
+  .szl.voll{color:var(--green)} .szl.roh{color:#e88fc0}
   .skgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
   @media(max-width:820px){.skgrid{grid-template-columns:1fr}}
   .logflags{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -4518,6 +4648,11 @@ function Styles() {
   .logfeld select.minifeld{width:64px;cursor:pointer;color:var(--green)}
   .logfeld select.moodfeld{width:132px}
   .logflags.wf .logflag{font-size:11px;padding:7px 8px;letter-spacing:.02em}
+  .logflag.magisch{font-family:var(--term);font-size:13px;letter-spacing:.1em;padding:8px 14px;
+    border-color:#e88fc0;color:#e88fc0}
+  .logflag.magisch:hover{color:#ffb6db;border-color:#ffb6db}
+  .logflag.magisch.on{background:#e88fc0;border-color:#e88fc0;color:var(--void);
+    box-shadow:0 0 12px rgba(232,143,192,.55);text-shadow:none}
   .projektzaehler{font-family:var(--term);font-size:11px;letter-spacing:.06em;color:var(--green-mid);
     border:1px solid var(--line);border-radius:4px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
   .logflag{font-family:var(--mono);font-size:12px;letter-spacing:.03em;background:transparent;
