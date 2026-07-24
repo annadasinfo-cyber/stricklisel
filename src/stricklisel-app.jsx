@@ -1165,17 +1165,7 @@ const SZ_ZIEL = 1600;               // wörter je szene, aus dem commit
 const SZ_ANZAHL = 63;
 const dkurz = (s) => { const t = String(s || "").split("-"); return t.length === 3 ? `${t[2]}.${t[1]}.` : s; };
 
-function SzenenWand({ alle, wurzelId, springe, zuLog }) {
-  const [entw, setEntw] = useState([]);
-
-  const ladeEntw = async () => {
-    try {
-      const l = await dbGet("logfiles-szenen", `${SUPABASE_URL}/rest/v1/logfiles?select=datum,szene,text,flags&szene=not.is.null&order=datum.desc`);
-      if (Array.isArray(l)) setEntw(l);
-    } catch {}
-  };
-  useEffect(() => { ladeEntw(); }, []);
-
+function SzenenWand({ alle, wurzelId, springe, entw }) {
   const wurzeln = (alle || []).filter((s) => !s.eltern_id);
   const wurzel = wurzeln.find((s) => s.id === wurzelId) || wurzeln[0] || null;
 
@@ -1201,27 +1191,13 @@ function SzenenWand({ alle, wurzelId, springe, zuLog }) {
     return raus;
   })();
 
-  const entwurfFuer = (n) => entw.filter((e) => Number(e.szene) === n).length;
+  const entwurfFuer = (n) => (entw || []).filter((e) => Number(e.szene) === n).length;
   const fertig = szenen.filter((x) => x.node && zaehleWoerter(x.text) >= SZ_ZIEL).length;
   const begonnen = szenen.filter((x) => x.node && zaehleWoerter(x.text) > 0).length;
 
-  // rohmaterial-liste: alle log_files-einträge mit gesetzter szene, sortiert nach szene, dann datum
-  const roh = [...entw].sort((a, b) => (Number(a.szene) - Number(b.szene)) || (a.datum < b.datum ? 1 : -1));
-
-  // P-marker eines eintrags löschen: szene lösen + "p" aus den flags — versinkt zurück in log_files
-  const pWeg = async (row) => {
-    const neueFlags = (Array.isArray(row.flags) ? row.flags : []).filter((f) => f !== "p");
-    setEntw((es) => es.filter((e) => e.datum !== row.datum));   // sofort aus der liste
-    try {
-      await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/logfiles?datum=eq.${row.datum}`,
-        { szene: null, flags: neueFlags, updated_at: new Date().toISOString() },
-        { prefer: "return=minimal" });
-    } catch { ladeEntw(); }
-  };
-
   return (
     <Panel id="sk-wand" title="SZENEN" sub={`${fertig} von ${SZ_ANZAHL} fertig · ${begonnen} begonnen`}>
-      {!wurzel && <p className="hint">noch kein projekt gewählt — oben im commit eins aussuchen, dann füllt sich die wand.</p>}
+      {!wurzel && <p className="hint">noch kein projekt gewählt — im AURA3_COMMIT ein projekt wählen, dann füllt sich die wand.</p>}
 
       <div className="mgrid szgrid">
         {Array.from({ length: SZ_ANZAHL }, (_, n) => {
@@ -1257,8 +1233,19 @@ function SzenenWand({ alle, wurzelId, springe, zuLog }) {
         <span className="szl voll">▪ fertig</span>
         <span className="szl roh">• rohmaterial in log_files</span>
       </div>
+    </Panel>
+  );
+}
 
-      <div className="rohkopf">rohmaterial · log_files</div>
+// ============================================================
+// ROHMATERIAL · eigene box, bleibt unten. hier kommt sie zu ihren einträgen.
+// zeile: datum · szene · erste 3 sätze. klick vorne → sprung in die log_files.
+// "P ✕" löst die szene + entfernt "p" aus flags → versinkt zurück in die log_files.
+// ============================================================
+function RohListe({ entw, zuLog, onPweg }) {
+  const roh = [...(entw || [])].sort((a, b) => (Number(a.szene) - Number(b.szene)) || (a.datum < b.datum ? 1 : -1));
+  return (
+    <Panel id="sk-rohmaterial" title="ROHMATERIAL" sub="log_files · nach szene">
       <div className="rohliste">
         {!roh.length && <div className="pleer">noch kein rohmaterial mit szene markiert. der magische P in den log_files legt's hier an.</div>}
         {roh.map((row) => (
@@ -1270,7 +1257,7 @@ function SzenenWand({ alle, wurzelId, springe, zuLog }) {
               <span className="rohtext">{ersteSaetze(row.text, 3) || "—"}</span>
             </button>
             <button className="rohweg" title="P-marker löschen — versinkt zurück in die normalen log_files"
-              onClick={() => pWeg(row)}>P ✕</button>
+              onClick={() => onPweg(row)}>P ✕</button>
           </div>
         ))}
       </div>
@@ -1349,6 +1336,26 @@ function SkUltra({ springe, zuLog }) {
   }, []);
   const wurzeln = alle.filter((s) => !s.eltern_id);
   const wurzel = wurzeln.find((s) => s.id === cWurzel) || wurzeln[0] || null;
+
+  // rohmaterial aus den log_files (einträge mit gesetzter szene) — teilen sich szenenwand + rohliste
+  const [entw, setEntw] = useState([]);
+  const ladeEntw = async () => {
+    try {
+      const l = await dbGet("logfiles-szenen", `${SUPABASE_URL}/rest/v1/logfiles?select=datum,szene,text,flags&szene=not.is.null&order=datum.desc`);
+      if (Array.isArray(l)) setEntw(l);
+    } catch {}
+  };
+  useEffect(() => { ladeEntw(); }, []);
+  // P-marker eines eintrags löschen: szene lösen + "p" aus den flags — versinkt zurück in log_files
+  const pWeg = async (row) => {
+    const neueFlags = (Array.isArray(row.flags) ? row.flags : []).filter((f) => f !== "p");
+    setEntw((es) => es.filter((e) => e.datum !== row.datum));   // sofort weg (wand-punkt + liste)
+    try {
+      await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/logfiles?datum=eq.${row.datum}`,
+        { szene: null, flags: neueFlags, updated_at: new Date().toISOString() },
+        { prefer: "return=minimal" });
+    } catch { ladeEntw(); }
+  };
   useEffect(() => {
     if (!dirty) return;
     if (tRef.current) clearTimeout(tRef.current);
@@ -1411,6 +1418,8 @@ function SkUltra({ springe, zuLog }) {
   return (
     <>
       <div className="grouphead">SK_ULTRA<span className="rule" /></div>
+
+      <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} entw={entw} />
 
       <div className="skgrid">
         <Panel id="sk-projekt" title="PROJEKT" sub="gegenzeichnung · ohne administrative rechte">
@@ -1515,7 +1524,7 @@ function SkUltra({ springe, zuLog }) {
         ))}
       </Panel>
 
-      <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} zuLog={zuLog} />
+      <RohListe entw={entw} zuLog={zuLog} onPweg={pWeg} />
     </>
   );
 }
@@ -4759,8 +4768,6 @@ function Styles() {
   .szl.voll{color:var(--green)} .szl.roh{color:#e88fc0}
 
   /* rohmaterial-liste (offene-fäden-stil) */
-  .rohkopf{margin-top:22px;margin-bottom:8px;font-family:var(--term);font-size:10.5px;
-    letter-spacing:.14em;color:var(--green-mid);text-transform:uppercase}
   .rohliste{display:flex;flex-direction:column;gap:4px}
   .rohzeile{display:flex;align-items:center;gap:8px;border-bottom:1px dotted var(--line)}
   .rohgo{flex:1 1 auto;min-width:0;display:flex;align-items:baseline;gap:9px;text-align:left;
