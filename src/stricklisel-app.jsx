@@ -1191,7 +1191,9 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
     return raus;
   })();
 
-  const entwurfFuer = (n) => (entw || []).filter((e) => Number(e.szene) === n).length;
+  const flagsVon = (e) => (Array.isArray(e.flags) ? e.flags : []);
+  const pFuer = (n) => (entw || []).filter((e) => Number(e.szene) === n && flagsVon(e).includes("p")).length;
+  const rFuer = (n) => (entw || []).filter((e) => Number(e.szene) === n && flagsVon(e).includes("r")).length;
   const fertig = szenen.filter((x) => x.node && zaehleWoerter(x.text) >= SZ_ZIEL).length;
   const begonnen = szenen.filter((x) => x.node && zaehleWoerter(x.text) > 0).length;
 
@@ -1204,12 +1206,14 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
           const sz = szenen[n];
           const da = !!(sz && sz.node);            // station aufgeklappt → echte szene
           const w = da ? zaehleWoerter(sz.text) : 0;
-          const r = entwurfFuer(n + 1);
+          const pz = pFuer(n + 1);                 // rohmaterial (rosa)
+          const rz = rFuer(n + 1);                 // recherche (blau)
           const cls = ["kasten", "szkachel"];
           if (w >= SZ_ZIEL) cls.push("voll");
           else if (w >= SZ_ZIEL / 2) cls.push("halb");
           else if (w > 0) cls.push("teil");
           if (!da) cls.push("fehlt");
+          const marker = [pz ? `${pz}× rohmaterial` : "", rz ? `${rz}× recherche` : ""].filter(Boolean).join(" · ");
           return (
             <button key={n} className={cls.join(" ")}
               disabled={!wurzel}
@@ -1219,9 +1223,10 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
                 else springe(wurzel.id, sz.st);               // station noch zu → dorthin, wo man sie aufklappt
               }}
               title={da
-                ? `szene ${n + 1} · ${w} wörter${r ? ` · ${r}× rohmaterial in log_files` : ""}`
+                ? `szene ${n + 1} · ${w} wörter${marker ? ` · ${marker} in log_files` : ""}`
                 : `szene ${n + 1} · station noch nicht aufgeklappt — klick springt hin`}>
-              {r > 0 && <i className="szp" />}
+              {pz > 0 && <i className="szp" />}
+              {rz > 0 && <i className="szr" />}
             </button>
           );
         })}
@@ -1231,7 +1236,8 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
         <span className="szl teil">▪ angefangen</span>
         <span className="szl halb">▪ über die hälfte</span>
         <span className="szl voll">▪ fertig</span>
-        <span className="szl roh">• rohmaterial in log_files</span>
+        <span className="szl roh">• rohmaterial</span>
+        <span className="szl rech">• recherche</span>
       </div>
     </Panel>
   );
@@ -1243,7 +1249,8 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
 // "P ✕" löst die szene + entfernt "p" aus flags → versinkt zurück in die log_files.
 // ============================================================
 function RohListe({ entw, zuLog, onPweg }) {
-  const roh = [...(entw || [])].sort((a, b) => (Number(a.szene) - Number(b.szene)) || (a.datum < b.datum ? 1 : -1));
+  const roh = [...(entw || [])].filter((e) => (Array.isArray(e.flags) ? e.flags : []).includes("p"))
+    .sort((a, b) => (Number(a.szene) - Number(b.szene)) || (a.datum < b.datum ? 1 : -1));
   return (
     <Panel id="sk-rohmaterial" title="ROHMATERIAL" sub="log_files · nach szene">
       <div className="rohliste">
@@ -1258,6 +1265,60 @@ function RohListe({ entw, zuLog, onPweg }) {
             </button>
             <button className="rohweg" title="P-marker löschen — versinkt zurück in die normalen log_files"
               onClick={() => onPweg(row)}>P ✕</button>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+// ============================================================
+// RECHERCHE · blaues spiegelbild zum rohmaterial. einträge mit R-marker.
+// links im text werden anklickbar, youtube-links zeigen ein vorschaubild.
+// ============================================================
+const ytId = (u) => {
+  const m = String(u || "").match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+};
+const urlKurz = (u) => { try { const x = new URL(u); return (x.hostname.replace(/^www\./, "") + x.pathname).replace(/\/$/, "").slice(0, 42); } catch { return u.slice(0, 42); } };
+function LinkVorschau({ text }) {
+  const urls = (String(text || "").match(/https?:\/\/[^\s)]+/g) || []).filter((u, i, a) => a.indexOf(u) === i);
+  if (!urls.length) return null;
+  return (
+    <div className="rechlinks">
+      {urls.map((u, i) => {
+        const yid = ytId(u);
+        if (yid) return (
+          <a key={i} className="ytlink" href={`https://www.youtube.com/watch?v=${yid}`} target="_blank" rel="noopener noreferrer" title={u}>
+            <img src={`https://img.youtube.com/vi/${yid}/mqdefault.jpg`} alt="youtube-vorschau" loading="lazy" />
+            <span className="ytplay">▶</span>
+          </a>
+        );
+        return <a key={i} className="rechlink" href={u} target="_blank" rel="noopener noreferrer" title={u}>🔗 {urlKurz(u)}</a>;
+      })}
+    </div>
+  );
+}
+function RechercheListe({ entw, zuLog, onRweg }) {
+  const rech = [...(entw || [])].filter((e) => (Array.isArray(e.flags) ? e.flags : []).includes("r"))
+    .sort((a, b) => (Number(a.szene) - Number(b.szene)) || (a.datum < b.datum ? 1 : -1));
+  return (
+    <Panel id="sk-recherche" title="RECHERCHE" sub="log_files · nach szene">
+      <div className="rohliste">
+        {!rech.length && <div className="pleer">noch keine recherche mit szene markiert. der blaue R in den log_files legt sie hier an.</div>}
+        {rech.map((row) => (
+          <div className="rechzeile" key={row.datum}>
+            <div className="rechtop">
+              <button className="rohgo" title="→ zum eintrag in den log_files"
+                onClick={() => zuLog && zuLog(row.datum)}>
+                <span className="ftag">{dkurz(row.datum)}</span>
+                <span className="ftag rz">szene {row.szene}</span>
+                <span className="rohtext">{ersteSaetze(row.text, 3) || "—"}</span>
+              </button>
+              <button className="rohweg blau" title="R-marker löschen — versinkt zurück in die normalen log_files"
+                onClick={() => onRweg(row)}>R ✕</button>
+            </div>
+            <LinkVorschau text={row.text} />
           </div>
         ))}
       </div>
@@ -1347,16 +1408,21 @@ function SkUltra({ springe, zuLog }) {
     } catch {}
   };
   useEffect(() => { ladeEntw(); }, []);
-  // P-marker eines eintrags löschen: szene lösen + "p" aus den flags — versinkt zurück in log_files
-  const pWeg = async (row) => {
-    const neueFlags = (Array.isArray(row.flags) ? row.flags : []).filter((f) => f !== "p");
-    setEntw((es) => es.filter((e) => e.datum !== row.datum));   // sofort weg (wand-punkt + liste)
+  // marker eines eintrags lösen: flag raus; szene nur nullen, wenn der ANDERE marker auch weg ist
+  const markerWeg = async (row, flag) => {
+    const flags = (Array.isArray(row.flags) ? row.flags : []).filter((f) => f !== flag);
+    const nochGebunden = flags.includes("p") || flags.includes("r");
+    setEntw((es) => es
+      .map((e) => e.datum === row.datum ? { ...e, flags, szene: nochGebunden ? e.szene : null } : e)
+      .filter((e) => e.szene != null));
     try {
       await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/logfiles?datum=eq.${row.datum}`,
-        { szene: null, flags: neueFlags, updated_at: new Date().toISOString() },
+        { flags, ...(nochGebunden ? {} : { szene: null }), updated_at: new Date().toISOString() },
         { prefer: "return=minimal" });
     } catch { ladeEntw(); }
   };
+  const pWeg = (row) => markerWeg(row, "p");
+  const rWeg = (row) => markerWeg(row, "r");
 
   // hitch_wheel — dieselbe wendungs-sammlung wie im denkbrett (tabelle wheel), dreht nur per knopf
   const [wheelListe, setWheelListe] = useState([]);
@@ -1597,6 +1663,8 @@ function SkUltra({ springe, zuLog }) {
       </Panel>
 
       <RohListe entw={entw} zuLog={zuLog} onPweg={pWeg} />
+
+      <RechercheListe entw={entw} zuLog={zuLog} onRweg={rWeg} />
 
       <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
         liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
@@ -2030,9 +2098,12 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
       <div className="logextra">
         <button type="button" className={"logflag magisch" + (logFlags.includes("p") ? " on" : "")}
                 onClick={() => flagKlick("p")}
-                title="text zu einer projekt-szene">P</button>
-        {logFlags.includes("p") && (
-          <label className="logfeld" title="welcher szene gehört dieser text?">
+                title="text zu einer projekt-szene (rohmaterial)">P</button>
+        <button type="button" className={"logflag magisch blau" + (logFlags.includes("r") ? " on" : "")}
+                onClick={() => flagKlick("r")}
+                title="recherche zu einer projekt-szene">R</button>
+        {(logFlags.includes("p") || logFlags.includes("r")) && (
+          <label className="logfeld" title="welcher szene gehört das?">
             <span>szene</span>
             <select className="ti minifeld" value={szene}
                     onChange={(e) => { setSzene(e.target.value); setDirty(true); }}>
@@ -4900,11 +4971,13 @@ function Styles() {
   .szkachel{position:relative}
   .szkachel .szp{position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;
     background:#e88fc0;box-shadow:0 0 6px rgba(232,143,192,.85)}
+  .szkachel .szr{position:absolute;bottom:3px;right:3px;width:5px;height:5px;border-radius:50%;
+    background:#5fb8e8;box-shadow:0 0 6px rgba(95,184,232,.85)}
   .kasten.fehlt{opacity:.28}
   .szlegende{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-family:var(--term);
     font-size:10.5px;letter-spacing:.06em;color:var(--dim)}
   .szl.teil{color:var(--green)} .szl.halb{color:var(--amber)}
-  .szl.voll{color:var(--green)} .szl.roh{color:#e88fc0}
+  .szl.voll{color:var(--green)} .szl.roh{color:#e88fc0} .szl.rech{color:#5fb8e8}
 
   /* rohmaterial-liste (offene-fäden-stil) */
   .rohliste{display:flex;flex-direction:column;gap:4px}
@@ -4920,6 +4993,23 @@ function Styles() {
     background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:3px;
     padding:3px 7px;cursor:pointer;transition:.12s}
   .rohweg:hover{border-color:#e88fc0;color:#e88fc0}
+  /* recherche (blaues spiegelbild) */
+  .rechzeile{display:flex;flex-direction:column;gap:6px;padding-bottom:8px;border-bottom:1px dotted var(--line)}
+  .rechtop{display:flex;align-items:center;gap:8px}
+  .rohgo .ftag.rz{color:#5fb8e8;border-color:rgba(95,184,232,.4)}
+  .rohweg.blau:hover{border-color:#5fb8e8;color:#5fb8e8}
+  .rechlinks{display:flex;flex-wrap:wrap;gap:8px;padding-left:2px}
+  .rechlink{font-family:var(--mono);font-size:11.5px;color:#5fb8e8;text-decoration:none;
+    border:1px solid rgba(95,184,232,.35);border-radius:4px;padding:3px 8px;transition:.12s;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rechlink:hover{border-color:#8fd4ff;color:#8fd4ff;background:rgba(95,184,232,.08)}
+  .ytlink{position:relative;display:inline-block;line-height:0;border-radius:6px;overflow:hidden;
+    border:1px solid rgba(95,184,232,.35);transition:.12s}
+  .ytlink img{width:120px;height:68px;object-fit:cover;display:block;opacity:.9;transition:.12s}
+  .ytlink:hover{border-color:#8fd4ff}
+  .ytlink:hover img{opacity:1}
+  .ytplay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:22px;color:#fff;text-shadow:0 0 10px rgba(0,0,0,.8);pointer-events:none}
   .skgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
   @media(max-width:820px){.skgrid{grid-template-columns:1fr}}
   .logflags{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -4935,6 +5025,10 @@ function Styles() {
   .logflag.magisch:hover{color:#ffb6db;border-color:#ffb6db}
   .logflag.magisch.on{background:#e88fc0;border-color:#e88fc0;color:var(--void);
     box-shadow:0 0 12px rgba(232,143,192,.55);text-shadow:none}
+  .logflag.magisch.blau{border-color:#5fb8e8;color:#5fb8e8}
+  .logflag.magisch.blau:hover{color:#8fd4ff;border-color:#8fd4ff}
+  .logflag.magisch.blau.on{background:#5fb8e8;border-color:#5fb8e8;color:var(--void);
+    box-shadow:0 0 12px rgba(95,184,232,.55);text-shadow:none}
   .projektzaehler{font-family:var(--term);font-size:11px;letter-spacing:.06em;color:var(--green-mid);
     border:1px solid var(--line);border-radius:4px;padding:3px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
   .logflag{font-family:var(--mono);font-size:12px;letter-spacing:.03em;background:transparent;
