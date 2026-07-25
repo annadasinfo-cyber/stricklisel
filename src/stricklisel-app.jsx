@@ -1550,18 +1550,18 @@ function SkUltra({ springe, zuLog }) {
       </div>
 
       <div className="skgrid">
-        <Panel id="sk-wheel" title="HITCH_WHEEL" sub="wendungen zum einbauen">
-          <button className={"wheel" + (wheelDreht ? " dreht" : "")} onClick={wheelDrehen} disabled={!wheelListe.length}
-            title={wheelListe.length ? "dreh am rad" : "noch keine wendungen — unten in der verwaltung eintragen"}>
-            <span className="wheeltext" key={wendung}>{wheelListe.length ? (wendung || "…") : "— noch keine wendungen —"}</span>
-            <span className="wheeldreh">↻ drehen</span>
-          </button>
-        </Panel>
         <Panel id="sk-fragen" title="100 FRAGEN" sub="eine ziehen, beantworten">
           <button className={"wheel" + (frageDreht ? " dreht" : "")} onClick={frageDrehen} disabled={!fragenListe.length}
             title={fragenListe.length ? "zieh eine frage" : "noch keine fragen — unten in der verwaltung eintragen"}>
             <span className="wheeltext" key={frage}>{fragenListe.length ? (frage || "…") : "— noch keine fragen —"}</span>
             <span className="wheeldreh">↻ ziehen</span>
+          </button>
+        </Panel>
+        <Panel id="sk-wheel" title="HITCH_WHEEL" sub="wendungen zum einbauen">
+          <button className={"wheel" + (wheelDreht ? " dreht" : "")} onClick={wheelDrehen} disabled={!wheelListe.length}
+            title={wheelListe.length ? "dreh am rad" : "noch keine wendungen — unten in der verwaltung eintragen"}>
+            <span className="wheeltext" key={wendung}>{wheelListe.length ? (wendung || "…") : "— noch keine wendungen —"}</span>
+            <span className="wheeldreh">↻ drehen</span>
           </button>
         </Panel>
       </div>
@@ -3488,6 +3488,114 @@ function VerwaltKarte({ titel, leer, liste, label, keyOf, wert, setWert, onAdd, 
   );
 }
 
+// ============================================================
+// SPIELECKE fürs denkbrett (pausen-bildschirm): drei kleine spielereien.
+// löffel-zähler · kaninchen-tamagotchi · glückskeks. reiner spaß, kein SQL.
+// ============================================================
+const LOEFFEL_SPRUCH = [
+  "es gibt keinen löffel.",
+  "der löffel biegt sich nicht — du dich.",
+  "wieder einer im reaktor versenkt.",
+  "nicht der löffel zählt, nur der text danach.",
+  "neo hätte auch einfach weitergeschrieben.",
+  "schlürf. und weiter.",
+];
+function LoeffelZaehler() {
+  const key = "off:loeffel";
+  const [n, setN] = useState(0);
+  const [spruch, setSpruch] = useState(LOEFFEL_SPRUCH[0]);
+  useEffect(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(key) || "{}");
+      if (raw.datum === heute()) setN(raw.n || 0);
+      else localStorage.setItem(key, JSON.stringify({ datum: heute(), n: 0 }));
+    } catch {}
+  }, []);
+  const plus = () => {
+    setN((v) => {
+      const nv = v + 1;
+      try { localStorage.setItem(key, JSON.stringify({ datum: heute(), n: nv })); } catch {}
+      return nv;
+    });
+    setSpruch(LOEFFEL_SPRUCH[Math.floor(Math.random() * LOEFFEL_SPRUCH.length)]);
+  };
+  return (
+    <div className="spielkarte">
+      <div className="spktitel">🥄 löffel-zähler</div>
+      <div className="loeffelzahl">{n}</div>
+      <div className="spktext">{spruch}</div>
+      <button className="btn" onClick={plus}>einen versenken</button>
+    </div>
+  );
+}
+
+const _bs = String.fromCharCode(92);   // ein echter backslash, ohne escape-chaos
+const KANI_FRAMES = [
+  `  (${_bs}(${_bs}\n  ( ･ｰ･)\n o_(")(")`,
+  `  (${_bs}_/)\n  ( ･o･)\n o_(")(")`,
+];
+const KANI_SPRUCH = [
+  "schreibst du noch oder guckst du mich an?",
+  "ein kapitel noch, dann gibt's möhre.",
+  "der reaktor lädt. ich auch. *mampf*",
+  "es gibt kein möhrchen … doch, im kühlschrank.",
+  "hoppel hoppel — weiter im text!",
+  "ich pass auf deine plot-löcher auf. *schnüffel*",
+  "kraul mich, dann schreib ich mit.",
+];
+const KANI_STREICHEL = [
+  "*schnurr* … moment, kaninchen schnurren nicht. egal.",
+  "quietsch! nochmal!",
+  "❤ und jetzt ran an die szene.",
+  "*wackelnase* du schaffst das.",
+];
+function KaninchenTama() {
+  const [f, setF] = useState(0);
+  const [msg, setMsg] = useState(KANI_SPRUCH[0]);
+  useEffect(() => {
+    const a = setInterval(() => setF((x) => (x + 1) % KANI_FRAMES.length), 1200);
+    const b = setInterval(() => setMsg(KANI_SPRUCH[Math.floor(Math.random() * KANI_SPRUCH.length)]), 9000);
+    return () => { clearInterval(a); clearInterval(b); };
+  }, []);
+  const streicheln = () => setMsg(KANI_STREICHEL[Math.floor(Math.random() * KANI_STREICHEL.length)]);
+  return (
+    <div className="spielkarte">
+      <div className="spktitel">🐇 kaninchen</div>
+      <div className="spktext">{msg}</div>
+      <button className="kani" onClick={streicheln} title="streicheln"><pre>{KANI_FRAMES[f]}</pre></button>
+    </div>
+  );
+}
+
+const KEKS = [
+  "die beste szene ist die, die du noch nicht gelöscht hast.",
+  "ein plot-loch ist eine tür, die du noch nicht beschriftet hast.",
+  "dein held weiß mehr als du. frag ihn.",
+  "schreib den satz, vor dem du dich fürchtest — das ist der richtige.",
+  "die möhre liegt immer hinter dem nächsten absatz.",
+  "wer die matrix schreibt, braucht keinen löffel.",
+  "kill your darlings — aber heb die leichen im schmierheft auf.",
+  "zwei sätze heute schlagen null sätze mit vorsatz.",
+  "die figur, die dich nervt, hat meistens recht.",
+  "ein guter twist fühlt sich hinterher unvermeidlich an.",
+  "wenn du nicht weiterweißt, lass jemanden zur tür reinkommen.",
+  "das ende kennst du schon — schreib dich nur hin.",
+];
+function GlueckskeksRad() {
+  const [f, setF] = useState(null);
+  const knacken = () => {
+    const pool = f ? KEKS.filter((k) => k !== f) : KEKS;
+    setF(pool[Math.floor(Math.random() * pool.length)]);
+  };
+  return (
+    <div className="spielkarte">
+      <div className="spktitel">🥠 glückskeks</div>
+      <div className="spktext keks">{f || "knack den keks …"}</div>
+      <button className="btn" onClick={knacken}>keks knacken</button>
+    </div>
+  );
+}
+
 function Pausenschirm({ springe, zuM42, zurPerson }) {
   const [ort, setOrt] = useState(RADAR_ORTE[0]);
   const [nm, setNm] = useState(25);
@@ -3650,51 +3758,6 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     return () => clearInterval(iv);
   }, [orakelListe]);
 
-  // hitch_wheel — deine eigene sammlung an wendungen, dreht wie das orakel
-  const [wheelListe, setWheelListe] = useState([]); // {id, wendung}
-  const wendungen = wheelListe.map((w) => w.wendung);
-  const [wendung, setWendung] = useState(null);
-  const [dreht, setDreht] = useState(false);
-  const [neueWendung, setNeueWendung] = useState("");
-  const wheelLaden = () => {
-    dbGet("wheel", `${SUPABASE_URL}/rest/v1/wheel?select=id,wendung&order=created_at.desc&limit=300`)
-      .then((d) => setWheelListe(Array.isArray(d) ? d.filter((x) => (x.wendung || "").trim()) : []))
-      .catch(() => {});
-  };
-  useEffect(wheelLaden, []);
-  async function wendungAdd() {
-    const t = neueWendung.trim();
-    if (!t) return;
-    setNeueWendung("");
-    const id = neueId();
-    setWheelListe((l) => [{ id, wendung: t }, ...l]);
-    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/wheel`, { id, user_id: getUserId(), wendung: t });
-    if (ok) wheelLaden();
-  }
-  async function wendungWeg(w) {
-    setWheelListe((l) => l.filter((x) => x.id !== w.id));
-    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/wheel?id=eq.${w.id}`);
-  }
-  async function wendungEdit(w, wert) {
-    setWheelListe((l) => l.map((x) => x.id === w.id ? { ...x, wendung: wert } : x));
-    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/wheel?id=eq.${w.id}`, { wendung: wert });
-  }
-  const drehen = () => {
-    if (!wendungen.length) return;
-    setDreht(true);
-    setTimeout(() => {
-      const pool = wendungen.length > 1 ? wendungen.filter((w) => w !== wendung) : wendungen;
-      setWendung(pool[Math.floor(Math.random() * pool.length)]);
-      setDreht(false);
-    }, 550);
-  };
-  // eine zeigen sobald wendungen da sind — aber NICHT automatisch wechseln.
-  // wendungen sind sachen zum einbauen; sie sollen nicht verschwinden, bevor du sie genutzt hast.
-  useEffect(() => {
-    if (!wendungen.length) return;
-    setWendung((w) => (w ? w : wendungen[Math.floor(Math.random() * wendungen.length)]));
-  }, [wendungen]);
-
   // hts_max · henkeltassen-schrank — gesendete hooks, zieht wie das orakel (king-konzept)
   const [htsListe, setHtsListe] = useState([]); // {id, hook}
   const htsHooks = htsListe.map((h) => h.hook);
@@ -3841,7 +3904,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
         </div>
 
         <div className="raeder">
-          <button className={"rad" + (dreht ? " dreht" : "")} onClick={orakelZiehen} disabled={!zitate.length} title="orakel · impuls ziehen">
+          <button className="rad" onClick={orakelZiehen} disabled={!zitate.length} title="orakel · impuls ziehen">
             <span className="radkopf">📟 orakel</span>
             <span className="radtext" key={"o" + spruch}>{zitate.length ? (spruch || "…") : "— leer —"}</span>
           </button>
@@ -3895,6 +3958,12 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
           </>
         )}
 
+        <div className="spielraum">
+          <LoeffelZaehler />
+          <KaninchenTama />
+          <GlueckskeksRad />
+        </div>
+
         <div className="pgrid">
           <div className="pradar">
             <svg viewBox={`0 0 ${R * 2 + 20} ${R * 2 + 20}`} className="rsvg">
@@ -3945,13 +4014,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
           </div>
 
           <div className="ppanel">
-            <div className="ptitel">hitch_wheel</div>
-            <button className={"wheel" + (dreht ? " dreht" : "")} onClick={drehen} disabled={!wendungen.length}
-                    title={wendungen.length ? "dreh am rad" : "noch keine wendungen — unten bei der dramaturgie eintragen"}>
-              <span className="wheeltext" key={wendung}>{wendungen.length ? (wendung || "…") : "— noch keine wendungen —"}</span>
-              <span className="wheeldreh">↻ drehen</span>
-            </button>
-            <div className="ptitel" style={{ marginTop: 18 }}>systemstatus</div>
+            <div className="ptitel">systemstatus</div>
             {ZEILEN.map(([k, v, warn]) => (
               <div className="pzeile" key={k}>
                 <span className={"ppunkt " + (warn || "")} />
@@ -3999,11 +4062,6 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
         </div>
 
         <Kurve />
-
-        <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
-          liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
-          wert={neueWendung} setWert={setNeueWendung} onAdd={wendungAdd} onWeg={wendungWeg} onEdit={wendungEdit}
-          platzhalter="neue wendung …" />
 
         <VerwaltKarte titel="orakel · impulse" leer="noch keine impulse — trag welche ein."
           liste={orakelListe} label={(o) => o.spruch} keyOf={(o) => o.id}
@@ -5201,6 +5259,21 @@ function Styles() {
   @keyframes wheelspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
   .wheelrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
   .wheelrow .ti{flex:1 1 200px;min-width:0}
+
+  /* spielecke im denkbrett */
+  .spielraum{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px;margin-bottom:6px}
+  .spielkarte{flex:1 1 200px;min-width:180px;background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+  .spktitel{font-family:var(--term);font-size:10.5px;letter-spacing:.14em;color:var(--green-mid);
+    text-transform:uppercase;align-self:flex-start}
+  .loeffelzahl{font-family:var(--term);font-size:44px;line-height:1;color:var(--green);text-shadow:var(--glow)}
+  .spktext{font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.5;min-height:36px;
+    display:flex;align-items:center;justify-content:center}
+  .spktext.keks{color:var(--green);font-style:italic}
+  .kani{background:transparent;border:0;cursor:pointer;padding:0}
+  .kani pre{font-family:var(--mono);font-size:14px;line-height:1.25;color:var(--green);margin:0;
+    text-shadow:var(--glow);transition:.12s}
+  .kani:hover pre{color:var(--white)}
 
   /* verwaltungs-karten (wheel · orakel) */
   .vkarte{border:1px solid var(--line);border-radius:7px;background:var(--panel-2);margin-top:12px;overflow:hidden}
