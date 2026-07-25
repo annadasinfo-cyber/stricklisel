@@ -1431,7 +1431,7 @@ function SkUltra({ springe, zuLog }) {
   const [neueWendung, setNeueWendung] = useState("");
   const wheelLaden = () => dbGet("wheel", `${SUPABASE_URL}/rest/v1/wheel?select=id,wendung&order=created_at.desc&limit=300`)
     .then((d) => setWheelListe(Array.isArray(d) ? d.filter((x) => (x.wendung || "").trim()) : [])).catch(() => {});
-  useEffect(wheelLaden, []);
+  useEffect(() => { wheelLaden(); }, []);
   const wendungAdd = async () => {
     const t = neueWendung.trim(); if (!t) return; setNeueWendung(""); const id = neueId();
     setWheelListe((l) => [{ id, wendung: t }, ...l]);
@@ -1454,7 +1454,7 @@ function SkUltra({ springe, zuLog }) {
   const [neueFrage, setNeueFrage] = useState("");
   const fragenLaden = () => dbGet("fragen100", `${SUPABASE_URL}/rest/v1/fragen100?select=id,frage&order=created_at.desc&limit=300`)
     .then((d) => setFragenListe(Array.isArray(d) ? d.filter((x) => (x.frage || "").trim()) : [])).catch(() => {});
-  useEffect(fragenLaden, []);
+  useEffect(() => { fragenLaden(); }, []);
   const frageAdd = async () => {
     const t = neueFrage.trim(); if (!t) return; setNeueFrage(""); const id = neueId();
     setFragenListe((l) => [{ id, frage: t }, ...l]);
