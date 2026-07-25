@@ -2184,6 +2184,13 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
           onChange={(e) => { setText(e.target.value); setDirty(true); }}
           placeholder={"> operator log\n> " + d.toLocaleDateString("de-DE") + "\n> was heute durch den reaktor ging …"} />
 
+        {/https?:\/\/[^\s)]+/.test(text) && (
+          <div className="loglinks">
+            <div className="loglinkkopf">🔗 links &amp; videos in diesem eintrag</div>
+            <LinkVorschau text={text} />
+          </div>
+        )}
+
         <div className="logfoot">
           <div className="logbar"><i style={{ width: Math.min(100, (w / ZIEL_WOERTER) * 100) + "%" }} className={voll ? "voll" : w >= HALB_WOERTER ? "halb" : ""} /></div>
           <div className={"wcount" + (voll ? " voll" : "")}>
@@ -4085,7 +4092,7 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
           </div>
 
           <div className="ppanel">
-            <div className="ptitel">systemstatus</div>
+            <div className="ptitel" style={{ marginBottom: 10 }}>systemstatus</div>
             {ZEILEN.map(([k, v, warn]) => (
               <div className="pzeile" key={k}>
                 <span className={"ppunkt " + (warn || "")} />
@@ -4498,6 +4505,7 @@ export default function StricklieselApp() {
   return (
     <>
       <Styles />
+      <Fehlerfang>
       <Rain />
       <ScrollTop />
       <SchwebeFenster text={abschreib} onClose={() => setAbschreib(null)} />
@@ -4836,6 +4844,7 @@ export default function StricklieselApp() {
 
         <div className="rabbit">// <b>follow the white rabbit</b> 🐇</div>
       </div>
+      </Fehlerfang>
     </>
   );
 }
@@ -5363,11 +5372,14 @@ function Styles() {
   .loeffelzahl{font-family:var(--term);font-size:44px;line-height:1;color:var(--green);text-shadow:var(--glow)}
   .spktext{font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.5;min-height:36px;
     display:flex;align-items:center;justify-content:center}
-  .spktext.keks{color:var(--green);font-style:italic}
+  .spktext.keks{color:var(--green);font-style:italic;margin-top:8px}
   .kani{background:transparent;border:0;cursor:pointer;padding:0}
-  .kani pre{font-family:var(--mono);font-size:14px;line-height:1.25;color:var(--green);margin:0;
+  .kani pre{font-family:var(--mono);font-size:20px;line-height:1.3;color:var(--green);margin:0;
     text-shadow:var(--glow);transition:.12s}
   .kani:hover pre{color:var(--white)}
+  .loglinks{margin-top:12px}
+  .loglinkkopf{font-family:var(--term);font-size:10px;letter-spacing:.12em;color:var(--dim);
+    margin-bottom:7px;text-transform:uppercase}
 
   /* verwaltungs-karten (wheel · orakel) */
   .vkarte{border:1px solid var(--line);border-radius:7px;background:var(--panel-2);margin-top:12px;overflow:hidden}
