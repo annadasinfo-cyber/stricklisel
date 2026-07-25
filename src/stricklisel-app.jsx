@@ -1317,6 +1317,7 @@ function SkUltra({ springe, zuLog }) {
   const [cDatum, setCDatum] = useState("");
   const [fragen, setFragen] = useState(["", "", "", ""]);
   const [arche, setArche] = useState(["", "", "", ""]);   // 4 archetypen-antworten
+  const [synopsis, setSynopsis] = useState("");           // kurzzusammenfassung, über den ermittlungen
   const [cWurzel, setCWurzel] = useState("");   // gewähltes matrix-projekt (wurzel-id) für die szenenwand
   const [alle, setAlle] = useState([]);         // alle skripte, für projekt-auswahl + szenenwand
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
@@ -1361,7 +1362,7 @@ function SkUltra({ springe, zuLog }) {
     if (tRef.current) clearTimeout(tRef.current);
     tRef.current = setTimeout(() => speichern(true), 2000);
     return () => clearTimeout(tRef.current);
-  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, arche, cWurzel, dirty]);
+  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, arche, synopsis, cWurzel, dirty]);
 
   const aend = (fn) => { fn(); setDirty(true); };
 
@@ -1379,6 +1380,7 @@ function SkUltra({ springe, zuLog }) {
       setCSig(r.c_sig || ""); setCDatum(r.c_datum || "");
       setFragen([r.f1 || "", r.f2 || "", r.f3 || "", r.f4 || ""]);
       setArche([r.a1 || "", r.a2 || "", r.a3 || "", r.a4 || ""]);
+      setSynopsis(r.synopsis || "");
       setCWurzel(r.c_wurzel || "");
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
@@ -1394,6 +1396,7 @@ function SkUltra({ springe, zuLog }) {
       c_start: cStart || null, c_ziel: cZiel || null, c_sig: cSig, c_datum: cDatum,
       f1: fragen[0], f2: fragen[1], f3: fragen[2], f4: fragen[3],
       a1: arche[0], a2: arche[1], a3: arche[2], a4: arche[3],
+      synopsis,
       c_wurzel: cWurzel || null,
       updated_at: new Date().toISOString(),
     };
@@ -1499,6 +1502,12 @@ function SkUltra({ springe, zuLog }) {
           </div>
         </Panel>
       </div>
+
+      <Panel id="sk-synopsis" title="SYNOPSIS" sub="worum geht's — in kurz">
+        <AutoTa className="ta" value={synopsis} style={{ minHeight: 150 }}
+          onChange={(e) => aend(() => setSynopsis(e.target.value))}
+          placeholder="die ganze geschichte in ein paar sätzen — wer, was, wogegen, wie es ausgeht." />
+      </Panel>
 
       <Panel id="sk-ermittlungen" title="ERMITTLUNGEN" sub="4 fragen">
         {ERMITTLUNG.map((f, i) => (
