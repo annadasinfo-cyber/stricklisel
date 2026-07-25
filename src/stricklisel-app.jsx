@@ -1357,6 +1357,52 @@ function SkUltra({ springe, zuLog }) {
         { prefer: "return=minimal" });
     } catch { ladeEntw(); }
   };
+
+  // hitch_wheel — dieselbe wendungs-sammlung wie im denkbrett (tabelle wheel), dreht nur per knopf
+  const [wheelListe, setWheelListe] = useState([]);
+  const [wendung, setWendung] = useState(null);
+  const [wheelDreht, setWheelDreht] = useState(false);
+  const [neueWendung, setNeueWendung] = useState("");
+  const wheelLaden = () => dbGet("wheel", `${SUPABASE_URL}/rest/v1/wheel?select=id,wendung&order=created_at.desc&limit=300`)
+    .then((d) => setWheelListe(Array.isArray(d) ? d.filter((x) => (x.wendung || "").trim()) : [])).catch(() => {});
+  useEffect(wheelLaden, []);
+  const wendungAdd = async () => {
+    const t = neueWendung.trim(); if (!t) return; setNeueWendung(""); const id = neueId();
+    setWheelListe((l) => [{ id, wendung: t }, ...l]);
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/wheel`, { id, user_id: getUserId(), wendung: t });
+    if (ok) wheelLaden();
+  };
+  const wendungWeg = async (w) => { setWheelListe((l) => l.filter((x) => x.id !== w.id)); await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/wheel?id=eq.${w.id}`); };
+  const wendungEdit = async (w, wert) => { setWheelListe((l) => l.map((x) => x.id === w.id ? { ...x, wendung: wert } : x)); await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/wheel?id=eq.${w.id}`, { wendung: wert }); };
+  const wheelDrehen = () => {
+    const arr = wheelListe.map((w) => w.wendung); if (!arr.length) return;
+    setWheelDreht(true);
+    setTimeout(() => { const pool = arr.length > 1 ? arr.filter((x) => x !== wendung) : arr; setWendung(pool[Math.floor(Math.random() * pool.length)]); setWheelDreht(false); }, 550);
+  };
+  useEffect(() => { const arr = wheelListe.map((w) => w.wendung); if (!arr.length) return; setWendung((w) => w || arr[Math.floor(Math.random() * arr.length)]); }, [wheelListe]);
+
+  // 100 fragen — eigene sammlung (tabelle fragen100), dreht wie das hitch_wheel (nur per knopf)
+  const [fragenListe, setFragenListe] = useState([]);
+  const [frage, setFrage] = useState(null);
+  const [frageDreht, setFrageDreht] = useState(false);
+  const [neueFrage, setNeueFrage] = useState("");
+  const fragenLaden = () => dbGet("fragen100", `${SUPABASE_URL}/rest/v1/fragen100?select=id,frage&order=created_at.desc&limit=300`)
+    .then((d) => setFragenListe(Array.isArray(d) ? d.filter((x) => (x.frage || "").trim()) : [])).catch(() => {});
+  useEffect(fragenLaden, []);
+  const frageAdd = async () => {
+    const t = neueFrage.trim(); if (!t) return; setNeueFrage(""); const id = neueId();
+    setFragenListe((l) => [{ id, frage: t }, ...l]);
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/fragen100`, { id, user_id: getUserId(), frage: t });
+    if (ok) fragenLaden();
+  };
+  const frageWeg = async (f) => { setFragenListe((l) => l.filter((x) => x.id !== f.id)); await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/fragen100?id=eq.${f.id}`); };
+  const frageEdit = async (f, wert) => { setFragenListe((l) => l.map((x) => x.id === f.id ? { ...x, frage: wert } : x)); await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen100?id=eq.${f.id}`, { frage: wert }); };
+  const frageDrehen = () => {
+    const arr = fragenListe.map((f) => f.frage); if (!arr.length) return;
+    setFrageDreht(true);
+    setTimeout(() => { const pool = arr.length > 1 ? arr.filter((x) => x !== frage) : arr; setFrage(pool[Math.floor(Math.random() * pool.length)]); setFrageDreht(false); }, 550);
+  };
+  useEffect(() => { const arr = fragenListe.map((f) => f.frage); if (!arr.length) return; setFrage((f) => f || arr[Math.floor(Math.random() * arr.length)]); }, [fragenListe]);
   useEffect(() => {
     if (!dirty) return;
     if (tRef.current) clearTimeout(tRef.current);
@@ -1503,6 +1549,23 @@ function SkUltra({ springe, zuLog }) {
         </Panel>
       </div>
 
+      <div className="skgrid">
+        <Panel id="sk-wheel" title="HITCH_WHEEL" sub="wendungen zum einbauen">
+          <button className={"wheel" + (wheelDreht ? " dreht" : "")} onClick={wheelDrehen} disabled={!wheelListe.length}
+            title={wheelListe.length ? "dreh am rad" : "noch keine wendungen — unten in der verwaltung eintragen"}>
+            <span className="wheeltext" key={wendung}>{wheelListe.length ? (wendung || "…") : "— noch keine wendungen —"}</span>
+            <span className="wheeldreh">↻ drehen</span>
+          </button>
+        </Panel>
+        <Panel id="sk-fragen" title="100 FRAGEN" sub="eine ziehen, beantworten">
+          <button className={"wheel" + (frageDreht ? " dreht" : "")} onClick={frageDrehen} disabled={!fragenListe.length}
+            title={fragenListe.length ? "zieh eine frage" : "noch keine fragen — unten in der verwaltung eintragen"}>
+            <span className="wheeltext" key={frage}>{fragenListe.length ? (frage || "…") : "— noch keine fragen —"}</span>
+            <span className="wheeldreh">↻ ziehen</span>
+          </button>
+        </Panel>
+      </div>
+
       <Panel id="sk-synopsis" title="SYNOPSIS" sub="worum geht's — in kurz">
         <AutoTa className="ta" value={synopsis} style={{ minHeight: 150 }}
           onChange={(e) => aend(() => setSynopsis(e.target.value))}
@@ -1534,6 +1597,15 @@ function SkUltra({ springe, zuLog }) {
       </Panel>
 
       <RohListe entw={entw} zuLog={zuLog} onPweg={pWeg} />
+
+      <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
+        liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
+        wert={neueWendung} setWert={setNeueWendung} onAdd={wendungAdd} onWeg={wendungWeg} onEdit={wendungEdit}
+        platzhalter="neue wendung …" />
+      <VerwaltKarte titel="100 fragen" leer="noch keine fragen — trag welche ein oder gib sie mir zum reinladen."
+        liste={fragenListe} label={(f) => f.frage} keyOf={(f) => f.id}
+        wert={neueFrage} setWert={setNeueFrage} onAdd={frageAdd} onWeg={frageWeg} onEdit={frageEdit}
+        platzhalter="neue frage …" />
     </>
   );
 }
