@@ -1181,10 +1181,15 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
       const station = kind(wurzel.id, st);       // kann noch fehlen (nicht aufgeklappt)
       for (const p of ST_ORDER) {                // E2 · die 8 szenen je station
         if (st === 1 && p === 1) continue;        // KEINE pay-off × pay-off szene → 63
+        // ist die szene als eigenes skript ausgebaut, steht der text dort (im mainstate).
+        const szKind = station ? kind(station.id, p) : null;
         raus.push({
           node: station || null,
           st, i: p,
-          text: (station && Array.isArray(station.texte) ? station.texte[p] : "") || "",
+          zielId: szKind ? szKind.id : (station ? station.id : null),
+          zielPos: szKind ? 4 : p,
+          text: (szKind && Array.isArray(szKind.texte) ? szKind.texte[4]
+                : station && Array.isArray(station.texte) ? station.texte[p] : "") || "",
         });
       }
     }
@@ -1219,7 +1224,7 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
               disabled={!wurzel}
               onClick={() => {
                 if (!sz || !springe) return;
-                if (sz.node) springe(sz.node.id, sz.i);       // → direkt in die szene
+                if (sz.node) springe(sz.zielId || sz.node.id, sz.zielPos ?? sz.i);   // → direkt in die szene
                 else springe(wurzel.id, sz.st);               // station noch zu → dorthin, wo man sie aufklappt
               }}
               title={da
@@ -2287,6 +2292,8 @@ const POS = [
 const SCHREIB_ORDER = [4, 2, 5, 8, 7, 6, 3, 0, 1];
 const AKT_ROEMISCH = { 1: "I", 2: "II", 3: "III" };
 const ZIEL_ABSATZ = 200;
+// ab E2 ist ein skript EINE szene: eine einzige schreibbox wie in den log-files.
+const ZIEL_SZENE = 1660;
 const leer9 = () => ["", "", "", "", "", "", "", "", ""];
 
 // Satzende = punkt/!/? — aber nicht mitten in "..." und nicht in "E0.01_E1.01".
@@ -2539,6 +2546,16 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
     return eigeneId;
   }
 
+  // wie tief hängt das ding? 0 = das buch, 1 = station, ab 2 = EINE szene.
+  function ebeneVonEltern(eid) {
+    let n = 0, e = eid, t = 0;
+    while (e && t++ < 12) { const p = alle.find((x) => x.id === e); if (!p) break; n++; e = p.eltern_id; }
+    return n;
+  }
+  function ebeneVon(s) { return ebeneVonEltern(s?.eltern_id); }
+  // hängt an dieser zelle schon ein eigenes skript?
+  function hatKind(pid, pos) { return !!pid && alle.some((x) => x.eltern_id === pid && x.eltern_pos === pos); }
+
   // wie viele hängen dran? (kinder, enkel, urenkel …)
   function nachkommen(pid, tiefe = 0) {
     if (tiefe > 12) return [];
@@ -2606,31 +2623,50 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
     // die 200 wörter, die hier oben schon geschrieben wurden, wandern als übersicht mit.
     const tx = leer9(); tx[4] = texte[i] || "";
     neu({ name: POS[i].k, hook, matrix: m, texte: tx, eltern_id: eltern, eltern_pos: i, ordner_id: skriptOrdner });
-    setView("matrix");
-    setMsg({ t: "verzweigt · " + POS[i].k + " ist jetzt mainstate", c: "ok" });
+    const neueEbene = ebeneVonEltern(eltern) + 1;
+    // ab E2 gibt es nichts mehr zu unterteilen — direkt in die schreibbox.
+    setView(neueEbene >= 2 ? "schreiben" : "matrix");
+    setMsg({ t: neueEbene >= 2 ? "szene ausgebaut · " + POS[i].k : "station ausgebaut · " + POS[i].k, c: "ok" });
   }
+
+  // ab E2 ist dieses skript EINE szene — eine box, kein raster, kein weiterverzweigen.
+  const istSzene = ebeneVonEltern(elternId) >= 2;
+  // eine szene hat nichts mehr zu unterteilen — die 3x3-seite entfällt dort.
+  useEffect(() => { if (istSzene && view === "matrix") setView("schreiben"); }, [istSzene, view]);
 
   // alle szenentexte am stück — für thorsten in der konsole.
   // ohne mainstate (der hat kein textfeld) und ohne die matrix, nur der text.
-  const szenenTexte = SCHREIB_ORDER.filter((i) => i !== 4).map((i) => (texte[i] || "").trim()).filter(Boolean);
+  // im szenen-skript ist der mainstate (4) selbst der text.
+  const szenenTexte = istSzene
+    ? [(texte[4] || "").trim()].filter(Boolean)
+    : SCHREIB_ORDER.filter((i) => i !== 4).map((i) => (texte[i] || "").trim()).filter(Boolean);
   const szenenWoerter = szenenTexte.reduce((s, x) => s + zaehleWoerter(x), 0);
   // wörter des GANZEN projekts (wurzel + alle nachkommen); mitte (mainstate) zählt nicht mit.
   // seiten = volle 250-wörter-seiten. anzeige: "5326w // 21s"
   const projektWoerter = (() => {
-    const zaehl = (t) => Array.isArray(t) ? t.reduce((a, x, i) => i === 4 ? a : a + zaehleWoerter(x || ""), 0) : 0;
-    if (!id) return zaehl(texte);
+    // ein szenen-skript (ab E2) hat seinen ganzen text im mainstate.
+    // eine zelle, die schon als eigenes skript ausgebaut ist, zählt hier NICHT mit —
+    // sonst stünden dieselben wörter zweimal in der summe.
+    const zaehl = (row, t) => {
+      if (!Array.isArray(t)) return 0;
+      if (ebeneVon(row) >= 2) return zaehleWoerter(t[4] || "");
+      return t.reduce((a, x, i) => (i === 4 || hatKind(row?.id, i)) ? a : a + zaehleWoerter(x || ""), 0);
+    };
+    if (!id) return zaehl({ id: null, eltern_id: elternId }, texte);
     let w = alle.find((x) => x.id === id), g = 0;
     while (w && w.eltern_id && g++ < 20) { const par = alle.find((x) => x.id === w.eltern_id); if (!par) break; w = par; }
     const wurzel = w || { id, texte };
     const baum = [wurzel, ...nachkommen(wurzel.id)];
-    return baum.reduce((a, sc) => a + zaehl(sc.id === id ? texte : sc.texte), 0);
+    return baum.reduce((a, sc) => a + zaehl(sc, sc.id === id ? texte : sc.texte), 0);
   })();
   const projektBadge = projektWoerter + "w // " + Math.floor(projektWoerter / 250) + "s";
   // marker als eigener satz — dann liest thorsten sie als ansage, nicht als teil des textes
-  const szenenText = () => SCHREIB_ORDER.filter((i) => i !== 4)
-    .filter((i) => (texte[i] || "").trim())
-    .map((i) => POS[i].gk + ".\n\n" + texte[i].trim())
-    .join("\n\n");
+  const szenenText = () => istSzene
+    ? (texte[4] || "").trim()
+    : SCHREIB_ORDER.filter((i) => i !== 4)
+        .filter((i) => (texte[i] || "").trim())
+        .map((i) => POS[i].gk + ".\n\n" + texte[i].trim())
+        .join("\n\n");
 
   function anDieKonsole() {
     if (!szenenTexte.length) { setMsg({ t: "noch nichts geschrieben", c: "err" }); return; }
@@ -2698,7 +2734,11 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
               <span className="bname">{nm}</span>
               {!doppelt && <span className="bsub">{sub}</span>}
             </button>
-            <span className="bmeta">{gefuellt(s)}/8</span>
+            <span className="bmeta">
+              {tiefe >= 2
+                ? zaehleWoerter((Array.isArray(s.texte) ? s.texte[4] : "") || "") + " w"
+                : gefuellt(s) + "/8"}
+            </span>
             {tiefe === 0 && (
               <select className="bmove" value="" onChange={(e) => { if (e.target.value) zweigVerschieben(s, e.target.value); e.target.value = ""; }}
                 title="ganzen zweig in ein anderes projekt verschieben">
@@ -2828,14 +2868,72 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
       zeigeAbschreib={zeigeAbschreib}
       onZurueck={() => setView("schreiben")}
       onSpeichern={() => speichern(false)}
-      bloecke={SCHREIB_ORDER.filter((i) => i !== 4).map((i) => ({
-        key: "sz" + i,
-        nr: POS[i].k,
-        text: texte[i] || "",
-        onChange: (v) => setT(i, v),
-      }))}
+      bloecke={istSzene
+        ? [{ key: "sz4", nr: name || "szene", text: texte[4] || "", onChange: (v) => setT(4, v) }]
+        : SCHREIB_ORDER.filter((i) => i !== 4).map((i) => ({
+            key: "sz" + i,
+            nr: POS[i].k,
+            text: texte[i] || "",
+            onChange: (v) => setT(i, v),
+          }))}
     />
   );
+
+  // ---------- SEITE 3 · SZENE (ab E2) ----------
+  // eine einzige schreibbox wie in den log-files. kein 3x3-raster, kein weiterverzweigen.
+  if (istSzene) {
+    const sw = zaehleWoerter(texte[4] || "");
+    const svoll = sw >= ZIEL_SZENE;
+    return (
+      <>
+        <div className="seitenkopf">
+          <button className="btn" onClick={() => setView("projekte")}>← zurück</button>
+          <span className="xfiles" style={{ color: farbe(ebene), textShadow: "0 0 8px " + farbe(ebene) + "60" }}>{name || "unbenannt"}</span>
+          <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
+          {projektWoerter > 0 && <span className="projektzaehler" title="ganzes projekt · volle seiten à 250 wörter">{projektBadge}</span>}
+          <button className="btn txtbtn" onClick={anDieKonsole} disabled={!szenenTexte.length}
+                  title="szenentext ins textfeld der konsole — thorsten liest vor">
+            ▶ konsole{sw ? " · " + sw.toLocaleString("de-DE") + " w" : ""}
+          </button>
+          <button className="btn txtbtn klein" onClick={txtKopieren} disabled={!szenenTexte.length}
+                  title="stattdessen in die zwischenablage">⧉</button>
+          <button className="btn txtbtn klein" onClick={() => zeigeAbschreib(szenenText())} disabled={!szenenTexte.length}
+                  title="text als klartext — schwebendes fenster">▤</button>
+          <button className="btn txtbtn" onClick={() => setView("korrektur")} disabled={!szenenTexte.length}
+                  title="lesefassung zum korrigieren & vorlesen">✎ korrektur</button>
+          <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
+        </div>
+
+        <Krumen ziel="schreiben" />
+
+        {hook && <div className="hookzeile">🎯 {hook}</div>}
+
+        <div className="szeneworum">
+          <label className="cap">worum es hier geht</label>
+          <AutoTa className="ta" value={matrix[4]} onChange={(e) => setM(4, e.target.value)}
+            placeholder="in kurzen worten: was passiert in dieser szene?" />
+        </div>
+
+        <AutoTa className="ta log" value={texte[4]} onChange={(e) => setT(4, e.target.value)}
+          placeholder={"> szene\n> " + (name || "unbenannt") + "\n> hier wird geschrieben …"} />
+
+        <div className="logfoot">
+          <div className="logbar">
+            <i style={{ width: Math.min(100, (sw / ZIEL_SZENE) * 100) + "%" }}
+               className={svoll ? "voll" : sw >= ZIEL_SZENE / 2 ? "halb" : ""} />
+          </div>
+          <div className={"wcount" + (svoll ? " voll" : "")}>
+            {svoll ? <>✓ {sw.toLocaleString("de-DE")} wörter · szene steht</> : <>{sw.toLocaleString("de-DE")} <span className="wziel">/ {ZIEL_SZENE} wörter</span></>}
+          </div>
+        </div>
+
+        <div className="actions" style={{ marginTop: 14 }}>
+          <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
+        </div>
+        <p className="hint">speichert sich still von selbst, zwei sekunden nach dem letzten tastendruck.</p>
+      </>
+    );
+  }
 
   // ---------- SEITE 3 ----------
   return (
@@ -2932,7 +3030,12 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
             {i !== 4 && (
               <div className="zweig">
                 {kids.map((k) => <button key={k.id} className="kind" onClick={() => { oeffnen(k); setView("schreiben"); }}>↳ {k.name}</button>)}
-                <button className="btn zweigbtn" onClick={() => verzweigen(i)}>→ zum mainstate machen</button>
+                {!kids.length && (
+                  <button className="btn zweigbtn" onClick={() => verzweigen(i)}
+                    title={ebene === 0 ? "diese station als eigene seite aufmachen" : "diese szene als eigene schreibbox aufmachen"}>
+                    {ebene === 0 ? "→ station ausbauen" : "→ szene ausbauen"}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -5552,6 +5655,8 @@ function Styles() {
 
   /* log-files */
   .ta.log{min-height:340px;font-size:13.5px;line-height:1.65;overflow:hidden;resize:none}
+  .szeneworum{margin:14px 0 12px}
+  .szeneworum .ta{min-height:56px;font-size:12.5px;color:var(--muted)}
   .logfoot{display:flex;align-items:center;gap:14px;margin-top:8px}
   .logbar{flex:1;height:2px;background:var(--line);overflow:hidden}
   .logbar i{display:block;height:100%;background:var(--green-mid);transition:width .3s}
