@@ -661,6 +661,51 @@ const WMO = {
   95: ["⚡︎", "gewitter"], 96: ["⚡︎", "gewitter mit hagel"], 99: ["⚡︎", "gewitter mit hagel"],
 };
 
+// ============================================================
+// KONFETTI · matrix-regen für einen kurzen moment. völlig unnütz, macht spaß.
+// wird über konfetti() von überall ausgelöst; die komponente hängt einmal in der app.
+// ============================================================
+let konfettiFn = null;
+const konfetti = () => { try { konfettiFn && konfettiFn(); } catch {} };
+const KF_ZEICHEN = "01アイウエオカキクケコサシスセソタチツテトナニヌネノ<>/{}[]=+*".split("");
+
+function KonfettiRegen() {
+  const [teile, setTeile] = useState([]);
+  const lauf = useRef(0);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion:reduce)").matches) return;
+    konfettiFn = () => {
+      const n = ++lauf.current;
+      const neu = Array.from({ length: 70 }, (_, i) => ({
+        k: n + "-" + i,
+        x: Math.random() * 100,
+        z: KF_ZEICHEN[Math.floor(Math.random() * KF_ZEICHEN.length)],
+        dauer: 1.9 + Math.random() * 1.5,
+        wart: Math.random() * 0.8,
+        gr: Math.round(11 + Math.random() * 13),
+        drift: Math.round(-70 + Math.random() * 140),
+        hell: Math.random() < 0.16,
+      }));
+      setTeile((t) => [...t, ...neu]);
+      setTimeout(() => setTeile((t) => t.filter((x) => !x.k.startsWith(n + "-"))), 4400);
+    };
+    return () => { konfettiFn = null; };
+  }, []);
+  if (!teile.length) return null;
+  return (
+    <div className="konfetti" aria-hidden="true">
+      {teile.map((t) => (
+        <span key={t.k} className={"kfz" + (t.hell ? " hell" : "")}
+          style={{
+            left: t.x + "%", fontSize: t.gr + "px",
+            animationDuration: t.dauer + "s", animationDelay: t.wart + "s",
+            "--drift": t.drift + "px",
+          }}>{t.z}</span>
+      ))}
+    </div>
+  );
+}
+
 function ScrollTop() {
   const [sichtbar, setSichtbar] = useState(false);
   useEffect(() => {
@@ -1368,6 +1413,12 @@ const ARCHETYP_BEISPIEL = [
   "Am Ende muß der Held bereit sein, sich selbst oder zumindest seine eigenen Ziele aufzugeben. Das ist wirklich wichtig, denn sonst entwickelt sich unser Held nicht zum Helden. Er ist ein Mensch wie du und ich (Identifikation des Lesers), dann muss er zum Helden werden, damit uns das Herz aufgeht! Wie erreichst du das? Was bringt deinen Helden dazu? Hier muss es so richtig emotional werden. Das ist der Grund, warum der Leser dein Buch lesen will! der OMG Moment!!!",
 ];
 
+// ein gezogener eintrag (rad / 100 fragen) hält 24 stunden — beim wiederkommen
+// steht derselbe da, nicht bei jedem seitenwechsel ein neuer.
+const ZUG_MS = 24 * 60 * 60 * 1000;
+const zugLesen = (k) => { try { const r = JSON.parse(localStorage.getItem(k) || "null"); return r && r.text && Date.now() - r.ts < ZUG_MS ? r : null; } catch { return null; } };
+const zugSchreiben = (k, text) => { try { localStorage.setItem(k, JSON.stringify({ text, ts: Date.now() })); } catch {} };
+
 function SkUltra({ springe, zuLog }) {
   const [id, setId] = useState(null);
   const [pName, setPName] = useState("");
@@ -1448,9 +1499,21 @@ function SkUltra({ springe, zuLog }) {
   const wheelDrehen = () => {
     const arr = wheelListe.map((w) => w.wendung); if (!arr.length) return;
     setWheelDreht(true);
-    setTimeout(() => { const pool = arr.length > 1 ? arr.filter((x) => x !== wendung) : arr; setWendung(pool[Math.floor(Math.random() * pool.length)]); setWheelDreht(false); }, 550);
+    setTimeout(() => {
+      const pool = arr.length > 1 ? arr.filter((x) => x !== wendung) : arr;
+      const neu = pool[Math.floor(Math.random() * pool.length)];
+      zugSchreiben("off:wheel-zug", neu); setWendung(neu); setWheelDreht(false);
+    }, 550);
   };
-  useEffect(() => { const arr = wheelListe.map((w) => w.wendung); if (!arr.length) return; setWendung((w) => w || arr[Math.floor(Math.random() * arr.length)]); }, [wheelListe]);
+  // beim öffnen: der zug von heute bleibt stehen. erst nach 24 h ein neuer.
+  useEffect(() => {
+    const arr = wheelListe.map((w) => w.wendung);
+    if (!arr.length || wendung) return;
+    const g = zugLesen("off:wheel-zug");
+    if (g && arr.includes(g.text)) { setWendung(g.text); return; }
+    const neu = arr[Math.floor(Math.random() * arr.length)];
+    zugSchreiben("off:wheel-zug", neu); setWendung(neu);
+  }, [wheelListe, wendung]);
 
   // 100 fragen — eigene sammlung (tabelle fragen100), dreht wie das hitch_wheel (nur per knopf)
   const [fragenListe, setFragenListe] = useState([]);
@@ -1471,9 +1534,20 @@ function SkUltra({ springe, zuLog }) {
   const frageDrehen = () => {
     const arr = fragenListe.map((f) => f.frage); if (!arr.length) return;
     setFrageDreht(true);
-    setTimeout(() => { const pool = arr.length > 1 ? arr.filter((x) => x !== frage) : arr; setFrage(pool[Math.floor(Math.random() * pool.length)]); setFrageDreht(false); }, 550);
+    setTimeout(() => {
+      const pool = arr.length > 1 ? arr.filter((x) => x !== frage) : arr;
+      const neu = pool[Math.floor(Math.random() * pool.length)];
+      zugSchreiben("off:fragen-zug", neu); setFrage(neu); setFrageDreht(false);
+    }, 550);
   };
-  useEffect(() => { const arr = fragenListe.map((f) => f.frage); if (!arr.length) return; setFrage((f) => f || arr[Math.floor(Math.random() * arr.length)]); }, [fragenListe]);
+  useEffect(() => {
+    const arr = fragenListe.map((f) => f.frage);
+    if (!arr.length || frage) return;
+    const g = zugLesen("off:fragen-zug");
+    if (g && arr.includes(g.text)) { setFrage(g.text); return; }
+    const neu = arr[Math.floor(Math.random() * arr.length)];
+    zugSchreiben("off:fragen-zug", neu); setFrage(neu);
+  }, [fragenListe, frage]);
   useEffect(() => {
     if (!dirty) return;
     if (tRef.current) clearTimeout(tRef.current);
@@ -1620,21 +1694,23 @@ function SkUltra({ springe, zuLog }) {
         </Panel>
       </div>
 
-      <div className="skgrid">
-        <Panel id="sk-fragen" title="100 FRAGEN" sub="eine ziehen, beantworten">
-          <button className={"wheel" + (frageDreht ? " dreht" : "")} onClick={frageDrehen} disabled={!fragenListe.length}
-            title={fragenListe.length ? "zieh eine frage" : "noch keine fragen — unten in der verwaltung eintragen"}>
-            <span className="wheeltext" key={frage}>{fragenListe.length ? (frage || "…") : "— noch keine fragen —"}</span>
-            <span className="wheeldreh">↻ ziehen</span>
-          </button>
-        </Panel>
-        <Panel id="sk-wheel" title="HITCH_WHEEL" sub="wendungen zum einbauen">
-          <button className={"wheel" + (wheelDreht ? " dreht" : "")} onClick={wheelDrehen} disabled={!wheelListe.length}
-            title={wheelListe.length ? "dreh am rad" : "noch keine wendungen — unten in der verwaltung eintragen"}>
-            <span className="wheeltext" key={wendung}>{wheelListe.length ? (wendung || "…") : "— noch keine wendungen —"}</span>
-            <span className="wheeldreh">↻ drehen</span>
-          </button>
-        </Panel>
+      <div className="skgrid schmal">
+        <div className={"skrad" + (frageDreht ? " dreht" : "")}>
+          <div className="skradkopf">
+            <span className="skradtitel">100 fragen</span>
+            <button className="skraddreh" onClick={frageDrehen} disabled={!fragenListe.length}
+              title={fragenListe.length ? "neue frage ziehen" : "noch keine fragen — unten in der verwaltung eintragen"}>↻</button>
+          </div>
+          <div className="skradtext" key={frage}>{fragenListe.length ? (frage || "…") : "— noch keine fragen —"}</div>
+        </div>
+        <div className={"skrad" + (wheelDreht ? " dreht" : "")}>
+          <div className="skradkopf">
+            <span className="skradtitel">hitch_wheel</span>
+            <button className="skraddreh" onClick={wheelDrehen} disabled={!wheelListe.length}
+              title={wheelListe.length ? "neue wendung ziehen" : "noch keine wendungen — unten in der verwaltung eintragen"}>↻</button>
+          </div>
+          <div className="skradtext" key={wendung}>{wheelListe.length ? (wendung || "…") : "— noch keine wendungen —"}</div>
+        </div>
       </div>
 
       <Panel id="sk-synopsis" title="SYNOPSIS" sub="worum geht's — in kurz">
@@ -1940,6 +2016,16 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
 
   const w = zaehleWoerter(text);
   const voll = w >= ZIEL_WOERTER;
+  // konfetti genau beim überschreiten der 750 — nicht bei jedem tastendruck danach,
+  // und nicht beim blättern auf einen tag, der schon voll ist.
+  const wVorher = useRef(null);
+  const tagVorher = useRef(datum);
+  useEffect(() => {
+    if (tagVorher.current !== datum) { tagVorher.current = datum; wVorher.current = w; return; }
+    const vor = wVorher.current;
+    wVorher.current = w;
+    if (vor != null && vor < ZIEL_WOERTER && w >= ZIEL_WOERTER) konfetti();
+  }, [w, datum]);
   const nr = liste.length ? liste.findIndex((x) => x.datum === datum) : -1;
   const eintragNr = nr >= 0 ? liste.length - nr : liste.length + 1;
   const d = new Date(datum + "T12:00:00");
@@ -2633,6 +2719,17 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
   const istSzene = ebeneVonEltern(elternId) >= 2;
   // eine szene hat nichts mehr zu unterteilen — die 3x3-seite entfällt dort.
   useEffect(() => { if (istSzene && view === "matrix") setView("schreiben"); }, [istSzene, view]);
+  // konfetti, wenn die szene voll wird — beim überschreiten, nicht beim öffnen.
+  const szeneW = zaehleWoerter(texte[4] || "");
+  const szVorher = useRef(null);
+  const szIdVorher = useRef(null);
+  useEffect(() => {
+    if (!istSzene) { szVorher.current = null; szIdVorher.current = null; return; }
+    if (szIdVorher.current !== id) { szIdVorher.current = id; szVorher.current = szeneW; return; }
+    const vor = szVorher.current;
+    szVorher.current = szeneW;
+    if (vor != null && vor < ZIEL_SZENE && szeneW >= ZIEL_SZENE) konfetti();
+  }, [szeneW, istSzene, id]);
 
   // alle szenentexte am stück — für thorsten in der konsole.
   // ohne mainstate (der hat kein textfeld) und ohne die matrix, nur der text.
@@ -2882,7 +2979,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
   // ---------- SEITE 3 · SZENE (ab E2) ----------
   // eine einzige schreibbox wie in den log-files. kein 3x3-raster, kein weiterverzweigen.
   if (istSzene) {
-    const sw = zaehleWoerter(texte[4] || "");
+    const sw = szeneW;
     const svoll = sw >= ZIEL_SZENE;
     return (
       <>
@@ -4610,6 +4707,7 @@ export default function StricklieselApp() {
       <Styles />
       <Fehlerfang>
       <Rain />
+      <KonfettiRegen />
       <ScrollTop />
       <SchwebeFenster text={abschreib} onClose={() => setAbschreib(null)} />
       <div className="wrap">
@@ -5123,6 +5221,23 @@ function Styles() {
   .ytplay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     font-size:22px;color:#fff;text-shadow:0 0 10px rgba(0,0,0,.8);pointer-events:none}
   .skgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  .skgrid.schmal{gap:14px;margin-bottom:22px}
+  /* schaukästen auf sk_ultra · schlanke karte statt doppeltem rahmen */
+  .skrad{border:1px solid var(--line);border-radius:6px;padding:11px 13px 13px;
+    background:rgba(0,0,0,.18);display:flex;flex-direction:column;gap:9px}
+  .skradkopf{display:flex;align-items:center;gap:10px}
+  .skradtitel{flex:1;font-family:var(--term);font-size:10px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--green-mid)}
+  .skraddreh{flex:none;width:24px;height:24px;border:1px solid var(--line);border-radius:4px;
+    background:transparent;color:var(--dim);font-family:var(--term);font-size:13px;line-height:1;
+    cursor:pointer;transition:.15s}
+  .skraddreh:hover:not(:disabled){color:var(--green);border-color:var(--green-dim);
+    box-shadow:0 0 10px rgba(53,255,111,.16)}
+  .skraddreh:disabled{opacity:.35;cursor:default}
+  .skradtext{font-family:var(--mono);font-size:12.5px;line-height:1.55;color:var(--green);
+    text-shadow:var(--glow);min-height:3em;transition:opacity .25s}
+  .skrad.dreht .skradtext{opacity:.12}
+  .skrad.dreht .skraddreh{animation:wheelspin .55s linear}
   @media(max-width:820px){.skgrid{grid-template-columns:1fr}}
   .logflags{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .logAs{margin-left:auto}
@@ -5655,6 +5770,19 @@ function Styles() {
 
   /* log-files */
   .ta.log{min-height:340px;font-size:13.5px;line-height:1.65;overflow:hidden;resize:none}
+  /* konfetti · matrix-regen für einen moment */
+  .konfetti{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
+  .kfz{position:absolute;top:-8vh;font-family:var(--mono);color:var(--green);opacity:0;
+    text-shadow:0 0 8px rgba(53,255,111,.75);will-change:transform,opacity;
+    animation-name:kfall;animation-timing-function:linear;animation-fill-mode:forwards}
+  .kfz.hell{color:#fff;text-shadow:0 0 10px var(--green),0 0 22px rgba(53,255,111,.55)}
+  @keyframes kfall{
+    0%{transform:translate3d(0,0,0) rotate(0deg);opacity:0}
+    9%{opacity:1}
+    82%{opacity:1}
+    100%{transform:translate3d(var(--drift),112vh,0) rotate(260deg);opacity:0}
+  }
+
   .szeneworum{margin:14px 0 12px}
   .szeneworum .ta{min-height:56px;font-size:12.5px;color:var(--muted)}
   .logfoot{display:flex;align-items:center;gap:14px;margin-top:8px}
