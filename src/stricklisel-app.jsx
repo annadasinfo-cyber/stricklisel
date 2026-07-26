@@ -1226,15 +1226,10 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
       const station = kind(wurzel.id, st);       // kann noch fehlen (nicht aufgeklappt)
       for (const p of ST_ORDER) {                // E2 · die 8 szenen je station
         if (st === 1 && p === 1) continue;        // KEINE pay-off × pay-off szene → 63
-        // ist die szene als eigenes skript ausgebaut, steht der text dort (im mainstate).
-        const szKind = station ? kind(station.id, p) : null;
         raus.push({
           node: station || null,
           st, i: p,
-          zielId: szKind ? szKind.id : (station ? station.id : null),
-          zielPos: szKind ? 4 : p,
-          text: (szKind && Array.isArray(szKind.texte) ? szKind.texte[4]
-                : station && Array.isArray(station.texte) ? station.texte[p] : "") || "",
+          text: (station && Array.isArray(station.texte) ? station.texte[p] : "") || "",
         });
       }
     }
@@ -1269,7 +1264,7 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
               disabled={!wurzel}
               onClick={() => {
                 if (!sz || !springe) return;
-                if (sz.node) springe(sz.zielId || sz.node.id, sz.zielPos ?? sz.i);   // → direkt in die szene
+                if (sz.node) springe(sz.node.id, sz.i);       // → direkt in die szene
                 else springe(wurzel.id, sz.st);               // station noch zu → dorthin, wo man sie aufklappt
               }}
               title={da
@@ -2535,41 +2530,30 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
   const [elternId, setElternId] = useState(null);
   const [elternPos, setElternPos] = useState(null);
   const [gewaehlt, setGewaehlt] = useState(null);
-  const [zuSzene, setZuSzene] = useState({});
+  const [szeneIdx, setSzeneIdx] = useState(null);   // welche zelle gerade geschrieben wird
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
   const [dirty, setDirty] = useState(false);
   const tRef = useRef(null);
   const idRef = useRef(null);
   const eingabeRef = useRef(null);
   useEffect(() => { idRef.current = id; }, [id]);
-  // welche szenen zugeklappt sind — pro skript, überlebt das neuladen
-  useEffect(() => {
-    if (!id) { setZuSzene({}); return; }
-    try { setZuSzene(JSON.parse(localStorage.getItem("szenen:" + id) || "{}")); } catch { setZuSzene({}); }
-  }, [id]);
-  const kippeSzene = (i) => setZuSzene((z) => {
-    const n = { ...z, [i]: !z[i] };
-    if (id) try { localStorage.setItem("szenen:" + id, JSON.stringify(n)); } catch {}
-    return n;
-  });
-
   useEffect(() => { laden(); }, [projekt]);
 
-  // sprung aus THINGS: skript öffnen, auf die schreibseite, zur position scrollen
+  // sprung aus THINGS / von der szenenwand: skript öffnen und an die richtige stelle
   useEffect(() => {
     if (!sprung || !alle.length) return;
     const s = alle.find((x) => x.id === sprung.id);
     if (!s) return;
-    oeffnen(s); setView("schreiben");
+    oeffnen(s);
     const pos = sprung.i;
     setSprung(null);
-    setTimeout(() => {
-      const el = document.getElementById("szene-" + pos);
-      if (!el) return;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("blitz");
-      setTimeout(() => el.classList.remove("blitz"), 1600);
-    }, 120);
+    if (pos != null && pos !== 4 && (s.eltern_id || null) !== null) {
+      // eine station: direkt in die szene
+      setGewaehlt(pos); setSzeneIdx(pos); setView("szene");
+    } else {
+      setGewaehlt(pos != null ? pos : null); setView("matrix");
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [sprung, alle]);
 
   useEffect(() => {
@@ -2632,16 +2616,6 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
     return eigeneId;
   }
 
-  // wie tief hängt das ding? 0 = das buch, 1 = station, ab 2 = EINE szene.
-  function ebeneVonEltern(eid) {
-    let n = 0, e = eid, t = 0;
-    while (e && t++ < 12) { const p = alle.find((x) => x.id === e); if (!p) break; n++; e = p.eltern_id; }
-    return n;
-  }
-  function ebeneVon(s) { return ebeneVonEltern(s?.eltern_id); }
-  // hängt an dieser zelle schon ein eigenes skript?
-  function hatKind(pid, pos) { return !!pid && alle.some((x) => x.eltern_id === pid && x.eltern_pos === pos); }
-
   // wie viele hängen dran? (kinder, enkel, urenkel …)
   function nachkommen(pid, tiefe = 0) {
     if (tiefe > 12) return [];
@@ -2700,70 +2674,55 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
     setTimeout(() => setHtsMsg(""), 2500);
   }
 
-  // aus einer position ein eigenes skript machen — der baum
-  async function verzweigen(i) {
-    if (!matrix[i].trim()) { setMsg({ t: "erst beschreiben, was an der position passiert", c: "err" }); return; }
+  // aus einer zelle eine eigene STATION machen — nur auf E0.
+  // die grobe idee der zelle wandert dabei in die mitte des neuen blatts,
+  // genau so, wie sie es auf papier machen würde.
+  async function ausbauen(i) {
+    if (!matrix[i].trim()) { setMsg({ t: "erst hinschreiben, worum es an der stelle geht", c: "err" }); return; }
     const eltern = await speichern(true);
     if (!eltern) return;
     const m = leer9(); m[4] = matrix[i];
-    // die 200 wörter, die hier oben schon geschrieben wurden, wandern als übersicht mit.
-    const tx = leer9(); tx[4] = texte[i] || "";
-    neu({ name: POS[i].k, hook, matrix: m, texte: tx, eltern_id: eltern, eltern_pos: i, ordner_id: skriptOrdner });
-    const neueEbene = ebeneVonEltern(eltern) + 1;
-    // ab E2 gibt es nichts mehr zu unterteilen — direkt in die schreibbox.
-    setView(neueEbene >= 2 ? "schreiben" : "matrix");
-    setMsg({ t: neueEbene >= 2 ? "szene ausgebaut · " + POS[i].k : "station ausgebaut · " + POS[i].k, c: "ok" });
+    neu({ name: POS[i].k, hook, matrix: m, texte: leer9(), eltern_id: eltern, eltern_pos: i, ordner_id: skriptOrdner });
+    setGewaehlt(null); setSzeneIdx(null);
+    setDirty(true);   // damit der autosave die neue station gleich anlegt
+    setView("matrix");
+    setMsg({ t: "station ausgebaut · " + POS[i].k, c: "ok" });
   }
 
-  // ab E2 ist dieses skript EINE szene — eine box, kein raster, kein weiterverzweigen.
-  const istSzene = ebeneVonEltern(elternId) >= 2;
-  // eine szene hat nichts mehr zu unterteilen — die 3x3-seite entfällt dort.
-  useEffect(() => { if (istSzene && view === "matrix") setView("schreiben"); }, [istSzene, view]);
-  // konfetti, wenn die szene voll wird — beim überschreiten, nicht beim öffnen.
-  const szeneW = zaehleWoerter(texte[4] || "");
+  // konfetti, wenn eine szene voll wird — beim überschreiten, nicht beim öffnen.
+  const szeneW = szeneIdx == null ? 0 : zaehleWoerter(texte[szeneIdx] || "");
   const szVorher = useRef(null);
-  const szIdVorher = useRef(null);
+  const szSchluessel = useRef(null);
   useEffect(() => {
-    if (!istSzene) { szVorher.current = null; szIdVorher.current = null; return; }
-    if (szIdVorher.current !== id) { szIdVorher.current = id; szVorher.current = szeneW; return; }
+    if (szeneIdx == null) { szSchluessel.current = null; szVorher.current = null; return; }
+    const k = String(id) + "|" + szeneIdx;
+    if (szSchluessel.current !== k) { szSchluessel.current = k; szVorher.current = szeneW; return; }
     const vor = szVorher.current;
     szVorher.current = szeneW;
     if (vor != null && vor < ZIEL_SZENE && szeneW >= ZIEL_SZENE) konfetti();
-  }, [szeneW, istSzene, id]);
+  }, [szeneW, szeneIdx, id]);
 
-  // alle szenentexte am stück — für thorsten in der konsole.
-  // ohne mainstate (der hat kein textfeld) und ohne die matrix, nur der text.
-  // im szenen-skript ist der mainstate (4) selbst der text.
-  const szenenTexte = istSzene
-    ? [(texte[4] || "").trim()].filter(Boolean)
-    : SCHREIB_ORDER.filter((i) => i !== 4).map((i) => (texte[i] || "").trim()).filter(Boolean);
+  // alle szenentexte dieser station am stück — für thorsten in der konsole.
+  // die mitte (4) hat keinen text, die sagt nur, worum es geht.
+  const szenenTexte = SCHREIB_ORDER.filter((i) => i !== 4).map((i) => (texte[i] || "").trim()).filter(Boolean);
   const szenenWoerter = szenenTexte.reduce((s, x) => s + zaehleWoerter(x), 0);
-  // wörter des GANZEN projekts (wurzel + alle nachkommen); mitte (mainstate) zählt nicht mit.
+  // wörter des GANZEN projekts (wurzel + alle nachkommen); mitte zählt nicht mit.
   // seiten = volle 250-wörter-seiten. anzeige: "5326w // 21s"
   const projektWoerter = (() => {
-    // ein szenen-skript (ab E2) hat seinen ganzen text im mainstate.
-    // eine zelle, die schon als eigenes skript ausgebaut ist, zählt hier NICHT mit —
-    // sonst stünden dieselben wörter zweimal in der summe.
-    const zaehl = (row, t) => {
-      if (!Array.isArray(t)) return 0;
-      if (ebeneVon(row) >= 2) return zaehleWoerter(t[4] || "");
-      return t.reduce((a, x, i) => (i === 4 || hatKind(row?.id, i)) ? a : a + zaehleWoerter(x || ""), 0);
-    };
-    if (!id) return zaehl({ id: null, eltern_id: elternId }, texte);
+    const zaehl = (t) => Array.isArray(t) ? t.reduce((a, x, i) => i === 4 ? a : a + zaehleWoerter(x || ""), 0) : 0;
+    if (!id) return zaehl(texte);
     let w = alle.find((x) => x.id === id), g = 0;
     while (w && w.eltern_id && g++ < 20) { const par = alle.find((x) => x.id === w.eltern_id); if (!par) break; w = par; }
     const wurzel = w || { id, texte };
     const baum = [wurzel, ...nachkommen(wurzel.id)];
-    return baum.reduce((a, sc) => a + zaehl(sc, sc.id === id ? texte : sc.texte), 0);
+    return baum.reduce((a, sc) => a + zaehl(sc.id === id ? texte : sc.texte), 0);
   })();
   const projektBadge = projektWoerter + "w // " + Math.floor(projektWoerter / 250) + "s";
   // marker als eigener satz — dann liest thorsten sie als ansage, nicht als teil des textes
-  const szenenText = () => istSzene
-    ? (texte[4] || "").trim()
-    : SCHREIB_ORDER.filter((i) => i !== 4)
-        .filter((i) => (texte[i] || "").trim())
-        .map((i) => POS[i].gk + ".\n\n" + texte[i].trim())
-        .join("\n\n");
+  const szenenText = () => SCHREIB_ORDER.filter((i) => i !== 4)
+    .filter((i) => (texte[i] || "").trim())
+    .map((i) => POS[i].gk + ".\n\n" + texte[i].trim())
+    .join("\n\n");
 
   function anDieKonsole() {
     if (!szenenTexte.length) { setMsg({ t: "noch nichts geschrieben", c: "err" }); return; }
@@ -2790,13 +2749,12 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
     return k;
   })();
 
-  // brotkrumen — auf jeder seite gleich, springen ohne die seite zu wechseln
   const ebene = krumen.length;
   const Krumen = ({ ziel }) => krumen.length === 0 ? null : (
     <div className="krumen">
       {krumen.map((s, n) => (
         <span key={s.id}>
-          <button style={{ color: farbe(n) }} onClick={() => { oeffnen(s); if (ziel) setView(ziel); }}>{s.name || "unbenannt"}</button> ›{" "}
+          <button style={{ color: farbe(n) }} onClick={() => { oeffnen(s); setSzeneIdx(null); if (ziel) setView(ziel); }}>{s.name || "unbenannt"}</button> ›{" "}
         </span>
       ))}
       <b style={{ color: farbe(ebene) }}>{name || "neu"}</b>
@@ -2804,8 +2762,9 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
   );
 
   const meine = alle.filter((s) => (aktOrdner ? s.ordner_id === aktOrdner : true));
-  // mainstate (4) zählt nicht mit — der sagt nur, worum es geht. es gibt 8 stationen.
+  // mitte (4) zählt nicht mit — die sagt nur, worum es geht. es gibt 8 stationen.
   const gefuellt = (s) => (Array.isArray(s.matrix) ? s.matrix.filter((x, n) => n !== 4 && x && x.trim()).length : 0);
+  const kinder = (pid, pos) => alle.filter((s) => s.eltern_id === pid && s.eltern_pos === pos);
 
   // der baum: wurzeln, kinder, kindeskinder — aufklappbar
   const Baum = ({ eltern, tiefe }) => {
@@ -2814,7 +2773,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
     return kids.map((s) => {
       const enkel = meine.filter((x) => x.eltern_id === s.id);
       const offen = !zu[s.id];
-      // steht der mainstate-text schon im namen? dann nicht zweimal zeigen.
+      // steht der mitten-text schon im namen? dann nicht zweimal zeigen.
       const nm = (s.name || "unbenannt").trim();
       const sub = ((Array.isArray(s.matrix) ? s.matrix[4] : "") || "").trim();
       const a = nm.toLowerCase(), b = sub.toLowerCase();
@@ -2827,15 +2786,11 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
               onClick={() => setZu((z) => ({ ...z, [s.id]: !z[s.id] }))}>
               {enkel.length ? (offen ? "▾" : "▸") : "·"}
             </button>
-            <button className="bhaupt" onClick={() => oeffnen(s)}>
+            <button className="bhaupt" onClick={() => { oeffnen(s); setSzeneIdx(null); }}>
               <span className="bname">{nm}</span>
               {!doppelt && <span className="bsub">{sub}</span>}
             </button>
-            <span className="bmeta">
-              {tiefe >= 2
-                ? zaehleWoerter((Array.isArray(s.texte) ? s.texte[4] : "") || "") + " w"
-                : gefuellt(s) + "/8"}
-            </span>
+            <span className="bmeta">{gefuellt(s)}/8</span>
             {tiefe === 0 && (
               <select className="bmove" value="" onChange={(e) => { if (e.target.value) zweigVerschieben(s, e.target.value); e.target.value = ""; }}
                 title="ganzen zweig in ein anderes projekt verschieben">
@@ -2849,9 +2804,8 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
       );
     });
   };
-  const kinder = (pid, pos) => alle.filter((s) => s.eltern_id === pid && s.eltern_pos === pos);
 
-  // ---------- SEITE 1 ----------
+  // ---------- SEITE 1 · PROJEKTE ----------
   if (view === "projekte") return (
     <>
       <div className="grouphead">SKRIPTE<span className="rule" /></div>
@@ -2862,7 +2816,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
       </div>
       <Panel id="skripte-projekte" title="PROJEKTE" sub="ordner & gespeicherte skripte">
         <div className="otabs">
-          <button className="otab neu" onClick={() => neu()}>+ neues skript</button>
+          <button className="otab neu" onClick={() => { neu(); setSzeneIdx(null); }}>+ neues skript</button>
           <button className={"otab" + (aktOrdner === "" ? " on" : "")} onClick={() => setAktOrdner("")}>alle</button>
           {ordner.map((o) => (
             <span className={"otab" + (aktOrdner === o.id ? " on" : "")} key={o.id}>
@@ -2912,50 +2866,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
     </>
   );
 
-  // ---------- SEITE 2 ----------
-  if (view === "matrix") return (
-    <>
-      <div className="seitenkopf">
-        <button className="btn" onClick={() => setView("projekte")}>← zurück</button>
-        <span className="xfiles">x-files</span>
-        <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
-        {projektWoerter > 0 && <span className="projektzaehler" title="ganzes projekt · volle seiten à 250 wörter">{projektBadge}</span>}
-        <button className="btn primary" onClick={() => setView("schreiben")}>weiter →</button>
-      </div>
-      <Krumen ziel="matrix" />
-      <div className="mx">
-        {POS.map((p, i) => (
-          <button key={i} style={{ "--o": SCHREIB_ORDER.indexOf(i) }}
-            className={"zelle" + (gewaehlt === i ? " on" : "") + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "")}
-            onClick={() => {
-              setGewaehlt(i);
-              // portrait: das schreibfeld liegt unter neun kästchen. hinbringen.
-              if (window.innerWidth <= 640) setTimeout(() => eingabeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
-            }}>
-            {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
-            <span className="zname">{p.k}</span>
-            <span className="ztext">{erstSatz(matrix[i]) || "+"}</span>
-          </button>
-        ))}
-      </div>
-      {gewaehlt !== null && (
-        <div className="eingabe" ref={eingabeRef}>
-          <div className="ekopf">
-            <span className="zname">{POS[gewaehlt].k}</span>
-            <button className="btn" onClick={() => setM(gewaehlt, "")}>✕ leeren</button>
-            <button className="btn zumraster" onClick={() => { setGewaehlt(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}>↑ zurück zur matrix</button>
-          </div>
-          <textarea className="ta" autoFocus value={matrix[gewaehlt]} onChange={(e) => setM(gewaehlt, e.target.value)}
-            placeholder="in kurzen worten: was passiert hier?" style={{ minHeight: 80 }} />
-        </div>
-      )}
-      <div className="actions" style={{ marginTop: 12 }}>
-        <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
-      </div>
-    </>
-  );
-
-  // ---------- KORREKTUR (lesefassung) ----------
+  // ---------- KORREKTUR · lesefassung aller szenen dieser station ----------
   if (view === "korrektur") return (
     <Korrektur
       titel={name}
@@ -2963,64 +2874,84 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
       msg={msg}
       zurKonsole={zurKonsole}
       zeigeAbschreib={zeigeAbschreib}
-      onZurueck={() => setView("schreiben")}
+      onZurueck={() => setView("matrix")}
       onSpeichern={() => speichern(false)}
-      bloecke={istSzene
-        ? [{ key: "sz4", nr: name || "szene", text: texte[4] || "", onChange: (v) => setT(4, v) }]
-        : SCHREIB_ORDER.filter((i) => i !== 4).map((i) => ({
-            key: "sz" + i,
-            nr: POS[i].k,
-            text: texte[i] || "",
-            onChange: (v) => setT(i, v),
-          }))}
+      bloecke={SCHREIB_ORDER.filter((i) => i !== 4).map((i) => ({
+        key: "sz" + i,
+        nr: POS[i].k,
+        text: texte[i] || "",
+        onChange: (v) => setT(i, v),
+      }))}
     />
   );
 
-  // ---------- SEITE 3 · SZENE (ab E2) ----------
-  // eine einzige schreibbox wie in den log-files. kein 3x3-raster, kein weiterverzweigen.
-  if (istSzene) {
-    const sw = szeneW;
-    const svoll = sw >= ZIEL_SZENE;
+  // ---------- SZENE · schreibfeld mit dem erarbeiteten kontext darüber ----------
+  // der stapel geht von grob nach fein: die idee → die station → diese szene.
+  // beim reinscrollen liest man sich selbst in die szene hinein.
+  if (view === "szene" && szeneIdx != null && szeneIdx !== 4) {
+    const i = szeneIdx;
+    const w = zaehleWoerter(texte[i] || "");
+    const voll = w >= ZIEL_SZENE;
+    const text = (texte[i] || "").trim();
+    const ring = SCHREIB_ORDER.filter((x) => x !== 4);
+    const wo = ring.indexOf(i);
+    const geh = (d) => {
+      const n = ring[(wo + d + ring.length) % ring.length];
+      setSzeneIdx(n); setGewaehlt(n);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    const stapel = [
+      ...krumen.map((s, n) => ({
+        cap: n === 0 ? "die idee" : "station",
+        titel: s.name || "unbenannt",
+        text: ((Array.isArray(s.matrix) ? s.matrix[4] : "") || "").trim(),
+      })),
+      { cap: krumen.length ? "station" : "die idee", titel: name || "unbenannt", text: (matrix[4] || "").trim() },
+      { cap: "szene", titel: POS[i].k, text: (matrix[i] || "").trim() },
+    ];
     return (
       <>
         <div className="seitenkopf">
-          <button className="btn" onClick={() => setView("projekte")}>← zurück</button>
-          <span className="xfiles" style={{ color: farbe(ebene), textShadow: "0 0 8px " + farbe(ebene) + "60" }}>{name || "unbenannt"}</span>
-          <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
+          <button className="btn" onClick={() => setView("matrix")}>← zur matrix</button>
+          <span className="xfiles" style={{ color: farbe(ebene + 1), textShadow: "0 0 8px " + farbe(ebene + 1) + "60" }}>{POS[i].k}</span>
+          {POS[i].akt > 0 && <span className="ebadge" style={{ "--lvl": farbe(ebene + 1) }} title="akt">{AKT_ROEMISCH[POS[i].akt]}</span>}
           {projektWoerter > 0 && <span className="projektzaehler" title="ganzes projekt · volle seiten à 250 wörter">{projektBadge}</span>}
-          <button className="btn txtbtn" onClick={anDieKonsole} disabled={!szenenTexte.length}
-                  title="szenentext ins textfeld der konsole — thorsten liest vor">
-            ▶ konsole{sw ? " · " + sw.toLocaleString("de-DE") + " w" : ""}
-          </button>
-          <button className="btn txtbtn klein" onClick={txtKopieren} disabled={!szenenTexte.length}
-                  title="stattdessen in die zwischenablage">⧉</button>
-          <button className="btn txtbtn klein" onClick={() => zeigeAbschreib(szenenText())} disabled={!szenenTexte.length}
+          <button className="btn txtbtn klein" onClick={() => geh(-1)} title="vorige szene im kreis">‹</button>
+          <button className="btn txtbtn klein" onClick={() => geh(1)} title="nächste szene im kreis">›</button>
+          <button className="btn txtbtn klein" onClick={() => zeigeAbschreib(text)} disabled={!text}
                   title="text als klartext — schwebendes fenster">▤</button>
-          <button className="btn txtbtn" onClick={() => setView("korrektur")} disabled={!szenenTexte.length}
-                  title="lesefassung zum korrigieren & vorlesen">✎ korrektur</button>
+          <button className="btn txtbtn" onClick={() => { if (!text) { setMsg({ t: "noch nichts geschrieben", c: "err" }); return; } zurKonsole(text); }}
+                  disabled={!text} title="diese szene an die konsole — thorsten liest vor">
+            ▶ konsole{w ? " · " + w.toLocaleString("de-DE") + " w" : ""}
+          </button>
           <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
         </div>
 
-        <Krumen ziel="schreiben" />
+        <Krumen ziel="matrix" />
 
-        {hook && <div className="hookzeile">🎯 {hook}</div>}
-
-        <div className="szeneworum">
-          <label className="cap">worum es hier geht</label>
-          <AutoTa className="ta" value={matrix[4]} onChange={(e) => setM(4, e.target.value)}
-            placeholder="in kurzen worten: was passiert in dieser szene?" />
+        <div className="stapel">
+          {stapel.map((s, n) => (
+            <div className={"stapelbox" + (n === stapel.length - 1 ? " jetzt" : "")} key={n}
+                 style={{ "--lvl": farbe(n) }}>
+              <div className="stapelkopf">
+                <span className="stapelcap">{s.cap}</span>
+                <span className="stapeltitel">{s.titel}</span>
+              </div>
+              <div className="stapeltext">{s.text || "—"}</div>
+            </div>
+          ))}
         </div>
 
-        <AutoTa className="ta log" value={texte[4]} onChange={(e) => setT(4, e.target.value)}
-          placeholder={"> szene\n> " + (name || "unbenannt") + "\n> hier wird geschrieben …"} />
+        <AutoTa className="ta log" value={texte[i]} onChange={(e) => setT(i, e.target.value)}
+          placeholder={"> " + POS[i].k + "\n> hier wird geschrieben …"} />
 
         <div className="logfoot">
           <div className="logbar">
-            <i style={{ width: Math.min(100, (sw / ZIEL_SZENE) * 100) + "%" }}
-               className={svoll ? "voll" : sw >= ZIEL_SZENE / 2 ? "halb" : ""} />
+            <i style={{ width: Math.min(100, (w / ZIEL_SZENE) * 100) + "%" }}
+               className={voll ? "voll" : w >= ZIEL_SZENE / 2 ? "halb" : ""} />
           </div>
-          <div className={"wcount" + (svoll ? " voll" : "")}>
-            {svoll ? <>✓ {sw.toLocaleString("de-DE")} wörter · szene steht</> : <>{sw.toLocaleString("de-DE")} <span className="wziel">/ {ZIEL_SZENE} wörter</span></>}
+          <div className={"wcount" + (voll ? " voll" : "")}>
+            {voll ? <>✓ {w.toLocaleString("de-DE")} wörter · szene steht</> : <>{w.toLocaleString("de-DE")} <span className="wziel">/ {ZIEL_SZENE} wörter</span></>}
           </div>
         </div>
 
@@ -3032,112 +2963,93 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
     );
   }
 
-  // ---------- SEITE 3 ----------
+  // ---------- SEITE 2 · DIE MATRIX (standard) ----------
+  // E0 = das buch, mitte = die idee, drumherum die 8 stationen.
+  // E1 = eine station, mitte = deren grobe idee, drumherum die 8 szenen.
+  const kinderHier = (i) => (id ? kinder(id, i) : []);
+  const gewaehltKind = gewaehlt != null ? kinderHier(gewaehlt)[0] : null;
+  const kannWeiter = gewaehlt != null && gewaehlt !== 4;
+  const weiterText = ebene === 0
+    ? (gewaehltKind ? "→ in die station" : "→ station ausbauen")
+    : "→ schreiben";
+  const weiter = () => {
+    if (!kannWeiter) return;
+    if (ebene === 0) {
+      if (gewaehltKind) { oeffnen(gewaehltKind); setGewaehlt(null); setSzeneIdx(null); setView("matrix"); }
+      else ausbauen(gewaehlt);
+    } else {
+      setSzeneIdx(gewaehlt); setView("szene");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
   return (
     <>
       <div className="seitenkopf">
-        <button className="btn" onClick={() => setView("matrix")}>← zurück</button>
-        <span className="xfiles" style={{ color: farbe(ebene), textShadow: "0 0 8px " + farbe(ebene) + "60" }}>{name || "unbenannt"}</span>
+        <button className="btn" onClick={() => setView("projekte")}>← zurück</button>
+        <span className="xfiles" style={{ color: farbe(ebene), textShadow: "0 0 8px " + farbe(ebene) + "60" }}>
+          {ebene === 0 ? "x-files" : (name || "unbenannt")}
+        </span>
         <span className="ebadge" style={{ "--lvl": farbe(ebene) }} title={"ebene " + ebene}>E{ebene}</span>
         {projektWoerter > 0 && <span className="projektzaehler" title="ganzes projekt · volle seiten à 250 wörter">{projektBadge}</span>}
-        <button className="btn txtbtn" onClick={anDieKonsole} disabled={!szenenTexte.length}
-                title="alle szenentexte ins textfeld der konsole — thorsten liest vor">
-          ▶ konsole{szenenWoerter ? " · " + szenenWoerter.toLocaleString("de-DE") + " w" : ""}
-        </button>
-        <button className="btn txtbtn klein" onClick={txtKopieren} disabled={!szenenTexte.length}
-                title="stattdessen in die zwischenablage">⧉</button>
-        <button className="btn txtbtn klein" onClick={() => zeigeAbschreib(szenenText())} disabled={!szenenTexte.length}
-                title="text als klartext — schwebendes fenster">▤</button>
-        <button className="btn txtbtn" onClick={() => setView("korrektur")} disabled={!szenenTexte.length}
-                title="lesefassung zum korrigieren & vorlesen">✎ korrektur</button>
-        <button className="btn primary" onClick={() => speichern(false)}>⇥ speichern</button>
+        {ebene > 0 && (
+          <>
+            <button className="btn txtbtn" onClick={anDieKonsole} disabled={!szenenTexte.length}
+                    title="alle szenen dieser station an die konsole">
+              ▶ konsole{szenenWoerter ? " · " + szenenWoerter.toLocaleString("de-DE") + " w" : ""}
+            </button>
+            <button className="btn txtbtn klein" onClick={txtKopieren} disabled={!szenenTexte.length}
+                    title="stattdessen in die zwischenablage">⧉</button>
+            <button className="btn txtbtn klein" onClick={() => zeigeAbschreib(szenenText())} disabled={!szenenTexte.length}
+                    title="text als klartext — schwebendes fenster">▤</button>
+            <button className="btn txtbtn" onClick={() => setView("korrektur")} disabled={!szenenTexte.length}
+                    title="lesefassung zum korrigieren & vorlesen">✎ korrektur</button>
+          </>
+        )}
+        <button className="btn primary" onClick={weiter} disabled={!kannWeiter}
+                title={kannWeiter ? weiterText : "erst ein kästchen anklicken"}>{weiterText}</button>
       </div>
 
-      <Krumen ziel="schreiben" />
+      <Krumen ziel="matrix" />
 
-      {hook && <div className="hookzeile">🎯 {hook}</div>}
+      {hook && ebene === 0 && <div className="hookzeile">🎯 {hook}</div>}
 
-      <div className="mx klein">
+      <div className="mx">
         {POS.map((p, i) => {
-          const kids = id ? kinder(id, i) : [];
-          const kind = kids[0];
-          const zurSzene = () => {
-            const el = document.getElementById("szene-" + i);
-            if (!el) return;
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-            el.classList.add("blitz"); setTimeout(() => el.classList.remove("blitz"), 1600);
-          };
+          const kids = kinderHier(i);
+          const w = i === 4 ? 0 : zaehleWoerter(texte[i] || "");
           return (
             <button key={i} style={{ "--o": SCHREIB_ORDER.indexOf(i) }}
-              className={"zelle" + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "") + (kind ? " hatkind" : "")}
-              title={kind ? "→ " + kind.name + " (ebene " + (ebene + 1) + ")" : "→ zur szene"}
-              onClick={() => { if (kind) { oeffnen(kind); setView("schreiben"); } else zurSzene(); }}>
+              className={"zelle" + (gewaehlt === i ? " on" : "") + (i === 4 ? " mitte" : "") + (matrix[i].trim() ? " voll" : "") + (kids.length ? " hatkind" : "")}
+              onClick={() => {
+                setGewaehlt(i);
+                // portrait: das schreibfeld liegt unter neun kästchen. hinbringen.
+                if (window.innerWidth <= 640) setTimeout(() => eingabeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+              }}>
               {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
               <span className="zname">{p.k}</span>
-              <span className="ztext" title={matrix[i]}>{erstSatz(matrix[i]) || "—"}</span>
-              {kind && <span className="zkind" style={{ color: farbe(ebene + 1) }}>↳ {kids.length > 1 ? kids.length + " zweige" : kind.name}</span>}
+              <span className="ztext">{erstSatz(matrix[i]) || "+"}</span>
+              {kids.length > 0 && <span className="zkind" style={{ color: farbe(ebene + 1) }}>↳ {kids[0].name}</span>}
+              {ebene > 0 && w > 0 && <span className="zkind">{w.toLocaleString("de-DE")} w</span>}
             </button>
           );
         })}
       </div>
 
-      {SCHREIB_ORDER.map((i, n) => {
-        const w = zaehleWoerter(texte[i]);
-        const voll = w >= ZIEL_ABSATZ;
-        const kids = id ? kinder(id, i) : [];
-        const mitte = i === 4;
-        const zu = !!zuSzene[i];
-        return (
-          <div className={"szene" + (mitte ? " mitte" : "") + (zu ? " zu" : "")} key={i} id={"szene-" + i}>
-            <div className="skopf" onClick={() => kippeSzene(i)}>
-              <span className="snr">{mitte ? "00" : String(n).padStart(2, "0")}</span>
-              <span className="zname">{POS[i].k}</span>
-              {POS[i].akt > 0 && <span className="akt">{AKT_ROEMISCH[POS[i].akt]}</span>}
-              {!mitte && <span className="smatrix">{matrix[i] || "—"}</span>}
-              {mitte && <span className="smatrix mshinweis">worum es hier geht — nicht zu schreiben, sondern mitgebracht</span>}
-              {zu && !mitte && <span className="szu">{w} w</span>}
-              <span className="chev">▾</span>
-            </div>
-
-            {!zu && (mitte ? (
-              <div className="msuebersicht">
-                <div className="msvoll">{matrix[4] || "— noch kein mainstate —"}</div>
-                {texte[4] && (
-                  <div className="mserbe">
-                    <div className="mserbekopf">
-                      ↳ aus <b>{elternPos != null ? POS[elternPos].k : "der ebene drüber"}</b>
-                      {krumen.length > 0 && <> · {krumen[krumen.length - 1].name}</>}
-                      <i>{zaehleWoerter(texte[4])} wörter</i>
-                    </div>
-                    <div className="mserbetext">{texte[4]}</div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                <AutoTa className="ta" value={texte[i]} onChange={(e) => setT(i, e.target.value)} placeholder="…" />
-                <div className="logfoot">
-                  <div className="logbar"><i style={{ width: Math.min(100, (w / ZIEL_ABSATZ) * 100) + "%" }} className={voll ? "voll" : ""} /></div>
-                  <div className={"wcount" + (voll ? " voll" : "")}>
-                    {voll ? <>✓ {w} wörter</> : <>{w} <span className="wziel">/ {ZIEL_ABSATZ}</span></>}
-                  </div>
-                </div>
-              </>
-            ))}
-            {i !== 4 && (
-              <div className="zweig">
-                {kids.map((k) => <button key={k.id} className="kind" onClick={() => { oeffnen(k); setView("schreiben"); }}>↳ {k.name}</button>)}
-                {!kids.length && (
-                  <button className="btn zweigbtn" onClick={() => verzweigen(i)}
-                    title={ebene === 0 ? "diese station als eigene seite aufmachen" : "diese szene als eigene schreibbox aufmachen"}>
-                    {ebene === 0 ? "→ station ausbauen" : "→ szene ausbauen"}
-                  </button>
-                )}
-              </div>
-            )}
+      {gewaehlt !== null && (
+        <div className="eingabe" ref={eingabeRef}>
+          <div className="ekopf">
+            <span className="zname">{POS[gewaehlt].k}</span>
+            <button className="btn" onClick={() => setM(gewaehlt, "")}>✕ leeren</button>
+            <button className="btn zumraster" onClick={() => { setGewaehlt(null); window.scrollTo({ top: 0, behavior: "smooth" }); }}>↑ zurück zur matrix</button>
+            {kannWeiter && <button className="btn primary" onClick={weiter}>{weiterText}</button>}
           </div>
-        );
-      })}
+          <textarea className="ta" autoFocus value={matrix[gewaehlt]} onChange={(e) => setM(gewaehlt, e.target.value)}
+            placeholder={gewaehlt === 4
+              ? "worum geht es? zwei, drei sätze — der rest füllt sich von selbst."
+              : "in kurzen worten: was passiert hier?"}
+            style={{ minHeight: 80 }} />
+        </div>
+      )}
 
       <div className="actions" style={{ marginTop: 12 }}>
         <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
@@ -5770,6 +5682,19 @@ function Styles() {
 
   /* log-files */
   .ta.log{min-height:340px;font-size:13.5px;line-height:1.65;overflow:hidden;resize:none}
+  /* kontext-stapel über dem szenen-schreibfeld · grob nach fein */
+  .stapel{display:flex;flex-direction:column;gap:8px;margin:14px 0 12px}
+  .stapelbox{border:1px solid var(--line);border-left:2px solid var(--lvl,var(--green-dim));
+    border-radius:5px;padding:9px 12px 10px;background:rgba(0,0,0,.18)}
+  .stapelbox.jetzt{background:rgba(53,255,111,.05);border-color:var(--line-hot)}
+  .stapelkopf{display:flex;align-items:baseline;gap:9px;margin-bottom:5px}
+  .stapelcap{font-family:var(--term);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--lvl,var(--green-mid));flex:none}
+  .stapeltitel{font-family:var(--term);font-size:10.5px;letter-spacing:.06em;color:var(--dim);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stapeltext{font-family:var(--mono);font-size:12.5px;line-height:1.55;color:var(--muted)}
+  .stapelbox.jetzt .stapeltext{color:var(--ink)}
+
   /* konfetti · matrix-regen für einen moment */
   .konfetti{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
   .kfz{position:absolute;top:-8vh;font-family:var(--mono);color:var(--green);opacity:0;
