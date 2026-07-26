@@ -1372,6 +1372,34 @@ function RechercheListe({ entw, zuLog, onRweg }) {
 }
 
 // ============================================================
+// WEGWEISER · die matrix des buches (E0) als anschauungsmaterial.
+// nicht zum bearbeiten — nur zum draufschauen, ob die richtung noch stimmt.
+// klick auf ein kästchen springt in die skripte, auf genau diese zelle.
+// ============================================================
+function Wegweiser({ wurzel, springe }) {
+  const m = wurzel && Array.isArray(wurzel.matrix) ? wurzel.matrix : null;
+  return (
+    <Panel id="sk-wegweiser" title="WEGWEISER" sub={wurzel ? (wurzel.name || "unbenannt") + " · ebene 1" : "kein projekt gewählt"}>
+      {!wurzel && <p className="hint">im AURA3_COMMIT ein projekt wählen — dann steht die matrix hier.</p>}
+      {wurzel && (
+        <div className="mx wegw">
+          {POS.map((p, i) => (
+            <button key={i} style={{ "--o": SCHREIB_ORDER.indexOf(i) }}
+              className={"zelle" + (i === 4 ? " mitte" : "") + ((m && (m[i] || "").trim()) ? " voll" : "")}
+              title={(m && m[i]) ? p.k + " — " + m[i] : p.k + " — noch leer"}
+              onClick={() => springe && springe(wurzel.id, i)}>
+              {p.akt > 0 && <span className="akt">{AKT_ROEMISCH[p.akt]}</span>}
+              <span className="zname">{p.k}</span>
+              <span className="ztext">{(m && erstSatz(m[i])) || "—"}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+// ============================================================
 // SK_ULTRA · projektseite. zwei boxen nebeneinander:
 // links die gegenzeichnung DES PROJEKTS (name, prämisse, signatur) —
 // das projekt stimmt der zusammenarbeit zu, ohne administrative rechte.
@@ -1688,6 +1716,8 @@ function SkUltra({ springe, zuLog }) {
           </div>
         </Panel>
       </div>
+
+      <Wegweiser wurzel={wurzel} springe={springe} />
 
       <div className="skgrid schmal">
         <div className={"skrad" + (frageDreht ? " dreht" : "")}>
@@ -2373,8 +2403,8 @@ const POS = [
 const SCHREIB_ORDER = [4, 2, 5, 8, 7, 6, 3, 0, 1];
 const AKT_ROEMISCH = { 1: "I", 2: "II", 3: "III" };
 const ZIEL_ABSATZ = 200;
-// ab E2 ist ein skript EINE szene: eine einzige schreibbox wie in den log-files.
-const ZIEL_SZENE = 1660;
+// wörter je szene. eine zahl mit SZ_ZIEL (szenenwand), damit beide nie auseinanderlaufen.
+const ZIEL_SZENE = SZ_ZIEL;
 const leer9 = () => ["", "", "", "", "", "", "", "", ""];
 
 // Satzende = punkt/!/? — aber nicht mitten in "..." und nicht in "E0.01_E1.01".
@@ -5682,6 +5712,12 @@ function Styles() {
 
   /* log-files */
   .ta.log{min-height:340px;font-size:13.5px;line-height:1.65;overflow:hidden;resize:none}
+  /* wegweiser auf sk_ultra · die buch-matrix zum draufschauen, etwas kleiner */
+  .mx.wegw{margin-bottom:2px}
+  .mx.wegw .zelle{min-height:78px;padding:10px 11px 12px;gap:6px}
+  .mx.wegw .zname{font-size:10.5px}
+  .mx.wegw .ztext{font-size:11.5px;-webkit-line-clamp:2}
+
   /* kontext-stapel über dem szenen-schreibfeld · grob nach fein */
   .stapel{display:flex;flex-direction:column;gap:8px;margin:14px 0 12px}
   .stapelbox{border:1px solid var(--line);border-left:2px solid var(--lvl,var(--green-dim));
