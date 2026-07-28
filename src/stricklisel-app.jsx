@@ -1659,31 +1659,32 @@ function BesetzungTafel({ figuren, ordnerId, skripte, zurPerson }) {
 
   const genannt = meine.filter((p) => p.anzahl > 0).length;
 
+  if (!meine.length) return null;
   return (
-    <Panel id="sk-besetzung" title="BESETZUNG"
-      sub={meine.length ? `${meine.length} figuren · ${genannt} kommen vor` : "noch niemand besetzt"}>
-      {!meine.length && <p className="hint">in THINGS personen und gruppen anlegen — hier stehen sie dann alle.</p>}
-      {!!meine.length && (
-        <div className="bgrid">
-          {meine.map((p) => (
-            <button className={"skarte" + (p.anzahl ? "" : " stumm")} key={p.id}
-              onClick={() => zurPerson && zurPerson(p.id)}
-              title={p.anzahl ? p.anzahl + " fundstellen in diesem projekt" : "kommt noch nirgends vor"}>
-              <div className="sav">{p.avatar ? <Avatar typ={p.avatar} size={40} /> : <span className="savleer">?</span>}</div>
-              <div className="sinfo">
-                <div className="sname">
-                  {p.name || "unbenannt"}
-                  <span className="sanzahl">{p.anzahl ? p.anzahl + "×" : "–"}</span>
-                </div>
-                <div className="smeta">
-                  {[p.art === "gruppe" ? "gruppe" : null, p.archetyp, p.rolle].filter(Boolean).join(" · ") || "—"}
-                </div>
+    <>
+      <div className="ptitel bestitel">
+        besetzung
+        <span className="beszahl">{meine.length} figuren · {genannt} kommen vor</span>
+      </div>
+      <div className="bgrid fuenf">
+        {meine.map((p) => (
+          <button className={"skarte" + (p.anzahl ? "" : " stumm")} key={p.id}
+            onClick={() => zurPerson && zurPerson(p.id)}
+            title={p.anzahl ? p.anzahl + " fundstellen in diesem projekt" : "kommt noch nirgends vor"}>
+            <div className="sav">{p.avatar ? <Avatar typ={p.avatar} size={32} /> : <span className="savleer">?</span>}</div>
+            <div className="sinfo">
+              <div className="sname">
+                {p.name || "unbenannt"}
+                <span className="sanzahl">{p.anzahl ? p.anzahl + "×" : "–"}</span>
               </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </Panel>
+              <div className="smeta">
+                {[p.art === "gruppe" ? "gruppe" : null, p.archetyp, p.rolle].filter(Boolean).join(" · ") || "—"}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -2007,6 +2008,8 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         <div className="skradtext qedsatz">{qed.trim() || "— noch keine prämisse —"}</div>
       </div>
 
+      <BesetzungTafel figuren={figuren} ordnerId={wurzel ? wurzel.ordner_id : null} skripte={alle} zurPerson={zurPerson} />
+
       <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} entw={entw} qListe={qListe} />
 
       <div className="skgrid">
@@ -2145,8 +2148,6 @@ function SkUltra({ springe, zuLog, zurPerson }) {
           </div>
         ))}
       </Panel>
-
-      <BesetzungTafel figuren={figuren} ordnerId={wurzel ? wurzel.ordner_id : null} skripte={alle} zurPerson={zurPerson} />
 
       <RohListe entw={entw} zuLog={zuLog} onPweg={pWeg} />
 
@@ -6178,6 +6179,14 @@ function Styles() {
   .sname{font-family:var(--mono);font-size:13px;color:var(--ink);display:flex;align-items:baseline;gap:8px}
   .sanzahl{font-family:var(--term);font-size:11px;color:var(--green);text-shadow:var(--glow);flex:0 0 auto}
   .smeta{font-family:var(--term);font-size:10.5px;letter-spacing:.06em;color:var(--dim);margin-top:3px}
+  .bestitel{display:flex;align-items:baseline;gap:12px;margin-top:4px}
+  .beszahl{font-size:9.5px;letter-spacing:.1em;color:var(--dim);text-shadow:none;text-transform:none}
+  /* fünf figuren nebeneinander, schlanker als im denkbrett */
+  .bgrid.fuenf{gap:8px}
+  .bgrid.fuenf .skarte{flex:1 1 165px;gap:9px;padding:8px 10px;border-radius:6px}
+  .bgrid.fuenf .sav{width:32px;height:32px}
+  .bgrid.fuenf .sname{font-size:12px}
+  .bgrid.fuenf .smeta{font-size:9.5px;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .skarte.stumm{opacity:.5}
   .skarte.stumm .sanzahl{color:var(--dim);text-shadow:none}
 
