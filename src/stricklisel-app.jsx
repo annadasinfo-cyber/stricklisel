@@ -1669,11 +1669,20 @@ function BesetzungTafel({ ordnerId, skripte, zurPerson }) {
     .sort((a, b) => b.anzahl - a.anzahl || (a.name || "").localeCompare(b.name || ""));
 
   const genannt = meine.filter((p) => p.anzahl > 0).length;
+  // welche rollen sind in diesem projekt noch gar nicht besetzt?
+  const vergeben = new Set(meine.map((p) => p.rolle).filter(Boolean));
+  const offen = ROLLEN.flatMap((g) => g.r.map(([r]) => r)).filter((r) => !vergeben.has(r));
 
   return (
     <Panel id="sk-besetzung" title="BESETZUNG"
       sub={meine.length ? `${meine.length} figuren · ${genannt} kommen vor` : "noch niemand besetzt"}>
       {!meine.length && <p className="hint">in THINGS personen und gruppen anlegen — hier stehen sie dann alle.</p>}
+      {!!offen.length && (
+        <div className="offrollen">
+          <span className="offkopf">noch unbesetzt</span>
+          {offen.map((r) => <span className="offchip" key={r}>{r}</span>)}
+        </div>
+      )}
       {!!meine.length && (
         <div className="bgrid">
           {meine.map((p) => (
@@ -1991,6 +2000,11 @@ function SkUltra({ springe, zuLog, zurPerson }) {
     <>
       <div className="grouphead">SK_ULTRA<span className="rule" /></div>
 
+      <Panel id="sk-praemisse" title="PRÄMISSE" sub="quod erat demonstrandum">
+        <textarea className="ta qed" value={qed} onChange={(e) => aend(() => setQed(e.target.value))}
+          placeholder="wird jackson seine angst (wut, zorn, gier) überwinden, sich auf den weg machen und die welt retten?" />
+      </Panel>
+
       <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} entw={entw} qListe={qListe} />
 
       <div className="skgrid">
@@ -2099,11 +2113,6 @@ function SkUltra({ springe, zuLog, zurPerson }) {
           <div className="skradtext" key={wendung}>{wheelListe.length ? (wendung || "…") : "— noch keine wendungen —"}</div>
         </div>
       </div>
-
-      <Panel id="sk-praemisse" title="PRÄMISSE" sub="quod erat demonstrandum">
-        <textarea className="ta qed" value={qed} onChange={(e) => aend(() => setQed(e.target.value))}
-          placeholder="wird jackson seine angst (wut, zorn, gier) überwinden, sich auf den weg machen und die welt retten?" />
-      </Panel>
 
       <Panel id="sk-synopsis" title="SYNOPSIS" sub="worum geht's — in kurz">
         <AutoTa className="ta" value={synopsis} style={{ minHeight: 150 }}
@@ -6134,6 +6143,13 @@ function Styles() {
   .sname{font-family:var(--mono);font-size:13px;color:var(--ink);display:flex;align-items:baseline;gap:8px}
   .sanzahl{font-family:var(--term);font-size:11px;color:var(--green);text-shadow:var(--glow);flex:0 0 auto}
   .smeta{font-family:var(--term);font-size:10.5px;letter-spacing:.06em;color:var(--dim);margin-top:3px}
+  .offrollen{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:14px;
+    padding-top:12px;border-top:1px dashed var(--line)}
+  .offkopf{font-family:var(--term);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--dim);margin-right:4px}
+  .offchip{font-family:var(--term);font-size:9.5px;letter-spacing:.06em;color:var(--dim);
+    border:1px dashed var(--line);border-radius:3px;padding:3px 7px}
+
   .skarte.stumm{opacity:.5}
   .skarte.stumm .sanzahl{color:var(--dim);text-shadow:none}
 
