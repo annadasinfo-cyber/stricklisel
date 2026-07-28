@@ -1209,6 +1209,9 @@ function Abteilung17b({ say }) {
 const SZ_ZIEL = 1600;               // wörter je szene, aus dem commit
 const SZ_ANZAHL = 63;
 const dkurz = (s) => { const t = String(s || "").split("-"); return t.length === 3 ? `${t[2]}.${t[1]}.` : s; };
+// szene 0 = GLOBAL: gehört (noch) zu keiner szene und bleibt beim projektwechsel stehen.
+const istGlobal = (s) => Number(s) === 0;
+const szLabel = (s) => (istGlobal(s) ? "global" : "szene " + s);
 
 function SzenenWand({ alle, wurzelId, springe, entw }) {
   const wurzeln = (alle || []).filter((s) => !s.eltern_id);
@@ -1297,15 +1300,15 @@ function RohListe({ entw, zuLog, onPweg }) {
   const roh = [...(entw || [])].filter((e) => (Array.isArray(e.flags) ? e.flags : []).includes("p"))
     .sort((a, b) => (Number(a.szene) - Number(b.szene)) || (a.datum < b.datum ? 1 : -1));
   return (
-    <Panel id="sk-rohmaterial" title="ROHMATERIAL" sub="log_files · nach szene">
+    <Panel id="sk-rohmaterial" title="ROHMATERIAL" sub="log_files · global zuerst, dann nach szene">
       <div className="rohliste">
         {!roh.length && <div className="pleer">noch kein rohmaterial mit szene markiert. der magische P in den log_files legt's hier an.</div>}
-        {roh.map((row) => (
-          <div className="rohzeile" key={row.datum}>
+        {roh.map((row, n) => (
+          <div className={"rohzeile" + (n > 0 && istGlobal(roh[n - 1].szene) && !istGlobal(row.szene) ? " nachglobal" : "")} key={row.datum}>
             <button className="rohgo" title="→ zum eintrag in den log_files"
               onClick={() => zuLog && zuLog(row.datum)}>
               <span className="ftag">{dkurz(row.datum)}</span>
-              <span className="ftag sz">szene {row.szene}</span>
+              <span className={"ftag sz" + (istGlobal(row.szene) ? " glob" : "")}>{szLabel(row.szene)}</span>
               <span className="rohtext">{ersteSaetze(row.text, 3) || "—"}</span>
             </button>
             <button className="rohweg" title="P-marker löschen — versinkt zurück in die normalen log_files"
@@ -1348,16 +1351,16 @@ function RechercheListe({ entw, zuLog, onRweg }) {
   const rech = [...(entw || [])].filter((e) => (Array.isArray(e.flags) ? e.flags : []).includes("r"))
     .sort((a, b) => (Number(a.szene) - Number(b.szene)) || (a.datum < b.datum ? 1 : -1));
   return (
-    <Panel id="sk-recherche" title="RECHERCHE" sub="log_files · nach szene">
+    <Panel id="sk-recherche" title="RECHERCHE" sub="log_files · global zuerst, dann nach szene">
       <div className="rohliste">
         {!rech.length && <div className="pleer">noch keine recherche mit szene markiert. der blaue R in den log_files legt sie hier an.</div>}
-        {rech.map((row) => (
-          <div className="rechzeile" key={row.datum}>
+        {rech.map((row, n) => (
+          <div className={"rechzeile" + (n > 0 && istGlobal(rech[n - 1].szene) && !istGlobal(row.szene) ? " nachglobal" : "")} key={row.datum}>
             <div className="rechtop">
               <button className="rohgo" title="→ zum eintrag in den log_files"
                 onClick={() => zuLog && zuLog(row.datum)}>
                 <span className="ftag">{dkurz(row.datum)}</span>
-                <span className="ftag rz">szene {row.szene}</span>
+                <span className={"ftag rz" + (istGlobal(row.szene) ? " glob" : "")}>{szLabel(row.szene)}</span>
                 <span className="rohtext">{ersteSaetze(row.text, 3) || "—"}</span>
               </button>
               <button className="rohweg blau" title="R-marker löschen — versinkt zurück in die normalen log_files"
@@ -2090,7 +2093,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
       setGewicht(d2?.[0]?.gewicht ?? "");
       setSchmerz(d2?.[0]?.schmerz ?? "");
       setMood(d2?.[0]?.mood ?? "");
-      setSzene(d2?.[0]?.szene ?? "");
+      setSzene(d2?.[0]?.szene == null ? "" : String(d2[0].szene));
       setLogFlags(Array.isArray(d2?.[0]?.flags) ? d2[0].flags : []);
       setDirty(false);
       setMsg(d2?.[0] ? { t: "eintrag geladen", c: "" } : { t: "neuer eintrag", c: "" });
@@ -2219,11 +2222,12 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
                 onClick={() => flagKlick("r")}
                 title="recherche zu einer projekt-szene">R</button>
         {(logFlags.includes("p") || logFlags.includes("r")) && (
-          <label className="logfeld" title="welcher szene gehört das?">
+          <label className="logfeld" title="welcher szene gehört das? global = noch nicht einzuordnen oder für mehrere geschichten">
             <span>szene</span>
             <select className="ti minifeld" value={szene}
                     onChange={(e) => { setSzene(e.target.value); setDirty(true); }}>
               <option value="">–</option>
+              <option value="0">global</option>
               {Array.from({ length: 63 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
           </label>
@@ -5712,6 +5716,10 @@ function Styles() {
 
   /* log-files */
   .ta.log{min-height:340px;font-size:13.5px;line-height:1.65;overflow:hidden;resize:none}
+  /* global-marker in rohmaterial & recherche */
+  .ftag.glob{color:var(--amber);border-color:rgba(224,178,106,.45)}
+  .rohzeile.nachglobal,.rechzeile.nachglobal{border-top:1px dashed var(--line);padding-top:10px;margin-top:4px}
+
   /* wegweiser auf sk_ultra · die buch-matrix zum draufschauen, etwas kleiner */
   .mx.wegw{margin-bottom:2px}
   .mx.wegw .zelle{min-height:78px;padding:10px 11px 12px;gap:6px}
