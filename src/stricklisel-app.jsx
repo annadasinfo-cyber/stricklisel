@@ -1635,18 +1635,7 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, nurSzene }) {
 // nicht nur die drei meistgenannten: ALLE figuren dieses projekts,
 // nach häufigkeit sortiert. wer oben steht, trägt das buch.
 // ============================================================
-function BesetzungTafel({ ordnerId, skripte, zurPerson }) {
-  const [figuren, setFiguren] = useState([]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const th = await dbGet("besetzung-figuren",
-          `${SUPABASE_URL}/rest/v1/things?select=id,name,rolle,archetyp,avatar,art,ordner_id&or=(art.eq.person,art.eq.gruppe)`);
-        setFiguren(Array.isArray(th) ? th : []);
-      } catch { setFiguren([]); }
-    })();
-  }, []);
-
+function BesetzungTafel({ figuren, ordnerId, skripte, zurPerson }) {
   const sk = Array.isArray(skripte) ? skripte : [];
   // wie oft taucht der name in den skripten dieses projekts auf?
   const zaehlen = (name) => {
@@ -1663,26 +1652,17 @@ function BesetzungTafel({ ordnerId, skripte, zurPerson }) {
     return n;
   };
 
-  const meine = figuren
+  const meine = (figuren || [])
     .filter((p) => (ordnerId ? p.ordner_id === ordnerId : true))
     .map((p) => ({ ...p, anzahl: zaehlen(p.name) }))
     .sort((a, b) => b.anzahl - a.anzahl || (a.name || "").localeCompare(b.name || ""));
 
   const genannt = meine.filter((p) => p.anzahl > 0).length;
-  // welche rollen sind in diesem projekt noch gar nicht besetzt?
-  const vergeben = new Set(meine.map((p) => p.rolle).filter(Boolean));
-  const offen = ROLLEN.flatMap((g) => g.r.map(([r]) => r)).filter((r) => !vergeben.has(r));
 
   return (
     <Panel id="sk-besetzung" title="BESETZUNG"
       sub={meine.length ? `${meine.length} figuren · ${genannt} kommen vor` : "noch niemand besetzt"}>
       {!meine.length && <p className="hint">in THINGS personen und gruppen anlegen — hier stehen sie dann alle.</p>}
-      {!!offen.length && (
-        <div className="offrollen">
-          <span className="offkopf">noch unbesetzt</span>
-          {offen.map((r) => <span className="offchip" key={r}>{r}</span>)}
-        </div>
-      )}
       {!!meine.length && (
         <div className="bgrid">
           {meine.map((p) => (
@@ -1818,6 +1798,25 @@ function SkUltra({ springe, zuLog, zurPerson }) {
   const wurzel = wurzeln.find((s) => s.id === cWurzel) || wurzeln[0] || null;
 
   // rohmaterial aus den log_files (einträge mit gesetzter szene) — teilen sich szenenwand + rohliste
+  // personen + gruppen — für die besetzungstafel und die liste der offenen rollen
+  const [figuren, setFiguren] = useState([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const th = await dbGet("besetzung-figuren",
+          `${SUPABASE_URL}/rest/v1/things?select=id,name,rolle,archetyp,avatar,art,ordner_id&or=(art.eq.person,art.eq.gruppe)`);
+        setFiguren(Array.isArray(th) ? th : []);
+      } catch {}
+    })();
+  }, []);
+
+  // welche rollen hat in diesem projekt noch niemand?
+  const offeneRollen = (() => {
+    const o = wurzel ? wurzel.ordner_id : null;
+    const vergeben = new Set(figuren.filter((p) => (o ? p.ordner_id === o : true)).map((p) => p.rolle).filter(Boolean));
+    return ROLLEN.flatMap((g) => g.r.map(([r]) => r)).filter((r) => !vergeben.has(r));
+  })();
+
   // offene story-fragen — für den gelben punkt auf der wand und das schaufenster
   const [qListe, setQListe] = useState([]);
   const ladeQ = async () => setQListe(await qLaden());
@@ -2144,7 +2143,7 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         ))}
       </Panel>
 
-      <BesetzungTafel ordnerId={wurzel ? wurzel.ordner_id : null} skripte={alle} zurPerson={zurPerson} />
+      <BesetzungTafel figuren={figuren} ordnerId={wurzel ? wurzel.ordner_id : null} skripte={alle} zurPerson={zurPerson} />
 
       <RohListe entw={entw} zuLog={zuLog} onPweg={pWeg} />
 
@@ -2161,6 +2160,11 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         liste={fragenListe} label={(f) => f.frage} keyOf={(f) => f.id}
         wert={neueFrage} setWert={setNeueFrage} onAdd={frageAdd} onWeg={frageWeg} onEdit={frageEdit}
         platzhalter="neue frage …" />
+
+      <VerwaltKarte titel="besetzung · offene rollen" nurLesen
+        leer="alle rollen besetzt."
+        hinweis="anlegen geht in THINGS → besetzung: dort auf eine freie rolle tippen."
+        liste={offeneRollen} label={(r) => r} keyOf={(r) => r} />
     </>
   );
 }
@@ -6143,13 +6147,6 @@ function Styles() {
   .sname{font-family:var(--mono);font-size:13px;color:var(--ink);display:flex;align-items:baseline;gap:8px}
   .sanzahl{font-family:var(--term);font-size:11px;color:var(--green);text-shadow:var(--glow);flex:0 0 auto}
   .smeta{font-family:var(--term);font-size:10.5px;letter-spacing:.06em;color:var(--dim);margin-top:3px}
-  .offrollen{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:14px;
-    padding-top:12px;border-top:1px dashed var(--line)}
-  .offkopf{font-family:var(--term);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
-    color:var(--dim);margin-right:4px}
-  .offchip{font-family:var(--term);font-size:9.5px;letter-spacing:.06em;color:var(--dim);
-    border:1px dashed var(--line);border-radius:3px;padding:3px 7px}
-
   .skarte.stumm{opacity:.5}
   .skarte.stumm .sanzahl{color:var(--dim);text-shadow:none}
 
