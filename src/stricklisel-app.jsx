@@ -1657,33 +1657,44 @@ function BesetzungTafel({ figuren, ordnerId, skripte, zurPerson }) {
     .map((p) => ({ ...p, anzahl: zaehlen(p.name) }))
     .sort((a, b) => b.anzahl - a.anzahl || (a.name || "").localeCompare(b.name || ""));
 
-  const genannt = meine.filter((p) => p.anzahl > 0).length;
+  // personen oben, gruppen darunter — zwei blöcke, gleicher aufbau
+  const personen = meine.filter((p) => p.art !== "gruppe");
+  const gruppen = meine.filter((p) => p.art === "gruppe");
+
+  const Block = ({ titel, wer, leerwort }) => {
+    if (!wer.length) return null;
+    const genannt = wer.filter((p) => p.anzahl > 0).length;
+    return (
+      <>
+        <div className="ptitel bestitel">
+          {titel}
+          <span className="beszahl">{wer.length} {leerwort} · {genannt} kommen vor</span>
+        </div>
+        <div className="bgrid fuenf">
+          {wer.map((p) => (
+            <button className={"skarte" + (p.anzahl ? "" : " stumm")} key={p.id}
+              onClick={() => zurPerson && zurPerson(p.id)}
+              title={p.anzahl ? p.anzahl + " fundstellen in diesem projekt" : "kommt noch nirgends vor"}>
+              <div className="sav">{p.avatar ? <Avatar typ={p.avatar} size={32} /> : <span className="savleer">?</span>}</div>
+              <div className="sinfo">
+                <div className="sname">
+                  {p.name || "unbenannt"}
+                  <span className="sanzahl">{p.anzahl ? p.anzahl + "×" : "–"}</span>
+                </div>
+                <div className="smeta">{[p.archetyp, p.rolle].filter(Boolean).join(" · ") || "—"}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </>
+    );
+  };
 
   if (!meine.length) return null;
   return (
     <>
-      <div className="ptitel bestitel">
-        besetzung
-        <span className="beszahl">{meine.length} figuren · {genannt} kommen vor</span>
-      </div>
-      <div className="bgrid fuenf">
-        {meine.map((p) => (
-          <button className={"skarte" + (p.anzahl ? "" : " stumm")} key={p.id}
-            onClick={() => zurPerson && zurPerson(p.id)}
-            title={p.anzahl ? p.anzahl + " fundstellen in diesem projekt" : "kommt noch nirgends vor"}>
-            <div className="sav">{p.avatar ? <Avatar typ={p.avatar} size={32} /> : <span className="savleer">?</span>}</div>
-            <div className="sinfo">
-              <div className="sname">
-                {p.name || "unbenannt"}
-                <span className="sanzahl">{p.anzahl ? p.anzahl + "×" : "–"}</span>
-              </div>
-              <div className="smeta">
-                {[p.art === "gruppe" ? "gruppe" : null, p.archetyp, p.rolle].filter(Boolean).join(" · ") || "—"}
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
+      <Block titel="besetzung" wer={personen} leerwort="figuren" />
+      <Block titel="gruppen" wer={gruppen} leerwort="gruppen" />
     </>
   );
 }
@@ -2455,16 +2466,13 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
 
   const w = zaehleWoerter(text);
   const voll = w >= ZIEL_WOERTER;
-  // konfetti genau beim überschreiten der 750 — nicht bei jedem tastendruck danach,
-  // und nicht beim blättern auf einen tag, der schon voll ist.
-  const wVorher = useRef(null);
-  const tagVorher = useRef(datum);
-  useEffect(() => {
-    if (tagVorher.current !== datum) { tagVorher.current = datum; wVorher.current = w; return; }
-    const vor = wVorher.current;
-    wVorher.current = w;
-    if (vor != null && vor < ZIEL_WOERTER && w >= ZIEL_WOERTER) konfetti();
-  }, [w, datum]);
+  // konfetti NUR beim eigenen tippen über die marke — nicht beim laden der seite
+  // und nicht beim blättern auf einen tag, der längst voll ist. der vergleich
+  // passiert im tastendruck selbst: beim laden springt der zähler von 0 auf den
+  // gespeicherten stand, und das sah vorher wie „gerade eben überschritten" aus.
+  const beimTippen = (vorher, nachher) => {
+    if (zaehleWoerter(vorher) < ZIEL_WOERTER && zaehleWoerter(nachher) >= ZIEL_WOERTER) konfetti();
+  };
   const nr = liste.length ? liste.findIndex((x) => x.datum === datum) : -1;
   const eintragNr = nr >= 0 ? liste.length - nr : liste.length + 1;
   const d = new Date(datum + "T12:00:00");
@@ -2712,7 +2720,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
         </div>
 
         <AutoTa className="ta log" value={text}
-          onChange={(e) => { setText(e.target.value); setDirty(true); }}
+          onChange={(e) => { beimTippen(text, e.target.value); setText(e.target.value); setDirty(true); }}
           placeholder={"> operator log\n> " + d.toLocaleDateString("de-DE") + "\n> was heute durch den reaktor ging …"} />
 
         {/https?:\/\/[^\s)]+/.test(text) && (
@@ -3014,7 +3022,11 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
 
   const aendern = (fn) => { fn(); setDirty(true); };
   const setM = (i, v) => aendern(() => setMatrix((m) => m.map((x, n) => (n === i ? v : x))));
-  const setT = (i, v) => aendern(() => setTexte((m) => m.map((x, n) => (n === i ? v : x))));
+  const setT = (i, v) => {
+    // konfetti nur beim eigenen tippen über die marke — siehe log_files
+    if (zaehleWoerter(texte[i] || "") < ZIEL_SZENE && zaehleWoerter(v) >= ZIEL_SZENE) konfetti();
+    aendern(() => setTexte((m) => m.map((x, n) => (n === i ? v : x))));
+  };
 
   async function laden() {
     try {
@@ -3138,18 +3150,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
     setMsg({ t: "station ausgebaut · " + POS[i].k, c: "ok" });
   }
 
-  // konfetti, wenn eine szene voll wird — beim überschreiten, nicht beim öffnen.
   const szeneW = szeneIdx == null ? 0 : zaehleWoerter(texte[szeneIdx] || "");
-  const szVorher = useRef(null);
-  const szSchluessel = useRef(null);
-  useEffect(() => {
-    if (szeneIdx == null) { szSchluessel.current = null; szVorher.current = null; return; }
-    const k = String(id) + "|" + szeneIdx;
-    if (szSchluessel.current !== k) { szSchluessel.current = k; szVorher.current = szeneW; return; }
-    const vor = szVorher.current;
-    szVorher.current = szeneW;
-    if (vor != null && vor < ZIEL_SZENE && szeneW >= ZIEL_SZENE) konfetti();
-  }, [szeneW, szeneIdx, id]);
 
   // alle szenentexte dieser station am stück — für thorsten in der konsole.
   // die mitte (4) hat keinen text, die sagt nur, worum es geht.
