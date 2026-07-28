@@ -1999,10 +1999,13 @@ function SkUltra({ springe, zuLog, zurPerson }) {
     <>
       <div className="grouphead">SK_ULTRA<span className="rule" /></div>
 
-      <Panel id="sk-praemisse" title="PRÄMISSE" sub="quod erat demonstrandum">
-        <textarea className="ta qed" value={qed} onChange={(e) => aend(() => setQed(e.target.value))}
-          placeholder="wird jackson seine angst (wut, zorn, gier) überwinden, sich auf den weg machen und die welt retten?" />
-      </Panel>
+      <div className="skrad qedkasten">
+        <div className="skradkopf">
+          <span className="skradtitel">prämisse</span>
+          <span className="qedlatein">quod erat demonstrandum</span>
+        </div>
+        <div className="skradtext qedsatz">{qed.trim() || "— noch keine prämisse —"}</div>
+      </div>
 
       <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} entw={entw} qListe={qListe} />
 
@@ -2160,6 +2163,11 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         liste={fragenListe} label={(f) => f.frage} keyOf={(f) => f.id}
         wert={neueFrage} setWert={setNeueFrage} onAdd={frageAdd} onWeg={frageWeg} onEdit={frageEdit}
         platzhalter="neue frage …" />
+
+      <VerwaltFeld titel="prämisse eintragen"
+        hinweis="die zentrale frage in einem satz — innere, äußere und universelle ebene zusammen. macht man einmal pro projekt."
+        wert={qed} setWert={(v) => aend(() => setQed(v))}
+        platzhalter="wird jackson seine angst (wut, zorn, gier) überwinden, sich auf den weg machen und die welt retten?" />
 
       <VerwaltKarte titel="besetzung · offene rollen" nurLesen
         leer="alle rollen besetzt."
@@ -4110,6 +4118,29 @@ function Kurve() {
 
 // aufklappbare verwaltungs-karte für listen (wheel-wendungen, orakel-impulse, hts-hooks)
 // zeile antippen -> ändern (wenn onEdit da), enter speichert / esc bricht ab, ✕ löscht.
+// verwaltungsbox für EIN feld — gleiche optik wie die listen-verwaltung,
+// nur mit einem textfeld statt einer liste. für sachen, die man einmal einträgt.
+function VerwaltFeld({ titel, wert, setWert, platzhalter, hinweis }) {
+  const [auf, setAuf] = useState(false);
+  const voll = (wert || "").trim().length > 0;
+  return (
+    <div className="vkarte">
+      <button className="vkopf" onClick={() => setAuf((v) => !v)}>
+        <span className="vchev">{auf ? "▾" : "▸"}</span>
+        <span className="vtitel">{titel}</span>
+        <span className="vzahl">{voll ? "✓" : "–"}</span>
+      </button>
+      {auf && (
+        <div className="vbody">
+          {hinweis && <p className="vhinweis">{hinweis}</p>}
+          <AutoTa className="ta" value={wert} onChange={(e) => setWert(e.target.value)}
+            placeholder={platzhalter} style={{ minHeight: 90 }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VerwaltKarte({ titel, leer, liste, label, keyOf, wert, setWert, onAdd, onWeg, onEdit, platzhalter, nurLesen, hinweis }) {
   const [auf, setAuf] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -6215,9 +6246,10 @@ function Styles() {
   /* log-files */
   .ta.log{min-height:340px;font-size:13.5px;line-height:1.65;overflow:hidden;resize:none}
   /* die prämisse · der eine satz, der das ganze buch trägt */
-  .ta.qed{min-height:96px;font-size:15px;line-height:1.65;color:var(--green);
-    text-shadow:0 0 10px rgba(53,255,111,.28)}
-  .ta.qed::placeholder{color:var(--dim);text-shadow:none;font-size:14px;font-style:italic}
+  .qedkasten{margin-bottom:22px}
+  .qedlatein{font-family:var(--term);font-size:9.5px;letter-spacing:.14em;color:var(--dim);
+    font-style:italic;margin-left:auto}
+  .skradtext.qedsatz{font-size:14.5px;line-height:1.6;min-height:0}
 
   /* global-marker in rohmaterial & recherche */
   .ftag.glob{color:var(--amber);border-color:rgba(224,178,106,.45)}
