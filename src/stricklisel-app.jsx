@@ -1011,7 +1011,17 @@ function signaturErzeugen() {
   const s = Array.from(r).map((x) => z[x % z.length]).join("");
   return "AURA3-" + s.slice(0, 4) + "-" + s.slice(4, 8) + "-" + s.slice(8, 12);
 }
-const heute = () => new Date().toISOString().slice(0, 10);
+// ACHTUNG: nach ORTSZEIT rechnen, nicht nach UTC.
+// toISOString() liefert den UTC-tag — in deutschland begänne der neue tag
+// dadurch erst um 01:00 (winter) bzw. 02:00 (sommer). so beginnt er um 00:00.
+const tagVon = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const heute = () => tagVon(new Date());
+// millisekunden bis zum nächsten mitternacht (+1s puffer)
+const bisMitternacht = () => {
+  const n = new Date(), m = new Date(n);
+  m.setHours(24, 0, 1, 0);
+  return m - n;
+};
 
 function Abteilung17b({ say }) {
   const [liste, setListe] = useState([]);
@@ -1688,6 +1698,7 @@ const ARCHETYP_BEISPIEL = [
 // ein gezogener eintrag (rad / 100 fragen) hält 24 stunden — beim wiederkommen
 // steht derselbe da, nicht bei jedem seitenwechsel ein neuer.
 const ZUG_MS = 24 * 60 * 60 * 1000;
+const Q_TAKT = 90 * 1000;   // das fragen-kästchen blättert alle 90 sekunden weiter
 const zugLesen = (k) => { try { const r = JSON.parse(localStorage.getItem(k) || "null"); return r && r.text && Date.now() - r.ts < ZUG_MS ? r : null; } catch { return null; } };
 const zugSchreiben = (k, text) => { try { localStorage.setItem(k, JSON.stringify({ text, ts: Date.now() })); } catch {} };
 
@@ -1796,6 +1807,7 @@ function SkUltra({ springe, zuLog }) {
   const [fragenListe, setFragenListe] = useState([]);
   const [frage, setFrage] = useState(null);
   const [frageDreht, setFrageDreht] = useState(false);
+  const [qHalt, setQHalt] = useState(false);       // maus drauf → zeiger hält an
   const [neueFrage, setNeueFrage] = useState("");
   const fragenLaden = () => dbGet("fragen100", `${SUPABASE_URL}/rest/v1/fragen100?select=id,frage&order=created_at.desc&limit=300`)
     .then((d) => setFragenListe(Array.isArray(d) ? d.filter((x) => (x.frage || "").trim()) : [])).catch(() => {});
@@ -1821,18 +1833,27 @@ function SkUltra({ springe, zuLog }) {
     setFrageDreht(true);
     setTimeout(() => {
       const rest = qPool.length > 1 ? qPool.filter((x) => x.k !== (frage && frage.k)) : qPool;
-      const gezogen = rest[Math.floor(Math.random() * rest.length)];
-      zugSchreiben("off:fragen-zug", gezogen.k); setFrage(gezogen); setFrageDreht(false);
+      setFrage(rest[Math.floor(Math.random() * rest.length)]);
+      setFrageDreht(false);
     }, 550);
   };
+  // erste frage sofort, dann von selbst alle 90 sekunden weiter — sonst bekäme
+  // man die 100 fragen nie alle zu sehen. der zeiger hält an, solange die maus
+  // auf dem kästchen liegt: was man gerade liest, bleibt stehen.
+  const frageRef = useRef(null);
+  frageRef.current = frage;
   useEffect(() => {
-    if (!qPool.length || frage) return;
-    const g = zugLesen("off:fragen-zug");
-    const alt = g && qPool.find((x) => x.k === g.text);
-    if (alt) { setFrage(alt); return; }
-    const gezogen = qPool[Math.floor(Math.random() * qPool.length)];
-    zugSchreiben("off:fragen-zug", gezogen.k); setFrage(gezogen);
-  }, [qPool.length, frage]);
+    if (!qPool.length) return;
+    if (!frageRef.current) setFrage(qPool[Math.floor(Math.random() * qPool.length)]);
+    if (qHalt) return;
+    const t = setInterval(() => {
+      const jetzt = frageRef.current;
+      const rest = qPool.length > 1 ? qPool.filter((x) => x.k !== (jetzt && jetzt.k)) : qPool;
+      setFrageDreht(true);
+      setTimeout(() => { setFrage(rest[Math.floor(Math.random() * rest.length)]); setFrageDreht(false); }, 550);
+    }, Q_TAKT);
+    return () => clearInterval(t);
+  }, [qPool.length, qHalt]);
   useEffect(() => {
     if (!dirty) return;
     if (tRef.current) clearTimeout(tRef.current);
@@ -1982,7 +2003,9 @@ function SkUltra({ springe, zuLog }) {
       <Wegweiser wurzel={wurzel} springe={springe} />
 
       <div className="skgrid schmal">
-        <div className={"skrad" + (frageDreht ? " dreht" : "") + (frage && frage.art === "offen" ? " gelb" : "")}>
+        <div className={"skrad" + (frageDreht ? " dreht" : "") + (frage && frage.art === "offen" ? " gelb" : "") + (qHalt ? " haelt" : "")}
+             onMouseEnter={() => setQHalt(true)} onMouseLeave={() => setQHalt(false)}
+             title={qHalt ? "angehalten — solange die maus hier liegt" : "blättert alle 90 sekunden weiter"}>
           <div className="skradkopf">
             <span className="skradtitel">{frage && frage.art === "offen" ? "offene frage" : "100 fragen"}</span>
             {frage && frage.art === "offen" && (
@@ -2289,6 +2312,15 @@ function MonatsGitter({ liste, datum, setDatum, monat, setMonat, children }) {
 
 function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
   const [datum, setDatum] = useState(heute());
+  // punkt mitternacht: der neue tag ist da. wenn der alte eintrag noch offen
+  // und unberührt ist, schaltet er von selbst um — sonst wartet er, bis du
+  // fertig bist, und bietet dir oben „↺ heute" an. mitten im satz reißt dich
+  // hier niemand raus.
+  const [tagWechsel, setTagWechsel] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setTagWechsel((n) => n + 1), bisMitternacht());
+    return () => clearTimeout(t);
+  }, [tagWechsel]);
   const [monat, setMonat] = useState(() => heute().slice(0, 7));
   const [text, setText] = useState("");
   const [tagText, setTagText] = useState("");
@@ -2308,6 +2340,15 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
   const [mood, setMood] = useState("");        // 1 = im eimer … 5 = on fire
   const [szene, setSzene] = useState("");      // 1–63, wenn der text zu einer projekt-szene gehört
   const flagKlick = (k) => { setLogFlags((f) => f.includes(k) ? f.filter((x) => x !== k) : [...f, k]); setDirty(true); };
+
+  // um mitternacht still auf den neuen tag springen — aber nur, wenn der alte
+  // eintrag leer und gespeichert ist. wer um 00:00 mitten im schreiben ist,
+  // bleibt wo er ist und bekommt oben den „↺ heute"-knopf.
+  useEffect(() => {
+    if (!tagWechsel) return;
+    if (dirty || text.trim()) return;
+    setDatum(heute());
+  }, [tagWechsel]);
 
   const w = zaehleWoerter(text);
   const voll = w >= ZIEL_WOERTER;
@@ -5514,6 +5555,7 @@ function Styles() {
   .skrad.gelb{border-color:rgba(232,207,95,.35)}
   .skrad.gelb .skradtitel{color:#e8cf5f}
   .skrad.gelb .skradtext{color:#e8cf5f;text-shadow:0 0 8px rgba(232,207,95,.35)}
+  .skrad.haelt{border-color:var(--line-hot)}
   .skrad.dreht .skradtext{opacity:.12}
   .skrad.dreht .skraddreh{animation:wheelspin .55s linear}
   @media(max-width:820px){.skgrid{grid-template-columns:1fr}}
