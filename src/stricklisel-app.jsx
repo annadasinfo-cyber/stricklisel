@@ -1657,31 +1657,37 @@ function BesetzungTafel({ figuren, ordnerId, skripte, zurPerson }) {
     .map((p) => ({ ...p, anzahl: zaehlen(p.name) }))
     .sort((a, b) => b.anzahl - a.anzahl || (a.name || "").localeCompare(b.name || ""));
 
-  // personen oben, gruppen darunter — zwei blöcke, gleicher aufbau
-  const personen = meine.filter((p) => p.art !== "gruppe");
-  const gruppen = meine.filter((p) => p.art === "gruppe");
+  // vier blöcke untereinander, gleicher aufbau: wer, dann was
+  const nach = (a) => meine.filter((p) => (p.art || "person") === a);
 
-  const Block = ({ titel, wer, leerwort }) => {
+  // personen und gruppen zeigen archetyp/rolle, orte und dinge ihren steckbrief
+  const unterzeile = (p) => (p.art === "ort" || p.art === "ding")
+    ? erstSatz(p.steckbrief || "")
+    : [p.art === "gruppe" ? "gruppe" : null, p.archetyp, p.rolle].filter(Boolean).join(" · ");
+
+  const Block = ({ titel, wer, wort, zeichen }) => {
     if (!wer.length) return null;
     const genannt = wer.filter((p) => p.anzahl > 0).length;
     return (
       <>
         <div className="ptitel bestitel">
           {titel}
-          <span className="beszahl">{wer.length} {leerwort} · {genannt} kommen vor</span>
+          <span className="beszahl">{wer.length} {wort} · {genannt} kommen vor</span>
         </div>
         <div className="bgrid fuenf">
           {wer.map((p) => (
             <button className={"skarte" + (p.anzahl ? "" : " stumm")} key={p.id}
               onClick={() => zurPerson && zurPerson(p.id)}
               title={p.anzahl ? p.anzahl + " fundstellen in diesem projekt" : "kommt noch nirgends vor"}>
-              <div className="sav">{p.avatar ? <Avatar typ={p.avatar} size={32} /> : <span className="savleer">?</span>}</div>
+              <div className="sav">
+                {p.avatar ? <Avatar typ={p.avatar} size={32} /> : <span className="savleer">{zeichen}</span>}
+              </div>
               <div className="sinfo">
                 <div className="sname">
                   {p.name || "unbenannt"}
                   <span className="sanzahl">{p.anzahl ? p.anzahl + "×" : "–"}</span>
                 </div>
-                <div className="smeta">{[p.archetyp, p.rolle].filter(Boolean).join(" · ") || "—"}</div>
+                <div className="smeta">{unterzeile(p) || "—"}</div>
               </div>
             </button>
           ))}
@@ -1690,11 +1696,17 @@ function BesetzungTafel({ figuren, ordnerId, skripte, zurPerson }) {
     );
   };
 
+  // besetzung = wer auftritt: personen UND gruppen in EINER reihe, nach häufigkeit
+  // gemischt. so sieht man auf einen blick, wer das buch trägt — egal ob einer
+  // oder viele. orte und dinge treten nicht auf, die stehen darunter für sich.
+  const besetzung = meine.filter((p) => (p.art || "person") === "person" || p.art === "gruppe");
+
   if (!meine.length) return null;
   return (
     <>
-      <Block titel="besetzung" wer={personen} leerwort="figuren" />
-      <Block titel="gruppen" wer={gruppen} leerwort="gruppen" />
+      <Block titel="besetzung" wer={besetzung} wort="figuren" zeichen="?" />
+      <Block titel="orte" wer={nach("ort")} wort="orte" zeichen="⌖" />
+      <Block titel="dinge" wer={nach("ding")} wort="dinge" zeichen="◆" />
     </>
   );
 }
@@ -1816,7 +1828,7 @@ function SkUltra({ springe, zuLog, zurPerson }) {
     (async () => {
       try {
         const th = await dbGet("besetzung-figuren",
-          `${SUPABASE_URL}/rest/v1/things?select=id,name,rolle,archetyp,avatar,art,ordner_id&or=(art.eq.person,art.eq.gruppe)`);
+          `${SUPABASE_URL}/rest/v1/things?select=id,name,rolle,archetyp,avatar,art,steckbrief,ordner_id`);
         setFiguren(Array.isArray(th) ? th : []);
       } catch {}
     })();
