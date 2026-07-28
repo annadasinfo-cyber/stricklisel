@@ -1216,23 +1216,28 @@ const szLabel = (s) => (istGlobal(s) ? "global" : "szene " + s);
 // die 63 szenen liegen fest: 8 stationen × 8 positionen − pay-off×pay-off.
 // dieselbe reihenfolge, die die szenenwand aufbaut — hier einmal als tabelle,
 // damit auch die skripte wissen, welche nummer eine szene trägt.
-const SZ_TABELLE = (() => {
+// WICHTIG: erst beim ersten aufruf rechnen, nicht beim laden der datei —
+// SCHREIB_ORDER steht weiter unten und gibt es zum ladezeitpunkt noch nicht.
+let _szTabelle = null;
+function szTabelle() {
+  if (_szTabelle) return _szTabelle;
   const order = SCHREIB_ORDER.filter((i) => i !== 4);
   const raus = [];
   for (const st of order) for (const p of order) {
     if (st === 1 && p === 1) continue;
     raus.push([st, p]);
   }
-  return raus;                       // index 0 = szene 1
-})();
+  _szTabelle = raus;                 // index 0 = szene 1
+  return _szTabelle;
+}
 // nummer einer szene aus station-position + zellen-position
 const szNummer = (st, p) => {
-  const n = SZ_TABELLE.findIndex(([a, b]) => a === st && b === p);
+  const n = szTabelle().findIndex(([a, b]) => a === st && b === p);
   return n < 0 ? null : n + 1;
 };
 // wo endet welche station? für die trennstriche im zeitstrahl
-const SZ_GRENZEN = SZ_TABELLE.reduce((a, [st], n) => {
-  if (n && SZ_TABELLE[n - 1][0] !== st) a.push(n + 1);
+const szGrenzen = () => szTabelle().reduce((a, [st], n) => {
+  if (n && szTabelle()[n - 1][0] !== st) a.push(n + 1);
   return a;
 }, []);
 
@@ -1449,7 +1454,7 @@ function QStrahl({ f }) {
   return (
     <div className="qstrahl" title={`szene ${von} bis ${bis}`}>
       <div className="qstrahlbahn">
-        {SZ_GRENZEN.map((n) => <i key={"g" + n} className="qgrenze" style={{ left: pos(n) }} />)}
+        {szGrenzen().map((n) => <i key={"g" + n} className="qgrenze" style={{ left: pos(n) }} />)}
         <i className="qspanne" style={{ left: pos(von), width: `calc(${pos(bis)} - ${pos(von)})` }} />
         {tab.map((n) => <i key={"t" + n} className="qmark tab" style={{ left: pos(n) }} title={"aufs tablett · szene " + n} />)}
         {auf != null && <i className="qmark auf" style={{ left: pos(auf) }} title={"aufgeworfen · szene " + auf} />}
