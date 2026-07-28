@@ -1213,7 +1213,7 @@ const dkurz = (s) => { const t = String(s || "").split("-"); return t.length ===
 const istGlobal = (s) => Number(s) === 0;
 const szLabel = (s) => (istGlobal(s) ? "global" : "szene " + s);
 
-function SzenenWand({ alle, wurzelId, springe, entw }) {
+function SzenenWand({ alle, wurzelId, springe, entw, qListe }) {
   const wurzeln = (alle || []).filter((s) => !s.eltern_id);
   const wurzel = wurzeln.find((s) => s.id === wurzelId) || wurzeln[0] || null;
 
@@ -1242,6 +1242,8 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
   const flagsVon = (e) => (Array.isArray(e.flags) ? e.flags : []);
   const pFuer = (n) => (entw || []).filter((e) => Number(e.szene) === n && flagsVon(e).includes("p")).length;
   const rFuer = (n) => (entw || []).filter((e) => Number(e.szene) === n && flagsVon(e).includes("r")).length;
+  // gelb: offene fragen, die in dieser szene aufgeworfen wurden. eingelöste fallen von der wand.
+  const qFuer = (n) => (qListe || []).filter((f) => Number(f.szene) === n && qOffen(f)).length;
   const fertig = szenen.filter((x) => x.node && zaehleWoerter(x.text) >= SZ_ZIEL).length;
   const begonnen = szenen.filter((x) => x.node && zaehleWoerter(x.text) > 0).length;
 
@@ -1256,12 +1258,13 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
           const w = da ? zaehleWoerter(sz.text) : 0;
           const pz = pFuer(n + 1);                 // rohmaterial (rosa)
           const rz = rFuer(n + 1);                 // recherche (blau)
+          const qz = qFuer(n + 1);                 // offene frage (gelb)
           const cls = ["kasten", "szkachel"];
           if (w >= SZ_ZIEL) cls.push("voll");
           else if (w >= SZ_ZIEL / 2) cls.push("halb");
           else if (w > 0) cls.push("teil");
           if (!da) cls.push("fehlt");
-          const marker = [pz ? `${pz}× rohmaterial` : "", rz ? `${rz}× recherche` : ""].filter(Boolean).join(" · ");
+          const marker = [pz ? `${pz}× rohmaterial` : "", rz ? `${rz}× recherche` : "", qz ? `${qz}× offene frage` : ""].filter(Boolean).join(" · ");
           return (
             <button key={n} className={cls.join(" ")}
               disabled={!wurzel}
@@ -1275,6 +1278,7 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
                 : `szene ${n + 1} · station noch nicht aufgeklappt — klick springt hin`}>
               {pz > 0 && <i className="szp" />}
               {rz > 0 && <i className="szr" />}
+              {qz > 0 && <i className="szq" />}
             </button>
           );
         })}
@@ -1286,6 +1290,7 @@ function SzenenWand({ alle, wurzelId, springe, entw }) {
         <span className="szl voll">▪ fertig</span>
         <span className="szl roh">• rohmaterial</span>
         <span className="szl rech">• recherche</span>
+        <span className="szl frag">• offene frage</span>
       </div>
     </Panel>
   );
@@ -1370,6 +1375,169 @@ function RechercheListe({ entw, zuLog, onRweg }) {
           </div>
         ))}
       </div>
+    </Panel>
+  );
+}
+
+// ============================================================
+// Q · OFFENE FRAGEN
+// geschichten leben davon, fragen aufzuwerfen und sie zu beantworten.
+// eine frage wird in einer szene aufgeworfen und in einer anderen
+// eingelöst — die spanne dazwischen ist die spannung.
+// ============================================================
+const qOffen = (f) => !(f.antwort || "").trim();
+// offene zuerst, darin global nach oben, dann nach szene, dann neueste zuerst
+const qSort = (a, b) =>
+  (qOffen(b) ? 1 : 0) - (qOffen(a) ? 1 : 0) ||
+  (a.szene == null ? 999 : Number(a.szene)) - (b.szene == null ? 999 : Number(b.szene)) ||
+  (a.created_at < b.created_at ? 1 : -1);
+
+const qLaden = () => dbGet("fragen", `${SUPABASE_URL}/rest/v1/fragen?select=*&order=created_at.desc&limit=400`)
+  .then((d) => (Array.isArray(d) ? d : []))
+  .catch(() => []);
+
+// szenen-auswahl · dieselbe liste wie in den log_files, inkl. global
+function SzeneWahl({ wert, setWert, leer = "–", titel }) {
+  return (
+    <select className="ti minifeld" title={titel} value={wert == null ? "" : String(wert)}
+      onChange={(e) => setWert(e.target.value)}>
+      <option value="">{leer}</option>
+      <option value="0">global</option>
+      {Array.from({ length: 63 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+    </select>
+  );
+}
+
+function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, zuLog }) {
+  const [liste, setListe] = useState([]);
+  const [neu, setNeu] = useState("");
+  const [neuSz, setNeuSz] = useState("");
+  const [auf, setAuf] = useState(null);
+  const [entw, setEntw] = useState({});
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => { (async () => setListe(await qLaden()))(); }, []);
+  // in den log_files: die szene des tageseintrags ist die voreinstellung
+  useEffect(() => { if (szeneVorgabe != null) setNeuSz(String(szeneVorgabe)); }, [szeneVorgabe]);
+
+  async function stellen() {
+    const t = neu.trim();
+    if (!t) return;
+    const row = {
+      id: neueId(), user_id: getUserId(), frage: t,
+      szene: neuSz === "" ? null : Number(neuSz),
+      antwort: null, szene_antwort: null, created_at: new Date().toISOString(),
+    };
+    setNeu(""); setListe((l) => [row, ...l]);
+    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/fragen`, row);
+    setMsg(ok ? "frage steht im raum" : "offline gemerkt — sync folgt");
+  }
+
+  async function beantworten(f) {
+    const d = entw[f.id] || {};
+    const t = (d.text ?? "").trim();
+    if (!t) { setMsg("noch keine antwort eingetragen"); return; }
+    const sza = d.sz === "" || d.sz == null ? null : Number(d.sz);
+    const zeit = new Date().toISOString();
+    setListe((l) => l.map((x) => x.id === f.id ? { ...x, antwort: t, szene_antwort: sza, antwort_zeit: zeit } : x));
+    setAuf(null);
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`, { antwort: t, szene_antwort: sza, antwort_zeit: zeit });
+    setMsg("eingelöst");
+  }
+
+  async function wiederOeffnen(f) {
+    setListe((l) => l.map((x) => x.id === f.id ? { ...x, antwort: null, szene_antwort: null, antwort_zeit: null } : x));
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`, { antwort: null, szene_antwort: null, antwort_zeit: null });
+    setMsg("wieder offen");
+  }
+
+  async function weg(f) {
+    if (!confirm("frage löschen?")) return;
+    setListe((l) => l.filter((x) => x.id !== f.id));
+    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`);
+  }
+
+  async function szeneAendern(f, wert) {
+    const sz = wert === "" ? null : Number(wert);
+    setListe((l) => l.map((x) => x.id === f.id ? { ...x, szene: sz } : x));
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`, { szene: sz });
+  }
+
+  const sortiert = [...liste].sort(qSort);
+  const offeneN = liste.filter(qOffen).length;
+
+  return (
+    <Panel id={panelId} title={titel} sub={sub || `${offeneN} offen · ${liste.length - offeneN} eingelöst`}>
+      <div className="qneu">
+        <input className="ti" value={neu} placeholder="welche frage wirft das auf? …"
+          onChange={(e) => setNeu(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && stellen()} />
+        <SzeneWahl wert={neuSz} setWert={setNeuSz} leer="szene" titel="in welcher szene wird sie aufgeworfen?" />
+        <button className="btn" onClick={stellen} disabled={!neu.trim()}>+ aufwerfen</button>
+      </div>
+
+      <div className="qliste">
+        {!sortiert.length && <div className="pleer">noch keine frage. was lässt die szene offen?</div>}
+        {sortiert.map((f, n) => {
+          const offen = qOffen(f);
+          const zu = auf !== f.id;
+          const d = entw[f.id] || {};
+          const trenn = n > 0 && qOffen(sortiert[n - 1]) && !offen;
+          return (
+            <div className={"qkarte" + (offen ? " offen" : " zu") + (trenn ? " nachoffen" : "")} key={f.id}>
+              <button className="qkopf" onClick={() => setAuf(zu ? f.id : null)}>
+                <i className={"qpunkt" + (offen ? "" : " erledigt")} />
+                <span className="qfrage">{f.frage}</span>
+                <span className={"ftag sz" + (istGlobal(f.szene) ? " glob" : "")}>
+                  {f.szene == null ? "ohne szene" : szLabel(f.szene)}
+                </span>
+                {!offen && f.szene_antwort != null && (
+                  <span className="ftag qein" title="hier eingelöst">→ {szLabel(f.szene_antwort)}</span>
+                )}
+                <span className="qpfeil">{zu ? "▸" : "▾"}</span>
+              </button>
+
+              {!zu && (
+                <div className="qkoerper">
+                  {!offen ? (
+                    <>
+                      <div className="qzeile">
+                        <span className="qtag">antwort</span>
+                        {f.antwort_zeit && <i>{dkurz(String(f.antwort_zeit).slice(0, 10))}</i>}
+                      </div>
+                      <div className="qtext">{f.antwort}</div>
+                      <div className="rezrow" style={{ marginTop: 8 }}>
+                        <button className="btn" onClick={() => wiederOeffnen(f)}>↺ wieder öffnen</button>
+                        <button className="btn stop" onClick={() => weg(f)}>■ löschen</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <AutoTa className="ta" value={d.text || ""} placeholder="wie wird sie eingelöst? …"
+                        style={{ minHeight: 70 }}
+                        onChange={(e) => setEntw((x) => ({ ...x, [f.id]: { ...x[f.id], text: e.target.value } }))} />
+                      <div className="qzeile2">
+                        <span className="qtag">eingelöst in</span>
+                        <SzeneWahl wert={d.sz ?? ""} leer="–" titel="in welcher szene wird sie eingelöst?"
+                          setWert={(v) => setEntw((x) => ({ ...x, [f.id]: { ...x[f.id], sz: v } }))} />
+                        <span className="qtag" style={{ marginLeft: 12 }}>aufgeworfen in</span>
+                        <SzeneWahl wert={f.szene ?? ""} leer="–" setWert={(v) => szeneAendern(f, v)} />
+                        <span className="qspacer" />
+                        {zuLog && f.szene != null && !istGlobal(f.szene) && (
+                          <button className="btn" onClick={() => zuLog(f)} title="→ zur szene">→ szene</button>
+                        )}
+                        <button className="btn primary" onClick={() => beantworten(f)}>✓ einlösen</button>
+                        <button className="btn stop" onClick={() => weg(f)}>■</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {msg && <div className="actions" style={{ marginTop: 10 }}><span className="status ok">{msg}</span></div>}
     </Panel>
   );
 }
@@ -1482,6 +1650,11 @@ function SkUltra({ springe, zuLog }) {
   const wurzel = wurzeln.find((s) => s.id === cWurzel) || wurzeln[0] || null;
 
   // rohmaterial aus den log_files (einträge mit gesetzter szene) — teilen sich szenenwand + rohliste
+  // offene story-fragen — für den gelben punkt auf der wand und das schaufenster
+  const [qListe, setQListe] = useState([]);
+  const ladeQ = async () => setQListe(await qLaden());
+  useEffect(() => { ladeQ(); }, []);
+
   const [entw, setEntw] = useState([]);
   const ladeEntw = async () => {
     try {
@@ -1557,23 +1730,31 @@ function SkUltra({ springe, zuLog }) {
   };
   const frageWeg = async (f) => { setFragenListe((l) => l.filter((x) => x.id !== f.id)); await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/fragen100?id=eq.${f.id}`); };
   const frageEdit = async (f, wert) => { setFragenListe((l) => l.map((x) => x.id === f.id ? { ...x, frage: wert } : x)); await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen100?id=eq.${f.id}`, { frage: wert }); };
+  // das schaufenster zieht aus BEIDEN töpfen: den handwerksfragen aus dem
+  // 100er-pool (grün) und den offenen story-fragen aus der wand (gelb).
+  // eingelöste fragen sind erledigt und ziehen nicht mehr mit.
+  const qPool = [
+    ...fragenListe.map((f) => ({ k: "p:" + f.id, text: f.frage, art: "pool" })),
+    ...(qListe || []).filter(qOffen).map((f) => ({ k: "q:" + f.id, text: f.frage, art: "offen", szene: f.szene })),
+  ].filter((x) => (x.text || "").trim());
+
   const frageDrehen = () => {
-    const arr = fragenListe.map((f) => f.frage); if (!arr.length) return;
+    if (!qPool.length) return;
     setFrageDreht(true);
     setTimeout(() => {
-      const pool = arr.length > 1 ? arr.filter((x) => x !== frage) : arr;
-      const neu = pool[Math.floor(Math.random() * pool.length)];
-      zugSchreiben("off:fragen-zug", neu); setFrage(neu); setFrageDreht(false);
+      const rest = qPool.length > 1 ? qPool.filter((x) => x.k !== (frage && frage.k)) : qPool;
+      const gezogen = rest[Math.floor(Math.random() * rest.length)];
+      zugSchreiben("off:fragen-zug", gezogen.k); setFrage(gezogen); setFrageDreht(false);
     }, 550);
   };
   useEffect(() => {
-    const arr = fragenListe.map((f) => f.frage);
-    if (!arr.length || frage) return;
+    if (!qPool.length || frage) return;
     const g = zugLesen("off:fragen-zug");
-    if (g && arr.includes(g.text)) { setFrage(g.text); return; }
-    const neu = arr[Math.floor(Math.random() * arr.length)];
-    zugSchreiben("off:fragen-zug", neu); setFrage(neu);
-  }, [fragenListe, frage]);
+    const alt = g && qPool.find((x) => x.k === g.text);
+    if (alt) { setFrage(alt); return; }
+    const gezogen = qPool[Math.floor(Math.random() * qPool.length)];
+    zugSchreiben("off:fragen-zug", gezogen.k); setFrage(gezogen);
+  }, [qPool.length, frage]);
   useEffect(() => {
     if (!dirty) return;
     if (tRef.current) clearTimeout(tRef.current);
@@ -1639,7 +1820,7 @@ function SkUltra({ springe, zuLog }) {
     <>
       <div className="grouphead">SK_ULTRA<span className="rule" /></div>
 
-      <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} entw={entw} />
+      <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} entw={entw} qListe={qListe} />
 
       <div className="skgrid">
         <Panel id="sk-projekt" title="PROJEKT" sub="gegenzeichnung · ohne administrative rechte">
@@ -1723,13 +1904,18 @@ function SkUltra({ springe, zuLog }) {
       <Wegweiser wurzel={wurzel} springe={springe} />
 
       <div className="skgrid schmal">
-        <div className={"skrad" + (frageDreht ? " dreht" : "")}>
+        <div className={"skrad" + (frageDreht ? " dreht" : "") + (frage && frage.art === "offen" ? " gelb" : "")}>
           <div className="skradkopf">
-            <span className="skradtitel">100 fragen</span>
-            <button className="skraddreh" onClick={frageDrehen} disabled={!fragenListe.length}
-              title={fragenListe.length ? "neue frage ziehen" : "noch keine fragen — unten in der verwaltung eintragen"}>↻</button>
+            <span className="skradtitel">{frage && frage.art === "offen" ? "offene frage" : "100 fragen"}</span>
+            {frage && frage.art === "offen" && (
+              <span className={"ftag sz" + (istGlobal(frage.szene) ? " glob" : "")}>
+                {frage.szene == null ? "ohne szene" : szLabel(frage.szene)}
+              </span>
+            )}
+            <button className="skraddreh" onClick={frageDrehen} disabled={!qPool.length}
+              title={qPool.length ? "neue frage ziehen" : "noch keine fragen — unten in der verwaltung eintragen"}>↻</button>
           </div>
-          <div className="skradtext" key={frage}>{fragenListe.length ? (frage || "…") : "— noch keine fragen —"}</div>
+          <div className="skradtext" key={frage && frage.k}>{qPool.length ? ((frage && frage.text) || "…") : "— noch keine fragen —"}</div>
         </div>
         <div className={"skrad" + (wheelDreht ? " dreht" : "")}>
           <div className="skradkopf">
@@ -1774,6 +1960,9 @@ function SkUltra({ springe, zuLog }) {
       <RohListe entw={entw} zuLog={zuLog} onPweg={pWeg} />
 
       <RechercheListe entw={entw} zuLog={zuLog} onRweg={rWeg} />
+
+      <FragenAkkordeon panelId="sk-fragen" titel="FRAGEN"
+        sub="aufgeworfen und eingelöst · offene zuerst" />
 
       <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
         liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
@@ -2324,6 +2513,10 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
         </div>
         <p className="hint">speichert sich still von selbst, zwei sekunden nach dem letzten tastendruck.</p>
       </Panel>
+
+      <FragenAkkordeon panelId="log-fragen" titel="FRAGEN"
+        sub="was die szene offen lässt — aufwerfen und später einlösen"
+        szeneVorgabe={szene} />
     </>
   );
 }
@@ -5129,11 +5322,41 @@ function Styles() {
     background:#e88fc0;box-shadow:0 0 6px rgba(232,143,192,.85)}
   .szkachel .szr{position:absolute;bottom:3px;right:3px;width:5px;height:5px;border-radius:50%;
     background:#5fb8e8;box-shadow:0 0 6px rgba(95,184,232,.85)}
+  .szkachel .szq{position:absolute;bottom:3px;left:3px;width:5px;height:5px;border-radius:50%;
+    background:#e8cf5f;box-shadow:0 0 6px rgba(232,207,95,.85)}
   .kasten.fehlt{opacity:.28}
   .szlegende{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-family:var(--term);
     font-size:10.5px;letter-spacing:.06em;color:var(--dim)}
   .szl.teil{color:var(--green)} .szl.halb{color:var(--amber)}
   .szl.voll{color:var(--green)} .szl.roh{color:#e88fc0} .szl.rech{color:#5fb8e8}
+  .szl.frag{color:#e8cf5f}
+
+  /* Q · fragen-akkordeon */
+  .qneu{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+  .qneu .ti{flex:1;min-width:200px}
+  .qliste{display:flex;flex-direction:column;gap:5px}
+  .qkarte{border:1px solid var(--line);border-radius:5px;background:rgba(0,0,0,.18);overflow:hidden}
+  .qkarte.offen{border-left:2px solid #e8cf5f}
+  .qkarte.zu{opacity:.62}
+  .qkarte.nachoffen{margin-top:10px;border-top:1px dashed var(--line)}
+  .qkopf{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:transparent;
+    border:0;padding:9px 11px;cursor:pointer;color:inherit}
+  .qkopf:hover{background:rgba(53,255,111,.04)}
+  .qpunkt{flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:#e8cf5f;
+    box-shadow:0 0 7px rgba(232,207,95,.8)}
+  .qpunkt.erledigt{background:transparent;border:1px solid var(--dim);box-shadow:none}
+  .qfrage{flex:1;font-size:12.5px;line-height:1.5;color:var(--ink);word-break:break-word}
+  .qkarte.zu .qfrage{color:var(--muted)}
+  .ftag.qein{color:#e8cf5f;border-color:rgba(232,207,95,.4)}
+  .qpfeil{flex:0 0 auto;font-family:var(--term);font-size:11px;color:var(--dim)}
+  .qkoerper{padding:0 11px 11px;border-top:1px dotted var(--line)}
+  .qzeile{display:flex;align-items:baseline;gap:9px;margin:9px 0 5px}
+  .qzeile i{font-family:var(--term);font-size:9.5px;color:var(--dim);font-style:normal}
+  .qzeile2{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap}
+  .qspacer{flex:1}
+  .qtag{font-family:var(--term);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#e8cf5f}
+  .qtext{font-family:var(--mono);font-size:12.5px;line-height:1.55;color:var(--muted)}
+  .qkoerper .ta{margin-top:9px}
 
   /* rohmaterial-liste (offene-fäden-stil) */
   .rohliste{display:flex;flex-direction:column;gap:4px}
@@ -5182,6 +5405,9 @@ function Styles() {
   .skraddreh:disabled{opacity:.35;cursor:default}
   .skradtext{font-family:var(--mono);font-size:12.5px;line-height:1.55;color:var(--green);
     text-shadow:var(--glow);min-height:3em;transition:opacity .25s}
+  .skrad.gelb{border-color:rgba(232,207,95,.35)}
+  .skrad.gelb .skradtitel{color:#e8cf5f}
+  .skrad.gelb .skradtext{color:#e8cf5f;text-shadow:0 0 8px rgba(232,207,95,.35)}
   .skrad.dreht .skradtext{opacity:.12}
   .skrad.dreht .skraddreh{animation:wheelspin .55s linear}
   @media(max-width:820px){.skgrid{grid-template-columns:1fr}}
