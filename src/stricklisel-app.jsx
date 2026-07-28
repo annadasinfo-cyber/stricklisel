@@ -1213,6 +1213,29 @@ const dkurz = (s) => { const t = String(s || "").split("-"); return t.length ===
 const istGlobal = (s) => Number(s) === 0;
 const szLabel = (s) => (istGlobal(s) ? "global" : "szene " + s);
 
+// die 63 szenen liegen fest: 8 stationen × 8 positionen − pay-off×pay-off.
+// dieselbe reihenfolge, die die szenenwand aufbaut — hier einmal als tabelle,
+// damit auch die skripte wissen, welche nummer eine szene trägt.
+const SZ_TABELLE = (() => {
+  const order = SCHREIB_ORDER.filter((i) => i !== 4);
+  const raus = [];
+  for (const st of order) for (const p of order) {
+    if (st === 1 && p === 1) continue;
+    raus.push([st, p]);
+  }
+  return raus;                       // index 0 = szene 1
+})();
+// nummer einer szene aus station-position + zellen-position
+const szNummer = (st, p) => {
+  const n = SZ_TABELLE.findIndex(([a, b]) => a === st && b === p);
+  return n < 0 ? null : n + 1;
+};
+// wo endet welche station? für die trennstriche im zeitstrahl
+const SZ_GRENZEN = SZ_TABELLE.reduce((a, [st], n) => {
+  if (n && SZ_TABELLE[n - 1][0] !== st) a.push(n + 1);
+  return a;
+}, []);
+
 function SzenenWand({ alle, wurzelId, springe, entw, qListe }) {
   const wurzeln = (alle || []).filter((s) => !s.eltern_id);
   const wurzel = wurzeln.find((s) => s.id === wurzelId) || wurzeln[0] || null;
@@ -1242,8 +1265,9 @@ function SzenenWand({ alle, wurzelId, springe, entw, qListe }) {
   const flagsVon = (e) => (Array.isArray(e.flags) ? e.flags : []);
   const pFuer = (n) => (entw || []).filter((e) => Number(e.szene) === n && flagsVon(e).includes("p")).length;
   const rFuer = (n) => (entw || []).filter((e) => Number(e.szene) === n && flagsVon(e).includes("r")).length;
-  // gelb: offene fragen, die in dieser szene aufgeworfen wurden. eingelöste fallen von der wand.
-  const qFuer = (n) => (qListe || []).filter((f) => Number(f.szene) === n && qOffen(f)).length;
+  // gelb: offene fragen, die diese szene angehen — hier aufgeworfen oder hier
+  // wieder aufs tablett gebracht. eingelöste fallen von der wand.
+  const qFuer = (n) => (qListe || []).filter((f) => qOffen(f) && (Number(f.szene) === n || qTablett(f).includes(n))).length;
   const fertig = szenen.filter((x) => x.node && zaehleWoerter(x.text) >= SZ_ZIEL).length;
   const begonnen = szenen.filter((x) => x.node && zaehleWoerter(x.text) > 0).length;
 
@@ -1380,12 +1404,16 @@ function RechercheListe({ entw, zuLog, onRweg }) {
 }
 
 // ============================================================
-// Q · OFFENE FRAGEN
+// QUESTIONARY
 // geschichten leben davon, fragen aufzuwerfen und sie zu beantworten.
-// eine frage wird in einer szene aufgeworfen und in einer anderen
-// eingelöst — die spanne dazwischen ist die spannung.
+// eine frage wird in einer szene aufgeworfen, unterwegs immer mal wieder
+// aufs tablett gebracht und irgendwann eingelöst — die spanne dazwischen
+// ist die spannung.
 // ============================================================
 const qOffen = (f) => !(f.antwort || "").trim();
+const qTablett = (f) => (Array.isArray(f.tablett) ? f.tablett : []).map(Number).filter((n) => !isNaN(n)).sort((a, b) => a - b);
+// berührt die frage diese szene überhaupt? (aufgeworfen, aufs tablett, eingelöst)
+const qBeruehrt = (f, n) => Number(f.szene) === n || Number(f.szene_antwort) === n || qTablett(f).includes(n);
 // offene zuerst, darin global nach oben, dann nach szene, dann neueste zuerst
 const qSort = (a, b) =>
   (qOffen(b) ? 1 : 0) - (qOffen(a) ? 1 : 0) ||
@@ -1408,7 +1436,35 @@ function SzeneWahl({ wert, setWert, leer = "–", titel }) {
   );
 }
 
-function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, zuLog }) {
+// der weg einer frage über die 63 szenen: aufgeworfen · aufs tablett · eingelöst.
+// eine schmale leiste, damit man auf einen blick sieht, wie lang sie trägt.
+function QStrahl({ f }) {
+  const auf = f.szene == null || istGlobal(f.szene) ? null : Number(f.szene);
+  const ein = f.szene_antwort == null || istGlobal(f.szene_antwort) ? null : Number(f.szene_antwort);
+  const tab = qTablett(f).filter((n) => n > 0);
+  if (auf == null && ein == null && !tab.length) return null;
+  const pos = (n) => ((n - 1) / (SZ_ANZAHL - 1)) * 100 + "%";
+  const alle = [auf, ein, ...tab].filter((n) => n != null);
+  const von = Math.min(...alle), bis = Math.max(...alle);
+  return (
+    <div className="qstrahl" title={`szene ${von} bis ${bis}`}>
+      <div className="qstrahlbahn">
+        {SZ_GRENZEN.map((n) => <i key={"g" + n} className="qgrenze" style={{ left: pos(n) }} />)}
+        <i className="qspanne" style={{ left: pos(von), width: `calc(${pos(bis)} - ${pos(von)})` }} />
+        {tab.map((n) => <i key={"t" + n} className="qmark tab" style={{ left: pos(n) }} title={"aufs tablett · szene " + n} />)}
+        {auf != null && <i className="qmark auf" style={{ left: pos(auf) }} title={"aufgeworfen · szene " + auf} />}
+        {ein != null && <i className="qmark ein" style={{ left: pos(ein) }} title={"eingelöst · szene " + ein} />}
+      </div>
+      <div className="qstrahlfuss">
+        <span>1</span>
+        <span className="qspann">{auf != null && ein != null ? `trägt über ${bis - von} szenen` : tab.length ? `${tab.length}× wieder aufs tablett` : ""}</span>
+        <span>{SZ_ANZAHL}</span>
+      </div>
+    </div>
+  );
+}
+
+function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, nurSzene }) {
   const [liste, setListe] = useState([]);
   const [neu, setNeu] = useState("");
   const [neuSz, setNeuSz] = useState("");
@@ -1417,8 +1473,13 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, zuLog }) {
   const [msg, setMsg] = useState("");
 
   useEffect(() => { (async () => setListe(await qLaden()))(); }, []);
-  // in den log_files: die szene des tageseintrags ist die voreinstellung
+  // in den log_files und auf dem schreibblatt: die szene ist die voreinstellung
   useEffect(() => { if (szeneVorgabe != null) setNeuSz(String(szeneVorgabe)); }, [szeneVorgabe]);
+
+  const patch = async (f, feld) => {
+    setListe((l) => l.map((x) => x.id === f.id ? { ...x, ...feld } : x));
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`, feld);
+  };
 
   async function stellen() {
     const t = neu.trim();
@@ -1426,30 +1487,30 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, zuLog }) {
     const row = {
       id: neueId(), user_id: getUserId(), frage: t,
       szene: neuSz === "" ? null : Number(neuSz),
-      antwort: null, szene_antwort: null, created_at: new Date().toISOString(),
+      antwort: null, szene_antwort: null, tablett: [], created_at: new Date().toISOString(),
     };
     setNeu(""); setListe((l) => [row, ...l]);
     const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/fragen`, row);
     setMsg(ok ? "frage steht im raum" : "offline gemerkt — sync folgt");
   }
 
-  async function beantworten(f) {
+  async function einloesen(f) {
     const d = entw[f.id] || {};
     const t = (d.text ?? "").trim();
     if (!t) { setMsg("noch keine antwort eingetragen"); return; }
-    const sza = d.sz === "" || d.sz == null ? null : Number(d.sz);
-    const zeit = new Date().toISOString();
-    setListe((l) => l.map((x) => x.id === f.id ? { ...x, antwort: t, szene_antwort: sza, antwort_zeit: zeit } : x));
     setAuf(null);
-    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`, { antwort: t, szene_antwort: sza, antwort_zeit: zeit });
+    await patch(f, { antwort: t, szene_antwort: d.sz === "" || d.sz == null ? null : Number(d.sz), antwort_zeit: new Date().toISOString() });
     setMsg("eingelöst");
   }
 
-  async function wiederOeffnen(f) {
-    setListe((l) => l.map((x) => x.id === f.id ? { ...x, antwort: null, szene_antwort: null, antwort_zeit: null } : x));
-    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`, { antwort: null, szene_antwort: null, antwort_zeit: null });
-    setMsg("wieder offen");
+  async function tablettDazu(f, wert) {
+    if (wert === "") return;
+    const n = Number(wert);
+    const jetzt = qTablett(f);
+    if (jetzt.includes(n)) return;
+    await patch(f, { tablett: [...jetzt, n].sort((a, b) => a - b) });
   }
+  const tablettWeg = (f, n) => patch(f, { tablett: qTablett(f).filter((x) => x !== n) });
 
   async function weg(f) {
     if (!confirm("frage löschen?")) return;
@@ -1457,17 +1518,16 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, zuLog }) {
     await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`);
   }
 
-  async function szeneAendern(f, wert) {
-    const sz = wert === "" ? null : Number(wert);
-    setListe((l) => l.map((x) => x.id === f.id ? { ...x, szene: sz } : x));
-    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`, { szene: sz });
-  }
-
-  const sortiert = [...liste].sort(qSort);
-  const offeneN = liste.filter(qOffen).length;
+  // auf dem schreibblatt nur, was diese szene angeht
+  const roh = nurSzene == null ? liste : liste.filter((f) => qBeruehrt(f, Number(nurSzene)));
+  const sortiert = [...roh].sort(qSort);
+  const offeneN = roh.filter(qOffen).length;
+  const untertitel = sub || (nurSzene == null
+    ? `${offeneN} offen · ${roh.length - offeneN} eingelöst`
+    : (roh.length ? `${offeneN} offen · ${roh.length} betreffen diese szene` : "nichts offen für diese szene"));
 
   return (
-    <Panel id={panelId} title={titel} sub={sub || `${offeneN} offen · ${liste.length - offeneN} eingelöst`}>
+    <Panel id={panelId} title={titel} sub={untertitel}>
       <div className="qneu">
         <input className="ti" value={neu} placeholder="welche frage wirft das auf? …"
           onChange={(e) => setNeu(e.target.value)}
@@ -1482,12 +1542,14 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, zuLog }) {
           const offen = qOffen(f);
           const zu = auf !== f.id;
           const d = entw[f.id] || {};
+          const tab = qTablett(f);
           const trenn = n > 0 && qOffen(sortiert[n - 1]) && !offen;
           return (
             <div className={"qkarte" + (offen ? " offen" : " zu") + (trenn ? " nachoffen" : "")} key={f.id}>
               <button className="qkopf" onClick={() => setAuf(zu ? f.id : null)}>
                 <i className={"qpunkt" + (offen ? "" : " erledigt")} />
                 <span className="qfrage">{f.frage}</span>
+                {tab.length > 0 && <span className="ftag qtab" title="wieder aufs tablett">↻ {tab.length}</span>}
                 <span className={"ftag sz" + (istGlobal(f.szene) ? " glob" : "")}>
                   {f.szene == null ? "ohne szene" : szLabel(f.szene)}
                 </span>
@@ -1499,15 +1561,29 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, zuLog }) {
 
               {!zu && (
                 <div className="qkoerper">
+                  <QStrahl f={f} />
+
+                  <div className="qzeile2">
+                    <span className="qtag">aufs tablett</span>
+                    {tab.map((n2) => (
+                      <button key={n2} className="qchip" onClick={() => tablettWeg(f, n2)} title="wieder entfernen">
+                        {szLabel(n2)} ✕
+                      </button>
+                    ))}
+                    {!tab.length && <span className="qleiser">— noch nicht wieder aufgetaucht</span>}
+                    <SzeneWahl wert="" leer="+ szene" titel="wo kommt sie nochmal hoch?"
+                      setWert={(v) => tablettDazu(f, v)} />
+                  </div>
+
                   {!offen ? (
                     <>
                       <div className="qzeile">
-                        <span className="qtag">antwort</span>
+                        <span className="qtag">eingelöst</span>
                         {f.antwort_zeit && <i>{dkurz(String(f.antwort_zeit).slice(0, 10))}</i>}
                       </div>
                       <div className="qtext">{f.antwort}</div>
                       <div className="rezrow" style={{ marginTop: 8 }}>
-                        <button className="btn" onClick={() => wiederOeffnen(f)}>↺ wieder öffnen</button>
+                        <button className="btn" onClick={() => patch(f, { antwort: null, szene_antwort: null, antwort_zeit: null })}>↺ wieder öffnen</button>
                         <button className="btn stop" onClick={() => weg(f)}>■ löschen</button>
                       </div>
                     </>
@@ -1521,12 +1597,9 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, zuLog }) {
                         <SzeneWahl wert={d.sz ?? ""} leer="–" titel="in welcher szene wird sie eingelöst?"
                           setWert={(v) => setEntw((x) => ({ ...x, [f.id]: { ...x[f.id], sz: v } }))} />
                         <span className="qtag" style={{ marginLeft: 12 }}>aufgeworfen in</span>
-                        <SzeneWahl wert={f.szene ?? ""} leer="–" setWert={(v) => szeneAendern(f, v)} />
+                        <SzeneWahl wert={f.szene ?? ""} leer="–" setWert={(v) => patch(f, { szene: v === "" ? null : Number(v) })} />
                         <span className="qspacer" />
-                        {zuLog && f.szene != null && !istGlobal(f.szene) && (
-                          <button className="btn" onClick={() => zuLog(f)} title="→ zur szene">→ szene</button>
-                        )}
-                        <button className="btn primary" onClick={() => beantworten(f)}>✓ einlösen</button>
+                        <button className="btn primary" onClick={() => einloesen(f)}>✓ einlösen</button>
                         <button className="btn stop" onClick={() => weg(f)}>■</button>
                       </div>
                     </>
@@ -1961,8 +2034,8 @@ function SkUltra({ springe, zuLog }) {
 
       <RechercheListe entw={entw} zuLog={zuLog} onRweg={rWeg} />
 
-      <FragenAkkordeon panelId="sk-fragen" titel="FRAGEN"
-        sub="aufgeworfen und eingelöst · offene zuerst" />
+      <FragenAkkordeon panelId="sk-questionary" titel="QUESTIONARY"
+        sub="aufgeworfen · aufs tablett · eingelöst — offene zuerst" />
 
       <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
         liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
@@ -2514,8 +2587,8 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
         <p className="hint">speichert sich still von selbst, zwei sekunden nach dem letzten tastendruck.</p>
       </Panel>
 
-      <FragenAkkordeon panelId="log-fragen" titel="FRAGEN"
-        sub="was die szene offen lässt — aufwerfen und später einlösen"
+      <FragenAkkordeon panelId="log-questionary" titel="QUESTIONARY"
+        sub="was die szene offen lässt — aufwerfen, aufs tablett, einlösen"
         szeneVorgabe={szene} />
     </>
   );
@@ -3117,6 +3190,10 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
   // beim reinscrollen liest man sich selbst in die szene hinein.
   if (view === "szene" && szeneIdx != null && szeneIdx !== 4) {
     const i = szeneIdx;
+    // welche der 63 szenen ist das? nur eine station (E1) hat eine nummer:
+    // die station steht in eltern_pos, die zelle ist i.
+    const stationPos = alle.find((x) => x.id === id)?.eltern_pos;
+    const szNr = ebene === 1 && stationPos != null ? szNummer(stationPos, i) : null;
     const w = zaehleWoerter(texte[i] || "");
     const voll = w >= ZIEL_SZENE;
     const text = (texte[i] || "").trim();
@@ -3186,6 +3263,11 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
           <span className={"status " + msg.c}>{dirty ? "◉ rec" : msg.t}</span>
         </div>
         <p className="hint">speichert sich still von selbst, zwei sekunden nach dem letzten tastendruck.</p>
+
+        {szNr != null && (
+          <FragenAkkordeon panelId="skript-questionary" titel="QUESTIONARY"
+            szeneVorgabe={szNr} nurSzene={szNr} />
+        )}
       </>
     );
   }
@@ -5357,6 +5439,25 @@ function Styles() {
   .qtag{font-family:var(--term);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#e8cf5f}
   .qtext{font-family:var(--mono);font-size:12.5px;line-height:1.55;color:var(--muted)}
   .qkoerper .ta{margin-top:9px}
+  .qleiser{font-size:11.5px;color:var(--dim)}
+  .ftag.qtab{color:#e8cf5f;border-color:rgba(232,207,95,.35)}
+  .qchip{font-family:var(--term);font-size:9.5px;letter-spacing:.06em;color:#e8cf5f;
+    background:rgba(232,207,95,.07);border:1px solid rgba(232,207,95,.35);border-radius:3px;
+    padding:3px 7px;cursor:pointer;transition:.12s}
+  .qchip:hover{background:rgba(232,207,95,.16);color:#fff}
+
+  /* zeitstrahl einer frage über die 63 szenen */
+  .qstrahl{margin:12px 0 4px}
+  .qstrahlbahn{position:relative;height:16px;border-bottom:1px solid var(--line)}
+  .qgrenze{position:absolute;top:4px;bottom:0;width:1px;background:var(--line);opacity:.7}
+  .qspanne{position:absolute;top:7px;height:2px;background:rgba(232,207,95,.28);border-radius:1px}
+  .qmark{position:absolute;border-radius:50%;transform:translateX(-50%)}
+  .qmark.tab{top:5px;width:6px;height:6px;background:rgba(232,207,95,.55)}
+  .qmark.auf{top:3px;width:10px;height:10px;background:#e8cf5f;box-shadow:0 0 8px rgba(232,207,95,.8)}
+  .qmark.ein{top:3px;width:10px;height:10px;background:var(--green);box-shadow:0 0 8px rgba(53,255,111,.7)}
+  .qstrahlfuss{display:flex;align-items:baseline;gap:10px;margin-top:5px;
+    font-family:var(--term);font-size:9.5px;letter-spacing:.06em;color:var(--dim)}
+  .qspann{flex:1;text-align:center;color:#e8cf5f}
 
   /* rohmaterial-liste (offene-fäden-stil) */
   .rohliste{display:flex;flex-direction:column;gap:4px}
