@@ -2091,8 +2091,6 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         </Panel>
       </div>
 
-      <Wegweiser wurzel={wurzel} springe={springe} />
-
       <div className="skgrid schmal">
         <div className={"skrad" + (frageDreht ? " dreht" : "") + (frage && frage.art === "offen" ? " gelb" : "") + (qHalt ? " haelt" : "")}
              onMouseEnter={() => setQHalt(true)} onMouseLeave={() => setQHalt(false)}
@@ -2119,12 +2117,15 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         </div>
       </div>
 
+      <Wegweiser wurzel={wurzel} springe={springe} />
+
       <Panel id="sk-synopsis" title="SYNOPSIS" sub="worum geht's — in kurz">
         <AutoTa className="ta" value={synopsis} style={{ minHeight: 150 }}
           onChange={(e) => aend(() => setSynopsis(e.target.value))}
           placeholder="die ganze geschichte in ein paar sätzen — wer, was, wogegen, wie es ausgeht." />
       </Panel>
 
+      <div className="skgrid">
       <Panel id="sk-ermittlungen" title="ERMITTLUNGEN" sub="4 fragen">
         {ERMITTLUNG.map((f, i) => (
           <div className="ermfrage" key={i}>
@@ -2148,6 +2149,7 @@ function SkUltra({ springe, zuLog, zurPerson }) {
           </div>
         ))}
       </Panel>
+      </div>
 
       <RohListe entw={entw} zuLog={zuLog} onPweg={pWeg} />
 
