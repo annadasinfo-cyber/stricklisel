@@ -1631,6 +1631,74 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, nurSzene }) {
 }
 
 // ============================================================
+// BESETZUNG auf sk_ultra · wie die steckbriefe im denkbrett, aber
+// nicht nur die drei meistgenannten: ALLE figuren dieses projekts,
+// nach häufigkeit sortiert. wer oben steht, trägt das buch.
+// ============================================================
+function BesetzungTafel({ ordnerId, skripte, zurPerson }) {
+  const [figuren, setFiguren] = useState([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const th = await dbGet("besetzung-figuren",
+          `${SUPABASE_URL}/rest/v1/things?select=id,name,rolle,archetyp,avatar,art,ordner_id&or=(art.eq.person,art.eq.gruppe)`);
+        setFiguren(Array.isArray(th) ? th : []);
+      } catch { setFiguren([]); }
+    })();
+  }, []);
+
+  const sk = Array.isArray(skripte) ? skripte : [];
+  // wie oft taucht der name in den skripten dieses projekts auf?
+  const zaehlen = (name) => {
+    const low = (name || "").trim().toLowerCase();
+    if (!low) return 0;
+    let n = 0;
+    sk.forEach((s) => {
+      if (ordnerId && s.ordner_id !== ordnerId) return;
+      for (let i = 0; i < 9; i++) {
+        const m = (s.matrix?.[i] || ""), x = (s.texte?.[i] || "");
+        if (x.toLowerCase().includes(low) || m.toLowerCase().includes(low)) n++;
+      }
+    });
+    return n;
+  };
+
+  const meine = figuren
+    .filter((p) => (ordnerId ? p.ordner_id === ordnerId : true))
+    .map((p) => ({ ...p, anzahl: zaehlen(p.name) }))
+    .sort((a, b) => b.anzahl - a.anzahl || (a.name || "").localeCompare(b.name || ""));
+
+  const genannt = meine.filter((p) => p.anzahl > 0).length;
+
+  return (
+    <Panel id="sk-besetzung" title="BESETZUNG"
+      sub={meine.length ? `${meine.length} figuren · ${genannt} kommen vor` : "noch niemand besetzt"}>
+      {!meine.length && <p className="hint">in THINGS personen und gruppen anlegen — hier stehen sie dann alle.</p>}
+      {!!meine.length && (
+        <div className="bgrid">
+          {meine.map((p) => (
+            <button className={"skarte" + (p.anzahl ? "" : " stumm")} key={p.id}
+              onClick={() => zurPerson && zurPerson(p.id)}
+              title={p.anzahl ? p.anzahl + " fundstellen in diesem projekt" : "kommt noch nirgends vor"}>
+              <div className="sav">{p.avatar ? <Avatar typ={p.avatar} size={40} /> : <span className="savleer">?</span>}</div>
+              <div className="sinfo">
+                <div className="sname">
+                  {p.name || "unbenannt"}
+                  <span className="sanzahl">{p.anzahl ? p.anzahl + "×" : "–"}</span>
+                </div>
+                <div className="smeta">
+                  {[p.art === "gruppe" ? "gruppe" : null, p.archetyp, p.rolle].filter(Boolean).join(" · ") || "—"}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+// ============================================================
 // WEGWEISER · die matrix des buches (E0) als anschauungsmaterial.
 // nicht zum bearbeiten — nur zum draufschauen, ob die richtung noch stimmt.
 // klick auf ein kästchen springt in die skripte, auf genau diese zelle.
@@ -1660,7 +1728,7 @@ function Wegweiser({ wurzel, springe }) {
 
 // ============================================================
 // SK_ULTRA · projektseite. zwei boxen nebeneinander:
-// links die gegenzeichnung DES PROJEKTS (name, prämisse, signatur) —
+// links die gegenzeichnung DES PROJEKTS (name, synopsis, signatur) —
 // das projekt stimmt der zusammenarbeit zu, ohne administrative rechte.
 // rechts DEIN commit im format des prio-datenblatts, aber ohne prio-platz.
 // die signatur verortet das projekt (siehe remote viewing): es lässt sich wiederfinden.
@@ -1702,7 +1770,7 @@ const Q_TAKT = 90 * 1000;   // das fragen-kästchen blättert alle 90 sekunden w
 const zugLesen = (k) => { try { const r = JSON.parse(localStorage.getItem(k) || "null"); return r && r.text && Date.now() - r.ts < ZUG_MS ? r : null; } catch { return null; } };
 const zugSchreiben = (k, text) => { try { localStorage.setItem(k, JSON.stringify({ text, ts: Date.now() })); } catch {} };
 
-function SkUltra({ springe, zuLog }) {
+function SkUltra({ springe, zuLog, zurPerson }) {
   const [id, setId] = useState(null);
   const [pName, setPName] = useState("");
   const [pPraem, setPPraem] = useState("");
@@ -1718,6 +1786,8 @@ function SkUltra({ springe, zuLog }) {
   const [fragen, setFragen] = useState(["", "", "", ""]);
   const [arche, setArche] = useState(["", "", "", ""]);   // 4 archetypen-antworten
   const [synopsis, setSynopsis] = useState("");           // kurzzusammenfassung, über den ermittlungen
+  // die zentrale frage · ein satz. innere, äußere und universelle ebene in einem.
+  const [qed, setQed] = useState("");
   const [cWurzel, setCWurzel] = useState("");   // gewähltes matrix-projekt (wurzel-id) für die szenenwand
   const [alle, setAlle] = useState([]);         // alle skripte, für projekt-auswahl + szenenwand
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
@@ -1859,7 +1929,7 @@ function SkUltra({ springe, zuLog }) {
     if (tRef.current) clearTimeout(tRef.current);
     tRef.current = setTimeout(() => speichern(true), 2000);
     return () => clearTimeout(tRef.current);
-  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, arche, synopsis, cWurzel, dirty]);
+  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, arche, synopsis, qed, cWurzel, dirty]);
 
   const aend = (fn) => { fn(); setDirty(true); };
 
@@ -1878,6 +1948,7 @@ function SkUltra({ springe, zuLog }) {
       setFragen([r.f1 || "", r.f2 || "", r.f3 || "", r.f4 || ""]);
       setArche([r.a1 || "", r.a2 || "", r.a3 || "", r.a4 || ""]);
       setSynopsis(r.synopsis || "");
+      setQed(r.zentrale_frage || "");
       setCWurzel(r.c_wurzel || "");
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
@@ -1894,6 +1965,7 @@ function SkUltra({ springe, zuLog }) {
       f1: fragen[0], f2: fragen[1], f3: fragen[2], f4: fragen[3],
       a1: arche[0], a2: arche[1], a3: arche[2], a4: arche[3],
       synopsis,
+      zentrale_frage: qed,
       c_wurzel: cWurzel || null,
       updated_at: new Date().toISOString(),
     };
@@ -1929,7 +2001,7 @@ function SkUltra({ springe, zuLog }) {
               placeholder="arbeitstitel des projekts" />
           </div>
           <div className="field" style={{ marginTop: 14 }}>
-            <label className="cap">prämisse</label>
+            <label className="cap">synopsis</label>
             <textarea className="ta" value={pPraem} onChange={(e) => aend(() => setPPraem(e.target.value))}
               placeholder="worum es geht — ein satz" style={{ minHeight: 90 }} />
           </div>
@@ -2028,6 +2100,11 @@ function SkUltra({ springe, zuLog }) {
         </div>
       </div>
 
+      <Panel id="sk-praemisse" title="PRÄMISSE" sub="quod erat demonstrandum">
+        <textarea className="ta qed" value={qed} onChange={(e) => aend(() => setQed(e.target.value))}
+          placeholder="wird jackson seine angst (wut, zorn, gier) überwinden, sich auf den weg machen und die welt retten?" />
+      </Panel>
+
       <Panel id="sk-synopsis" title="SYNOPSIS" sub="worum geht's — in kurz">
         <AutoTa className="ta" value={synopsis} style={{ minHeight: 150 }}
           onChange={(e) => aend(() => setSynopsis(e.target.value))}
@@ -2057,6 +2134,8 @@ function SkUltra({ springe, zuLog }) {
           </div>
         ))}
       </Panel>
+
+      <BesetzungTafel ordnerId={wurzel ? wurzel.ordner_id : null} skripte={alle} zurPerson={zurPerson} />
 
       <RohListe entw={entw} zuLog={zuLog} onPweg={pWeg} />
 
@@ -3442,9 +3521,12 @@ function Avatar({ typ, size = 44 }) {
 const ARTEN = [
   { v: "besetzung", t: "besetzung", ein: "" },
   { v: "person", t: "personen", ein: "person" },
+  { v: "gruppe", t: "gruppen", ein: "gruppe" },   // wie eine person, nur mehrzahl
   { v: "ort", t: "orte", ein: "ort" },
   { v: "ding", t: "dinge", ein: "ding" },
 ];
+// personen und gruppen bekommen dieselben felder — rolle, archetyp, wants, needs
+const istFigur = (a) => a === "person" || a === "gruppe";
 
 // ---- Zwei achsen. Eine figur kann hauptfigur SEIN (rolle) und verführerin (archetyp). ----
 
@@ -3465,12 +3547,14 @@ const ROLLEN = [
     ["heilender charakter", "#37"],
     ["das orakel", "in der matrix"],
     ["lazarus-joker", "gibt neuen mut, wenn alles verloren scheint"],
+    ["lazarus-charakter", "totgeglaubt und wieder da — kommt zurück, wenn niemand mehr mit ihm rechnet"],
   ]},
   { g: "gegner", r: [
     ["schurke · schatten", ""],
     ["handlanger des schurken", ""],
     ["torwächter · schwellenhüter", "schlüsselwächter in der matrix"],
     ["gestaltwandler", ""],
+    ["janus-charakter", "zwei gesichter: dem helden zeigt er das eine, dem gegner das andere"],
     ["endboss", "#11 · #57 · antagonist"],
   ]},
   { g: "funktion", r: [
@@ -3521,7 +3605,7 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
     if (!sprungPerson || !liste.length) return;
     const p = liste.find((x) => x.id === sprungPerson);
     if (p) {
-      setArt("person");
+      setArt(p.art || "person");   // gruppen liegen im gruppen-tab, nicht bei den personen
       setAktOrdner("");
       setOffen(sprungPerson);
       setTimeout(() => document.querySelector('.thing.on')?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
@@ -3541,7 +3625,8 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
   }
 
   async function neu() {
-    const d0 = { id: neueId(), user_id: getUserId(), ordner_id: aktOrdner || null, art, name: "", created_at: new Date().toISOString() };
+    const d0 = { id: neueId(), user_id: getUserId(), ordner_id: aktOrdner || null, art, name: "",
+      ...(art === "gruppe" ? { avatar: "gruppe" } : {}), created_at: new Date().toISOString() };
     setListe((l) => [...l, d0]); setOffen(d0.id);
     await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/things`, d0);
   }
@@ -3577,27 +3662,37 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
     if (!q) { setMsg({ t: "erst einen namen eintragen", c: "err" }); return; }
     try {
       setMsg({ t: "suche …", c: "work" }); setFunde(null);
-      let url = `${SUPABASE_URL}/rest/v1/skripte?select=id,name,matrix,texte`;
+      let url = `${SUPABASE_URL}/rest/v1/skripte?select=id,name,matrix,texte,eltern_id,eltern_pos`;
       if (aktOrdner) url += `&ordner_id=eq.${aktOrdner}`;
       const sk = await dbGet("things-suche-" + (aktOrdner || "alle"), url);
       const low = q.toLowerCase();
+      const arr = Array.isArray(sk) ? sk : [];
+      // wie tief hängt ein skript? 0 = das buch, 1 = eine station.
+      // nur zellen einer station tragen eine der 63 szenennummern.
+      const nach = new Map(arr.map((s) => [s.id, s]));
+      const tiefe = (s) => { let n = 0, c = s; while (c?.eltern_id && n < 12) { c = nach.get(c.eltern_id); n++; } return n; };
       const tr = [];
-      (Array.isArray(sk) ? sk : []).forEach((s) => {
+      arr.forEach((s) => {
+        const ist1 = tiefe(s) === 1;
         for (let i = 0; i < 9; i++) {
           const m = (s.matrix?.[i] || ""), x = (s.texte?.[i] || "");
           const wo = (x.toLowerCase().includes(low) ? x : m.toLowerCase().includes(low) ? m : null);
           if (!wo) continue;
           const p = wo.toLowerCase().indexOf(low), a = p > 50 ? p - 50 : 0;
-          tr.push({ id: s.id, i, skript: s.name || "unbenannt", pos: POS[i].k,
+          const nr = ist1 && i !== 4 && s.eltern_pos != null ? szNummer(s.eltern_pos, i) : null;
+          tr.push({ id: s.id, i, nr, skript: s.name || "unbenannt", pos: POS[i].k,
             schnipsel: (a ? "… " : "") + wo.slice(a, a + 150).replace(/\n+/g, " ") + (wo.length > a + 150 ? " …" : "") });
         }
       });
+      // nach szenennummer sortieren — das ist die reihenfolge, in der man liest
+      tr.sort((a, b) => (a.nr == null ? 999 : a.nr) - (b.nr == null ? 999 : b.nr));
       setFunde({ q, tr });
       setMsg({ t: tr.length + " fundstelle" + (tr.length === 1 ? "" : "n"), c: "ok" });
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
 
   const alleBesetzung = liste.filter((x) => x.art === "person" && (aktOrdner ? x.ordner_id === aktOrdner : true));
+  const alleGruppen = liste.filter((x) => x.art === "gruppe" && (aktOrdner ? x.ordner_id === aktOrdner : true));
   const meine = liste.filter((x) => x.art === art && (aktOrdner ? x.ordner_id === aktOrdner : true));
   const einzahl = ARTEN.find((a) => a.v === art)?.ein || "ding";
 
@@ -3651,6 +3746,23 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
                 </div>
               </div>
             ))}
+            {alleGruppen.length > 0 && (
+              <>
+                <div className="divider">gruppen</div>
+                <div className="bzgrid">
+                  {alleGruppen.map((x) => (
+                    <button className="bzkarte klick" key={x.id} onClick={() => { setArt("gruppe"); setOffen(x.id); }} title="→ zur akte">
+                      <div className="bzkopf">
+                        <span className="bzav"><Avatar typ={x.avatar || "gruppe"} size={30} /></span>
+                        {x.rolle && <span className="bzrolle">{x.rolle}</span>}
+                        <span className="bzname">{x.name || "unbenannt"}{x.archetyp && <em>{x.archetyp}</em>}</span>
+                      </div>
+                      {x.steckbrief && <p className="bzinfo">{x.steckbrief}</p>}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             {alleBesetzung.filter((x) => !x.rolle).length > 0 && (
               <>
                 <div className="divider">ohne rolle</div>
@@ -3674,7 +3786,7 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
               <span className={"status " + msg.c}>{msg.t}</span>
             </div>
 
-            {!meine.length && <p className="hint" style={{ marginTop: 12 }}>noch nichts. jede gute geschichte braucht personal.</p>}
+            {!meine.length && <p className="hint" style={{ marginTop: 12 }}>{art === "gruppe" ? "noch keine gruppe. die wachen, der mob, die familie — alles was im rudel auftritt." : "noch nichts. jede gute geschichte braucht personal."}</p>}
           </>
         )}
 
@@ -3700,28 +3812,25 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
                     <textarea className="ta klein" value={th.steckbrief} onChange={(e) => feld(th, "steckbrief", e.target.value)}
                       placeholder="kurz. wer oder was ist das?" />
                   </div>
-                  {art === "person" && (
+                  {istFigur(art) && (
                     <>
                     <div className="field" style={{ marginTop: 12 }}>
                       <label className="cap">avatar</label>
                       <div className="avwahl">
                         <button className={"avopt" + (!th.avatar ? " on" : "")} onClick={() => feld(th, "avatar", "")} title="keiner">–</button>
-                        {AVATARE.map((a) => (
-                          <button key={a} className={"avopt" + (th.avatar === a ? " on" : "")} onClick={() => feld(th, "avatar", a)} title={a}>
-                            <Avatar typ={a} size={34} />
-                          </button>
-                        ))}
-                        <span className="avtrenn" />
-                        {GRUPPEN.map((a) => (
-                          <button key={a} className={"avopt" + (th.avatar === a ? " on" : "")} onClick={() => feld(th, "avatar", a)} title={a.replace("_", " ")}>
-                            <Avatar typ={a} size={34} />
-                          </button>
+                        {(art === "gruppe" ? [...GRUPPEN, ...AVATARE] : [...AVATARE, ...GRUPPEN]).map((a, n) => (
+                          <span key={a} style={{ display: "contents" }}>
+                            {n === (art === "gruppe" ? GRUPPEN.length : AVATARE.length) && <span className="avtrenn" />}
+                            <button className={"avopt" + (th.avatar === a ? " on" : "")} onClick={() => feld(th, "avatar", a)} title={a.replace("_", " ")}>
+                              <Avatar typ={a} size={34} />
+                            </button>
+                          </span>
                         ))}
                       </div>
                     </div>
                     <div className="row" style={{ marginTop: 12 }}>
                       <div className="field">
-                        <label className="cap">rolle · was sie tut</label>
+                        <label className="cap">rolle · was sie tun</label>
                         <select className="ti" value={th.rolle || ""} onChange={(e) => feld(th, "rolle", e.target.value)}>
                           <option value="">— keine rolle —</option>
                           {ROLLEN.map((g) => (
@@ -3774,8 +3883,8 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
             <div className="tkopf">{funde.tr.length} fundstelle{funde.tr.length === 1 ? "" : "n"} für <b>{funde.q}</b></div>
             {funde.tr.map((f, n) => (
               <button className="tzeile" key={n} onClick={() => springe(f.id, f.i)} title="zur szene springen">
-                <span className="tdatum">{f.skript}</span>
-                <span className="twoerter" style={{ color: "var(--green)" }}>{f.pos}</span>
+                <span className="tdatum">{f.nr != null ? "szene " + f.nr : f.skript}</span>
+                <span className="twoerter" style={{ color: "var(--green)" }}>{f.nr != null ? f.skript + " › " + f.pos : f.pos}</span>
                 <span className="tschnipsel">{f.schnipsel}</span>
               </button>
             ))}
@@ -5004,7 +5113,7 @@ export default function StricklieselApp() {
         {tab === "17b" && <Abteilung17b say={say} />}
         {tab === "m42" && <M42 />}
         {tab === "log" && <LogFiles zeigeAbschreib={zeigeAbschreib} zurKonsole={zurKonsole} sprungLog={sprungLog} setSprungLog={setSprungLog} />}
-        {tab === "skultra" && <SkUltra springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuLog={(dt) => { setSprungLog(dt); setTab("log"); }} />}
+        {tab === "skultra" && <SkUltra springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuLog={(dt) => { setSprungLog(dt); setTab("log"); }} zurPerson={(id) => { setSprungPerson(id); setTab("things"); }} />}
         {tab === "skripte" && <Skripte sprung={sprung} setSprung={setSprung} projekt={projekt} setProjekt={setzeProjekt} zurKonsole={zurKonsole} zeigeAbschreib={zeigeAbschreib} kette={cfg.ketteText} />}
         {tab === "things" && <Things springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} projekt={projekt} setProjekt={setzeProjekt} sprungPerson={sprungPerson} setSprungPerson={setSprungPerson} />}
         {tab === "think" && <Pausenschirm springe={(id, i) => { setSprung({ id, i }); setTab("skripte"); }} zuM42={() => setTab("m42")} zurPerson={(id) => { setSprungPerson(id); setTab("things"); }} />}
@@ -6025,6 +6134,8 @@ function Styles() {
   .sname{font-family:var(--mono);font-size:13px;color:var(--ink);display:flex;align-items:baseline;gap:8px}
   .sanzahl{font-family:var(--term);font-size:11px;color:var(--green);text-shadow:var(--glow);flex:0 0 auto}
   .smeta{font-family:var(--term);font-size:10.5px;letter-spacing:.06em;color:var(--dim);margin-top:3px}
+  .skarte.stumm{opacity:.5}
+  .skarte.stumm .sanzahl{color:var(--dim);text-shadow:none}
 
   /* handbuch */
   .handbuch{margin:14px 0 0;padding:16px;background:var(--panel-2);border:1px solid var(--line);
@@ -6090,6 +6201,11 @@ function Styles() {
 
   /* log-files */
   .ta.log{min-height:340px;font-size:13.5px;line-height:1.65;overflow:hidden;resize:none}
+  /* die prämisse · der eine satz, der das ganze buch trägt */
+  .ta.qed{min-height:96px;font-size:15px;line-height:1.65;color:var(--green);
+    text-shadow:0 0 10px rgba(53,255,111,.28)}
+  .ta.qed::placeholder{color:var(--dim);text-shadow:none;font-size:14px;font-style:italic}
+
   /* global-marker in rohmaterial & recherche */
   .ftag.glob{color:var(--amber);border-color:rgba(224,178,106,.45)}
   .rohzeile.nachglobal,.rechzeile.nachglobal{border-top:1px dashed var(--line);padding-top:10px;margin-top:4px}
