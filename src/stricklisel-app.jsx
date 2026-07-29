@@ -2171,6 +2171,152 @@ function Datenblatt({ szNr, text }) {
 }
 
 // ============================================================
+// ZEITSTRAHL · die POV-spuren nebeneinander.
+// jede szene hat einen beginn und eine dauer; wer denselben POV hat,
+// liegt auf derselben spur. wo zwei balken übereinander liegen, läuft
+// es gleichzeitig — daran sieht man, wieviel zeit dem anderen bleibt.
+//
+// problem und lösung: zwischen zwei szenen können jahre liegen, in einer
+// szene aber nur zwanzig minuten. maßstabsgetreu wäre der kurze balken
+// unsichtbar. deshalb BLÖCKE: innerhalb eines blocks stimmt der maßstab,
+// zwischen den blöcken steht ein bruch mit dem sprung dran.
+// ============================================================
+const EH_MIN = { min: 1, std: 60, tag: 1440, woche: 10080, monat: 43200, jahr: 525600 };
+const EH_NAME = { min: "min", std: "std", tag: "tage", woche: "wochen", monat: "monate", jahr: "jahre" };
+const inMinuten = (wert, eh) => (Number(wert) || 0) * (EH_MIN[eh] || 1);
+const spurFarben = ["#35ff6f", "#e88fc0", "#e8cf5f", "#5fb8e8", "#a98fe0", "#6fd8c4"];
+
+const dauerText = (m) => {
+  if (!m) return "—";
+  if (m < 60) return m + " min";
+  if (m < 1440) { const h = Math.floor(m / 60), r = m % 60; return h + " std" + (r ? " " + r + " min" : ""); }
+  if (m < 10080) { const t = m / 1440; return (Number.isInteger(t) ? t : t.toFixed(1)) + " tage"; }
+  if (m < 43200) { const w = m / 10080; return (Number.isInteger(w) ? w : w.toFixed(1)) + " wochen"; }
+  if (m < 525600) { const mo = m / 43200; return (Number.isInteger(mo) ? mo : mo.toFixed(1)) + " monate"; }
+  const j = m / 525600; return (Number.isInteger(j) ? j : j.toFixed(1)) + " jahre";
+};
+
+function Zeitstrahl({ alle, wurzelId, springe }) {
+  const [szenen, setSzenen] = useState([]);
+  const [figuren, setFiguren] = useState([]);
+  useEffect(() => {
+    (async () => {
+      const d = await dbGet("szenen", `${SUPABASE_URL}/rest/v1/szenen?select=*&order=nr.asc&limit=100`).catch(() => []);
+      setSzenen(Array.isArray(d) ? d : []);
+      const th = await dbGet("besetzung-figuren",
+        `${SUPABASE_URL}/rest/v1/things?select=id,name,art`).catch(() => []);
+      setFiguren(Array.isArray(th) ? th : []);
+    })();
+  }, []);
+
+  const namen = new Map(figuren.map((f) => [f.id, f.name || "unbenannt"]));
+  const reihen = [...szenen].sort((a, b) => Number(a.nr) - Number(b.nr));
+
+  // ---- die uhr laufen lassen ----
+  const info = new Map();
+  const bloecke = [];
+  let block = 0, uhr = 0;
+  bloecke[0] = { nr: 0, label: "beginn" };
+  for (const r of reihen) {
+    if (r.zeit_modus === "gleichzeitig") continue;   // die kommen im zweiten durchgang
+    if (r.zeit_modus === "datum") {
+      block++; uhr = 0;
+      bloecke[block] = { nr: block, label: (r.zeit_wert || "").trim() || "neues datum" };
+    } else if (r.zeit_modus === "spaeter") {
+      const j = inMinuten(r.sprung_wert, r.sprung_eh);
+      if (j >= EH_MIN.tag) {
+        block++; uhr = 0;
+        bloecke[block] = { nr: block, label: "+ " + (r.sprung_wert || 0) + " " + (EH_NAME[r.sprung_eh] || "") };
+      } else uhr += j;
+    }
+    const d = inMinuten(r.dauer, r.dauer_eh);
+    info.set(Number(r.nr), { block, start: uhr, dauer: d, row: r });
+    uhr += d;
+  }
+  // gleichzeitige szenen an ihr ziel hängen — mehrfach, falls sie sich ketten
+  for (let p = 0; p < 5; p++) {
+    for (const r of reihen) {
+      if (r.zeit_modus !== "gleichzeitig" || info.has(Number(r.nr))) continue;
+      const ziel = info.get(Number(r.zeit_szene));
+      if (!ziel) continue;
+      info.set(Number(r.nr), { block: ziel.block, start: ziel.start, dauer: inMinuten(r.dauer, r.dauer_eh), row: r });
+    }
+  }
+  const offenGeblieben = reihen.filter((r) => !info.has(Number(r.nr))).length;
+
+  // ---- spuren: eine je POV, in der reihenfolge des ersten auftretens ----
+  const spuren = [];
+  for (const r of reihen) {
+    const k = r.pov || "";
+    if (!spuren.includes(k)) spuren.push(k);
+  }
+
+  // ---- sprung in die szene ----
+  const zurSzene = (nr) => {
+    if (!springe || !wurzelId) return;
+    const paar = szTabelle()[Number(nr) - 1];
+    if (!paar) return;
+    const station = (alle || []).find((x) => x.eltern_id === wurzelId && x.eltern_pos === paar[0]);
+    if (station) springe(station.id, paar[1]);
+    else springe(wurzelId, paar[0]);
+  };
+
+  const gefuellt = info.size > 0;
+  const benutzteBloecke = bloecke.filter((b) => b && [...info.values()].some((x) => x.block === b.nr));
+
+  return (
+    <Panel id="sk-zeitstrahl" title="ZEITSTRAHL"
+      sub={gefuellt ? `${info.size} szenen · ${spuren.length} ${spuren.length === 1 ? "spur" : "spuren"}` : "noch keine zeiten eingetragen"}>
+      {!gefuellt && <p className="hint">trag im datenblatt einer szene beginn und dauer ein — hier entstehen daraus die spuren.</p>}
+
+      {benutzteBloecke.map((b, bi) => {
+        const drin = [...info.values()].filter((x) => x.block === b.nr);
+        const breite = Math.max(1, ...drin.map((x) => x.start + x.dauer));
+        return (
+          <div className="zsblock" key={b.nr}>
+            <div className="zskopf">
+              {bi > 0 && <span className="zsbruch">⋯ {b.label} ⋯</span>}
+              {bi === 0 && <span className="zsbeginn">beginn</span>}
+              <span className="zsgesamt">{dauerText(breite)}</span>
+            </div>
+            {spuren.map((pov, si) => {
+              const meine = drin.filter((x) => (x.row.pov || "") === pov);
+              if (!meine.length) return null;
+              const farbe = spurFarben[si % spurFarben.length];
+              return (
+                <div className="zsspur" key={pov || "ohne"}>
+                  <span className="zsname" style={{ color: farbe }}>
+                    {pov ? (namen.get(pov) || "unbekannt") : "ohne pov"}
+                  </span>
+                  <div className="zsbahn">
+                    {meine.map((x) => {
+                      const links = (x.start / breite) * 100;
+                      const w = Math.max(1.5, (x.dauer / breite) * 100);
+                      return (
+                        <button key={x.row.nr} className="zsbalken"
+                          style={{ left: links + "%", width: w + "%", background: farbe, borderColor: farbe }}
+                          onClick={() => zurSzene(x.row.nr)}
+                          title={`szene ${x.row.nr} · ${dauerText(x.dauer)}${x.row.zeit_modus === "gleichzeitig" ? " · gleichzeitig mit szene " + x.row.zeit_szene : ""}`}>
+                          <span>{x.row.nr}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+
+      {offenGeblieben > 0 && (
+        <p className="hint">{offenGeblieben} {offenGeblieben === 1 ? "szene hängt" : "szenen hängen"} an einer szene, die noch keine zeit hat — dort erst beginn und dauer eintragen.</p>
+      )}
+    </Panel>
+  );
+}
+
+// ============================================================
 // DRAMATURGIE · zwei linien über die 63 szenen, story und held.
 // gezeichnet wird nichts von hand: jede szene trägt eine änderung von
 // -3 bis +3, die app summiert ab dem startwert auf. wo sich die linien
@@ -2693,6 +2839,8 @@ function SkUltra({ springe, zuLog, zurPerson }) {
 
       <Dramaturgie startStory={startStory} startHeld={startHeld}
         setStart={(feld, w) => aend(() => (feld === "start_story" ? setStartStory(w) : setStartHeld(w)))} />
+
+      <Zeitstrahl alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} />
 
       <div className="skgrid">
         <Panel id="sk-projekt" title="PROJEKT" sub="gegenzeichnung · ohne administrative rechte">
@@ -7000,6 +7148,25 @@ function Styles() {
   .qstreifen .giltweg:hover{color:#e8cf5f}
   .qtabmini{flex:0 0 auto;font-family:var(--term);font-size:9px;color:#e8cf5f;
     border:1px solid rgba(232,207,95,.35);border-radius:3px;padding:1px 4px}
+
+  /* zeitstrahl · spuren je pov, blöcke mit brüchen dazwischen */
+  .zsblock{margin-bottom:16px}
+  .zskopf{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;
+    font-family:var(--term);font-size:9.5px;letter-spacing:.12em}
+  .zsbruch{color:var(--amber);text-transform:lowercase}
+  .zsbeginn{color:var(--green-mid);text-transform:uppercase;letter-spacing:.16em}
+  .zsgesamt{margin-left:auto;color:var(--dim)}
+  .zsspur{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+  .zsname{flex:0 0 96px;font-family:var(--term);font-size:10px;letter-spacing:.04em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+  @media(max-width:640px){.zsname{flex-basis:64px;font-size:9px}}
+  .zsbahn{position:relative;flex:1;height:20px;border-left:1px solid var(--line);
+    border-bottom:1px dotted var(--line);min-width:0}
+  .zsbalken{position:absolute;top:2px;height:15px;border:1px solid;border-radius:3px;
+    opacity:.82;cursor:pointer;padding:0;min-width:0;overflow:hidden;transition:.12s}
+  .zsbalken:hover{opacity:1;box-shadow:0 0 8px currentColor}
+  .zsbalken span{display:block;font-family:var(--term);font-size:8.5px;color:#0a0f0c;
+    line-height:15px;text-align:center;font-weight:600}
 
   /* dramaturgie-graph */
   .dramasvg{width:100%;height:auto;display:block;margin:4px 0 2px}
