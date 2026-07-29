@@ -1882,6 +1882,247 @@ function ContinuityTafel({ panelId, titel, sub }) {
 }
 
 // ============================================================
+// NOTIZEN · ((doppelklammern)) im szenentext werden EINMAL eingefangen.
+// danach sind text und notiz unabhängig: die klammer im text zu löschen
+// entfernt die notiz nicht — abgehakt wird hier in der liste.
+// ============================================================
+const NOTIZ_MUSTER = /\(\(([^()]{1,300})\)\)/g;
+const notizenImText = (t) => {
+  const raus = [];
+  let m;
+  NOTIZ_MUSTER.lastIndex = 0;
+  while ((m = NOTIZ_MUSTER.exec(t || "")) !== null) {
+    const s = m[1].trim();
+    if (s) raus.push(s);
+  }
+  return raus;
+};
+const ntLaden = () => dbGet("notizen", `${SUPABASE_URL}/rest/v1/notizen?select=*&order=created_at.asc&limit=500`)
+  .then((d) => (Array.isArray(d) ? d : []))
+  .catch(() => []);
+
+function NotizenHier({ szNr, text }) {
+  const [liste, setListe] = useState([]);
+  const [auf, setAuf] = useState(true);
+  const geladen = useRef(false);
+
+  useEffect(() => { (async () => { setListe(await ntLaden()); geladen.current = true; })(); }, []);
+
+  // einfangen: was im text steht und noch nicht in der liste ist, kommt dazu.
+  // absichtlich nur EINE richtung — verschwindet die klammer wieder, bleibt die notiz.
+  useEffect(() => {
+    if (!geladen.current || szNr == null) return;
+    const drin = new Set(liste.filter((n) => Number(n.szene) === Number(szNr)).map((n) => n.text));
+    const neue = notizenImText(text).filter((t) => !drin.has(t));
+    if (!neue.length) return;
+    const rows = neue.map((t) => ({
+      id: neueId(), user_id: getUserId(), szene: Number(szNr), text: t,
+      erledigt: false, created_at: new Date().toISOString(),
+    }));
+    setListe((l) => [...l, ...rows]);
+    rows.forEach((r) => dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/notizen`, r));
+  }, [text, szNr, liste.length]);
+
+  async function weg(n) {
+    setListe((l) => l.filter((x) => x.id !== n.id));
+    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/notizen?id=eq.${n.id}`);
+  }
+  async function kippen(n) {
+    const v = !n.erledigt;
+    setListe((l) => l.map((x) => x.id === n.id ? { ...x, erledigt: v } : x));
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/notizen?id=eq.${n.id}`, { erledigt: v });
+  }
+
+  const meine = liste.filter((n) => Number(n.szene) === Number(szNr));
+  const offen = meine.filter((n) => !n.erledigt).length;
+  if (!meine.length) return null;
+
+  return (
+    <div className="gilthier ntstreifen">
+      <button className="giltkopf" onClick={() => setAuf((v) => !v)}>
+        <span className="giltpfeil">{auf ? "▾" : "▸"}</span>
+        <span className="giltcap">notizen</span>
+        <span className="giltzahl">{offen} offen{meine.length - offen ? ` · ${meine.length - offen} erledigt` : ""}</span>
+      </button>
+      {auf && (
+        <div className="giltkoerper">
+          <ul className="giltliste">
+            {meine.map((n) => (
+              <li key={n.id} className={n.erledigt ? "" : "frisch"}>
+                <button className="ntbox" onClick={() => kippen(n)}
+                  title={n.erledigt ? "wieder offen" : "erledigt"}>{n.erledigt ? "☑" : "☐"}</button>
+                <span className={"gilttext" + (n.erledigt ? " durch" : "")}>{n.text}</span>
+                <button className="giltweg" onClick={() => weg(n)} title="notiz löschen">✕</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// DATENBLATT · alles, was zu einer szene gehört und nicht im text steht.
+// die meisten felder sind auswahlen — es soll nichts zu tippen geben.
+// ============================================================
+const ST_STUFEN = [["entwurf", "entwurf"], ["ue1", "ü1"], ["ue2", "ü2"], ["ue3", "ü3"], ["lektorat", "lektorat"], ["fertig", "fertig"]];
+const ZEIT_MODI = [
+  ["folgt", "läuft weiter"],
+  ["sprung", "später"],
+  ["datum", "festes datum"],
+  ["gleichzeitig", "gleichzeitig mit"],
+];
+const WERTE = [-3, -2, -1, 0, 1, 2, 3];
+
+function Datenblatt({ szNr, text }) {
+  const [row, setRow] = useState(null);
+  const [figuren, setFiguren] = useState([]);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const th = await dbGet("besetzung-figuren",
+        `${SUPABASE_URL}/rest/v1/things?select=id,name,rolle,avatar,art,ordner_id`).catch(() => []);
+      setFiguren((Array.isArray(th) ? th : []).filter((x) => x.art === "person" || x.art === "gruppe"));
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (szNr == null) return;
+    (async () => {
+      const d = await dbGet("szene-" + szNr, `${SUPABASE_URL}/rest/v1/szenen?select=*&nr=eq.${szNr}`).catch(() => []);
+      setRow(Array.isArray(d) && d[0] ? d[0] : {
+        id: neueId(), nr: Number(szNr), pov: null, wert_story: 0, wert_held: 0,
+        aktiv: [], inaktiv: [], zeit_modus: "folgt", zeit_wert: "", dauer: null, status: "entwurf", neu: true,
+      });
+    })();
+  }, [szNr]);
+
+  // still speichern, zwei sekunden nach der letzten änderung
+  useEffect(() => {
+    if (!dirty || !row) return;
+    const t = setTimeout(async () => {
+      const { neu, ...rest } = row;
+      const body = { ...rest, user_id: getUserId() };
+      if (neu) {
+        await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/szenen`, body);
+        setRow((r) => ({ ...r, neu: false }));
+      } else {
+        await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/szenen?id=eq.${row.id}`, body);
+      }
+      setDirty(false);
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [row, dirty]);
+
+  const setz = (feld, wert) => { setRow((r) => ({ ...r, [feld]: wert })); setDirty(true); };
+  if (!row) return null;
+
+  const aktiv = row.aktiv || [], inaktiv = row.inaktiv || [];
+  // vorschlag: wessen name steht im text? die soll sie nur noch antippen.
+  const imText = figuren.filter((f) => (f.name || "").trim() &&
+    (text || "").toLowerCase().includes(f.name.trim().toLowerCase()));
+  const gezeigt = figuren.filter((f) => imText.includes(f) || aktiv.includes(f.id) || inaktiv.includes(f.id));
+  // durchtippen: vorschlag → aktiv → inaktiv → weg
+  const kippeFigur = (f) => {
+    const a = aktiv.includes(f.id), i = inaktiv.includes(f.id);
+    if (!a && !i) { setz("aktiv", [...aktiv, f.id]); return; }
+    if (a) { setRow((r) => ({ ...r, aktiv: aktiv.filter((x) => x !== f.id), inaktiv: [...inaktiv, f.id] })); setDirty(true); return; }
+    setz("inaktiv", inaktiv.filter((x) => x !== f.id));
+  };
+
+  const povFiguren = figuren.filter((f) => f.art === "person");
+
+  return (
+    <Panel id="szene-datenblatt" title="DATENBLATT" sub={`szene ${szNr} · ${ST_STUFEN.find(([k]) => k === row.status)?.[1] || "entwurf"}`}>
+      <div className="dbgrid">
+        <div className="dbfeld">
+          <label className="cap">pov · durch wessen augen</label>
+          <select className="ti" value={row.pov || ""} onChange={(e) => setz("pov", e.target.value || null)}>
+            <option value="">–</option>
+            {povFiguren.map((f) => <option key={f.id} value={f.id}>{f.name || "unbenannt"}</option>)}
+          </select>
+        </div>
+        <div className="dbfeld">
+          <label className="cap">status</label>
+          <select className="ti" value={row.status} onChange={(e) => setz("status", e.target.value)}>
+            {ST_STUFEN.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="dbgrid">
+        <div className="dbfeld">
+          <label className="cap">was tut das der story an</label>
+          <div className="wertreihe">
+            {WERTE.map((w) => (
+              <button key={w} className={"wertknopf" + (row.wert_story === w ? " on story" : "")}
+                onClick={() => setz("wert_story", w)}>{w > 0 ? "+" + w : w}</button>
+            ))}
+          </div>
+        </div>
+        <div className="dbfeld">
+          <label className="cap">was tut das dem helden an</label>
+          <div className="wertreihe">
+            {WERTE.map((w) => (
+              <button key={w} className={"wertknopf" + (row.wert_held === w ? " on held" : "")}
+                onClick={() => setz("wert_held", w)}>{w > 0 ? "+" + w : w}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="dbfeld">
+        <label className="cap">wer ist dabei</label>
+        {!gezeigt.length && <p className="hint">noch niemand — sobald ein name im text steht, taucht er hier auf.</p>}
+        <div className="figchips">
+          {gezeigt.map((f) => {
+            const a = aktiv.includes(f.id), i = inaktiv.includes(f.id);
+            return (
+              <button key={f.id} className={"figchip" + (a ? " aktiv" : i ? " inaktiv" : " vorschlag")}
+                onClick={() => kippeFigur(f)}
+                title={a ? "tritt auf · tippen für „kommt nur vor“" : i ? "kommt nur vor · tippen zum entfernen" : "vorschlag aus dem text · tippen für „tritt auf“"}>
+                {a ? "● " : i ? "○ " : "· "}{f.name || "unbenannt"}
+              </button>
+            );
+          })}
+          <select className="ti minifeld" value="" onChange={(e) => { if (e.target.value) setz("aktiv", [...aktiv, e.target.value]); e.target.value = ""; }}>
+            <option value="" disabled>+ figur</option>
+            {figuren.filter((f) => !gezeigt.includes(f)).map((f) => <option key={f.id} value={f.id}>{f.name || "unbenannt"}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <div className="dbgrid">
+        <div className="dbfeld">
+          <label className="cap">wann</label>
+          <div className="zeitreihe">
+            <select className="ti" value={row.zeit_modus || "folgt"} onChange={(e) => setz("zeit_modus", e.target.value)}>
+              {ZEIT_MODI.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+            {row.zeit_modus !== "folgt" && (
+              <input className="ti" value={row.zeit_wert || ""} onChange={(e) => setz("zeit_wert", e.target.value)}
+                placeholder={row.zeit_modus === "sprung" ? "+3 tage" : row.zeit_modus === "datum" ? "01.02. 08:00" : "szene 24"} />
+            )}
+          </div>
+        </div>
+        <div className="dbfeld">
+          <label className="cap">wie lange · minuten</label>
+          <input className="ti" type="number" min="0" value={row.dauer ?? ""}
+            onChange={(e) => setz("dauer", e.target.value === "" ? null : Number(e.target.value))}
+            placeholder="20" />
+        </div>
+      </div>
+
+      <div className="actions" style={{ marginTop: 12 }}>
+        <span className={"status " + (dirty ? "work" : "ok")}>{dirty ? "◉ rec" : "gespeichert"}</span>
+      </div>
+    </Panel>
+  );
+}
+
+// ============================================================
 // DRAMATURGIE · zwei linien über die 63 szenen, story und held.
 // gezeichnet wird nichts von hand: jede szene trägt eine änderung von
 // -3 bis +3, die app summiert ab dem startwert auf. wo sich die linien
