@@ -2201,30 +2201,15 @@ function SkUltra({ springe, zuLog, zurPerson }) {
     zugSchreiben("off:wheel-zug", neu); setWendung(neu);
   }, [wheelListe, wendung]);
 
-  // 100 fragen — eigene sammlung (tabelle fragen100), dreht wie das hitch_wheel (nur per knopf)
-  const [fragenListe, setFragenListe] = useState([]);
   const [frage, setFrage] = useState(null);
   const [frageDreht, setFrageDreht] = useState(false);
   const [qHalt, setQHalt] = useState(false);       // maus drauf → zeiger hält an
-  const [neueFrage, setNeueFrage] = useState("");
-  const fragenLaden = () => dbGet("fragen100", `${SUPABASE_URL}/rest/v1/fragen100?select=id,frage&order=created_at.desc&limit=300`)
-    .then((d) => setFragenListe(Array.isArray(d) ? d.filter((x) => (x.frage || "").trim()) : [])).catch(() => {});
-  useEffect(() => { fragenLaden(); }, []);
-  const frageAdd = async () => {
-    const t = neueFrage.trim(); if (!t) return; setNeueFrage(""); const id = neueId();
-    setFragenListe((l) => [{ id, frage: t }, ...l]);
-    const { ok } = await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/fragen100`, { id, user_id: getUserId(), frage: t });
-    if (ok) fragenLaden();
-  };
-  const frageWeg = async (f) => { setFragenListe((l) => l.filter((x) => x.id !== f.id)); await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/fragen100?id=eq.${f.id}`); };
-  const frageEdit = async (f, wert) => { setFragenListe((l) => l.map((x) => x.id === f.id ? { ...x, frage: wert } : x)); await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen100?id=eq.${f.id}`, { frage: wert }); };
-  // das schaufenster zieht aus BEIDEN töpfen: den handwerksfragen aus dem
-  // 100er-pool (grün) und den offenen story-fragen aus der wand (gelb).
-  // eingelöste fragen sind erledigt und ziehen nicht mehr mit.
-  const qPool = [
-    ...fragenListe.map((f) => ({ k: "p:" + f.id, text: f.frage, art: "pool" })),
-    ...(qListe || []).filter(qOffen).map((f) => ({ k: "q:" + f.id, text: f.frage, art: "offen", szene: f.szene })),
-  ].filter((x) => (x.text || "").trim());
+  // das schaufenster zieht aus dem questionary — ALLE fragen, auch die
+  // eingelösten (die dann grün statt gelb). es ist ein inspirations-fenster,
+  // keine aufgabenliste. der frühere 100er-handwerks-pool ist raus.
+  const qPool = (qListe || [])
+    .map((f) => ({ k: "q:" + f.id, text: f.frage, offen: qOffen(f), szene: f.szene, bis: f.szene_antwort }))
+    .filter((x) => (x.text || "").trim());
 
   const frageDrehen = () => {
     if (!qPool.length) return;
@@ -2413,20 +2398,25 @@ function SkUltra({ springe, zuLog, zurPerson }) {
       </div>
 
       <div className="skgrid schmal">
-        <div className={"skrad" + (frageDreht ? " dreht" : "") + (frage && frage.art === "offen" ? " gelb" : "") + (qHalt ? " haelt" : "")}
+        <div className={"skrad" + (frage && frage.offen ? " gelb" : "") + (frageDreht ? " dreht" : "") + (qHalt ? " haelt" : "")}
              onMouseEnter={() => setQHalt(true)} onMouseLeave={() => setQHalt(false)}
              title={qHalt ? "angehalten — solange die maus hier liegt" : "blättert alle 90 sekunden weiter"}>
           <div className="skradkopf">
-            <span className="skradtitel">{frage && frage.art === "offen" ? "offene frage" : "100 fragen"}</span>
-            {frage && frage.art === "offen" && (
+            <span className="skradtitel">{frage ? (frage.offen ? "offene frage" : "eingelöst") : "questionary"}</span>
+            {frage && (
               <span className={"ftag sz" + (istGlobal(frage.szene) ? " glob" : "")}>
                 {frage.szene == null ? "ohne szene" : szLabel(frage.szene)}
               </span>
             )}
+            {frage && !frage.offen && frage.bis != null && (
+              <span className="ftag qein" title="hier eingelöst">→ {szLabel(frage.bis)}</span>
+            )}
             <button className="skraddreh" onClick={frageDrehen} disabled={!qPool.length}
-              title={qPool.length ? "neue frage ziehen" : "noch keine fragen — unten in der verwaltung eintragen"}>↻</button>
+              title={qPool.length ? "nächste frage ziehen" : "noch keine fragen — die wirfst du im questionary auf"}>↻</button>
           </div>
-          <div className="skradtext" key={frage && frage.k}>{qPool.length ? ((frage && frage.text) || "…") : "— noch keine fragen —"}</div>
+          <div className="skradtext" key={frage && frage.k}>
+            {qPool.length ? ((frage && frage.text) || "…") : "— noch keine fragen —"}
+          </div>
         </div>
         <div className={"skrad" + (wheelDreht ? " dreht" : "")}>
           <div className="skradkopf">
@@ -2476,6 +2466,9 @@ function SkUltra({ springe, zuLog, zurPerson }) {
 
       <RechercheListe entw={entw} zuLog={zuLog} onRweg={rWeg} />
 
+      <ContinuityTafel panelId="sk-continuity" titel="CONTINUITY"
+        sub="was ab einer szene wahr ist — und ab wann nicht mehr" />
+
       <FragenAkkordeon panelId="sk-questionary" titel="QUESTIONARY"
         sub="aufgeworfen · aufs tablett · eingelöst — offene zuerst" />
 
@@ -2483,14 +2476,6 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
         wert={neueWendung} setWert={setNeueWendung} onAdd={wendungAdd} onWeg={wendungWeg} onEdit={wendungEdit}
         platzhalter="neue wendung …" />
-      <VerwaltKarte titel="100 fragen" leer="noch keine fragen — trag welche ein oder gib sie mir zum reinladen."
-        liste={fragenListe} label={(f) => f.frage} keyOf={(f) => f.id}
-        wert={neueFrage} setWert={setNeueFrage} onAdd={frageAdd} onWeg={frageWeg} onEdit={frageEdit}
-        platzhalter="neue frage …" />
-
-      <ContinuityTafel panelId="sk-continuity" titel="CONTINUITY"
-        sub="was ab einer szene wahr ist — und ab wann nicht mehr" />
-
       <VerwaltFeld titel="prämisse eintragen"
         hinweis="die zentrale frage in einem satz — innere, äußere und universelle ebene zusammen. macht man einmal pro projekt."
         wert={qed} setWert={(v) => aend(() => setQed(v))}
