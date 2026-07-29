@@ -1631,6 +1631,184 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, nurSzene }) {
 }
 
 // ============================================================
+// CONTINUITY
+// was ab einer szene wahr ist — und ab wann nicht mehr.
+// nicht zum nachschlagen gedacht: auf dem schreibblatt steht einfach da,
+// was an dieser stelle gilt. der widerspruch fällt einem dann selbst auf.
+// ============================================================
+const ctLaden = () => dbGet("zustaende", `${SUPABASE_URL}/rest/v1/zustaende?select=*&order=ab.asc&limit=500`)
+  .then((d) => (Array.isArray(d) ? d : []))
+  .catch(() => []);
+
+// gilt diese tatsache in szene n? (ab = 0 heißt: von anfang an)
+const ctGilt = (z, n) => {
+  const ab = z.ab == null ? null : Number(z.ab);
+  const bis = z.bis == null ? null : Number(z.bis);
+  if (ab == null) return false;
+  if (ab > n) return false;
+  if (bis != null && bis <= n) return false;
+  return true;
+};
+const ctSort = (a, b) => (a.ab == null ? 999 : Number(a.ab)) - (b.ab == null ? 999 : Number(b.ab))
+  || (a.created_at < b.created_at ? -1 : 1);
+const ctAbLabel = (z) => (z.ab == null ? "ohne szene" : Number(z.ab) === 0 ? "von anfang an" : "ab szene " + z.ab);
+
+// die spanne einer tatsache über die 63 szenen
+function CtStrahl({ z }) {
+  const ab = z.ab == null ? null : Math.max(1, Number(z.ab));
+  const bis = z.bis == null ? null : Number(z.bis);
+  if (ab == null) return null;
+  const pos = (n) => ((n - 1) / (SZ_ANZAHL - 1)) * 100 + "%";
+  const ende = bis == null ? SZ_ANZAHL : bis;
+  return (
+    <div className="qstrahl">
+      <div className="qstrahlbahn">
+        {szGrenzen().map((n) => <i key={"g" + n} className="qgrenze" style={{ left: pos(n) }} />)}
+        <i className="ctspanne" style={{ left: pos(ab), width: `calc(${pos(ende)} - ${pos(ab)})` }} />
+        <i className="qmark ctab" style={{ left: pos(ab) }} title={"gilt ab szene " + ab} />
+        {bis != null && <i className="qmark ctbis" style={{ left: pos(bis) }} title={"gilt nicht mehr ab szene " + bis} />}
+      </div>
+      <div className="qstrahlfuss">
+        <span>1</span>
+        <span className="ctspann">{bis == null ? "gilt weiter" : `gilt über ${bis - ab} szenen`}</span>
+        <span>{SZ_ANZAHL}</span>
+      </div>
+    </div>
+  );
+}
+
+// KOMPAKT · auf dem schreibblatt: was hier gerade wahr ist, plus ein feld
+// zum hinwerfen. eine zeile, im moment des schreibens, ohne formular.
+function GiltHier({ szNr }) {
+  const [liste, setListe] = useState([]);
+  const [neu, setNeu] = useState("");
+  const [offen, setOffen] = useState(true);
+  useEffect(() => { (async () => setListe(await ctLaden()))(); }, []);
+
+  async function anlegen() {
+    const t = neu.trim();
+    if (!t) return;
+    const row = { id: neueId(), user_id: getUserId(), text: t, ab: Number(szNr), bis: null, created_at: new Date().toISOString() };
+    setNeu(""); setListe((l) => [...l, row]);
+    await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/zustaende`, row);
+  }
+  // „gilt nicht mehr" — ab dieser szene ist die tatsache vorbei
+  async function beenden(z) {
+    setListe((l) => l.map((x) => x.id === z.id ? { ...x, bis: Number(szNr) } : x));
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/zustaende?id=eq.${z.id}`, { bis: Number(szNr) });
+  }
+
+  const gilt = liste.filter((z) => ctGilt(z, Number(szNr))).sort(ctSort);
+  const neuHier = gilt.filter((z) => Number(z.ab) === Number(szNr)).length;
+
+  return (
+    <div className="gilthier">
+      <button className="giltkopf" onClick={() => setOffen((v) => !v)}>
+        <span className="giltpfeil">{offen ? "▾" : "▸"}</span>
+        <span className="giltcap">gilt hier</span>
+        <span className="giltzahl">{gilt.length} {gilt.length === 1 ? "tatsache" : "tatsachen"}{neuHier ? ` · ${neuHier} neu` : ""}</span>
+      </button>
+      {offen && (
+        <div className="giltkoerper">
+          {!gilt.length && <div className="giltleer">hier gilt noch nichts. was ist ab jetzt wahr?</div>}
+          {!!gilt.length && (
+            <ul className="giltliste">
+              {gilt.map((z) => (
+                <li key={z.id} className={Number(z.ab) === Number(szNr) ? "frisch" : ""}>
+                  <span className="giltab" title={ctAbLabel(z)}>{Number(z.ab) === 0 ? "◇" : z.ab}</span>
+                  <span className="gilttext">{z.text}</span>
+                  <button className="giltweg" onClick={() => beenden(z)}
+                    title="gilt ab dieser szene nicht mehr">✕</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="giltneu">
+            <input className="ti" value={neu} placeholder="was gilt ab hier? …"
+              onChange={(e) => setNeu(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && anlegen()} />
+            <button className="btn" onClick={anlegen} disabled={!neu.trim()}>+ gilt ab hier</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// VOLL · auf sk_ultra: alles verwalten, mit spanne und szenen zum korrigieren
+function ContinuityTafel({ panelId, titel, sub }) {
+  const [liste, setListe] = useState([]);
+  const [neu, setNeu] = useState("");
+  const [neuAb, setNeuAb] = useState("");
+  const [auf, setAuf] = useState(null);
+  useEffect(() => { (async () => setListe(await ctLaden()))(); }, []);
+
+  const patch = async (z, feld) => {
+    setListe((l) => l.map((x) => x.id === z.id ? { ...x, ...feld } : x));
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/zustaende?id=eq.${z.id}`, feld);
+  };
+  async function anlegen() {
+    const t = neu.trim();
+    if (!t) return;
+    const row = { id: neueId(), user_id: getUserId(), text: t, ab: neuAb === "" ? null : Number(neuAb), bis: null, created_at: new Date().toISOString() };
+    setNeu(""); setListe((l) => [...l, row]);
+    await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/zustaende`, row);
+  }
+  async function weg(z) {
+    if (!confirm("tatsache löschen?")) return;
+    setListe((l) => l.filter((x) => x.id !== z.id));
+    await dbSchreiben("DELETE", `${SUPABASE_URL}/rest/v1/zustaende?id=eq.${z.id}`);
+  }
+
+  const sortiert = [...liste].sort(ctSort);
+  const laufend = liste.filter((z) => z.bis == null).length;
+
+  return (
+    <Panel id={panelId} title={titel} sub={sub || `${liste.length} tatsachen · ${laufend} gelten bis zum schluss`}>
+      <div className="qneu">
+        <input className="ti" value={neu} placeholder="was ist ab einer szene wahr? …"
+          onChange={(e) => setNeu(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && anlegen()} />
+        <SzeneWahl wert={neuAb} setWert={setNeuAb} leer="ab szene" titel="ab welcher szene gilt das?" />
+        <button className="btn" onClick={anlegen} disabled={!neu.trim()}>+ eintragen</button>
+      </div>
+
+      <div className="qliste">
+        {!sortiert.length && <div className="pleer">noch nichts. was gilt in deiner geschichte?</div>}
+        {sortiert.map((z) => {
+          const zu = auf !== z.id;
+          const vorbei = z.bis != null;
+          return (
+            <div className={"qkarte ct" + (vorbei ? " zu" : " offen")} key={z.id}>
+              <button className="qkopf" onClick={() => setAuf(zu ? z.id : null)}>
+                <i className={"ctpunkt" + (vorbei ? " vorbei" : "")} />
+                <span className="qfrage">{z.text}</span>
+                <span className="ftag sz">{ctAbLabel(z)}</span>
+                {vorbei && <span className="ftag ctende" title="gilt danach nicht mehr">→ bis {z.bis}</span>}
+                <span className="qpfeil">{zu ? "▸" : "▾"}</span>
+              </button>
+              {!zu && (
+                <div className="qkoerper">
+                  <CtStrahl z={z} />
+                  <div className="qzeile2">
+                    <span className="qtag ctag">gilt ab</span>
+                    <SzeneWahl wert={z.ab ?? ""} leer="–" setWert={(v) => patch(z, { ab: v === "" ? null : Number(v) })} />
+                    <span className="qtag ctag" style={{ marginLeft: 12 }}>nicht mehr ab</span>
+                    <SzeneWahl wert={z.bis ?? ""} leer="gilt weiter" setWert={(v) => patch(z, { bis: v === "" ? null : Number(v) })} />
+                    <span className="qspacer" />
+                    <button className="btn stop" onClick={() => weg(z)}>■ löschen</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+// ============================================================
 // BESETZUNG auf sk_ultra · wie die steckbriefe im denkbrett, aber
 // nicht nur die drei meistgenannten: ALLE figuren dieses projekts,
 // nach häufigkeit sortiert. wer oben steht, trägt das buch.
@@ -2189,6 +2367,9 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         liste={fragenListe} label={(f) => f.frage} keyOf={(f) => f.id}
         wert={neueFrage} setWert={setNeueFrage} onAdd={frageAdd} onWeg={frageWeg} onEdit={frageEdit}
         platzhalter="neue frage …" />
+
+      <ContinuityTafel panelId="sk-continuity" titel="CONTINUITY"
+        sub="was ab einer szene wahr ist — und ab wann nicht mehr" />
 
       <VerwaltFeld titel="prämisse eintragen"
         hinweis="die zentrale frage in einem satz — innere, äußere und universelle ebene zusammen. macht man einmal pro projekt."
@@ -3407,6 +3588,8 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
             </div>
           ))}
         </div>
+
+        {szNr != null && <GiltHier szNr={szNr} />}
 
         <AutoTa className="ta log" value={texte[i]} onChange={(e) => setT(i, e.target.value)}
           placeholder={"> " + POS[i].k + "\n> hier wird geschrieben …"} />
@@ -6278,6 +6461,42 @@ function Styles() {
   /* global-marker in rohmaterial & recherche */
   .ftag.glob{color:var(--amber);border-color:rgba(224,178,106,.45)}
   .rohzeile.nachglobal,.rechzeile.nachglobal{border-top:1px dashed var(--line);padding-top:10px;margin-top:4px}
+
+  /* continuity · was ab einer szene wahr ist */
+  .ctpunkt{flex:0 0 auto;width:6px;height:6px;border-radius:1px;background:#a98fe0;
+    box-shadow:0 0 7px rgba(169,143,224,.75)}
+  .ctpunkt.vorbei{background:transparent;border:1px solid var(--dim);box-shadow:none}
+  .qkarte.ct.offen{border-left:2px solid #a98fe0}
+  .ftag.ctende{color:#a98fe0;border-color:rgba(169,143,224,.4)}
+  .qtag.ctag{color:#a98fe0}
+  .ctspanne{position:absolute;top:7px;height:2px;background:rgba(169,143,224,.3);border-radius:1px}
+  .qmark.ctab{top:3px;width:10px;height:10px;background:#a98fe0;box-shadow:0 0 8px rgba(169,143,224,.8)}
+  .qmark.ctbis{top:4px;width:8px;height:8px;background:transparent;border:1px solid var(--dim)}
+  .ctspann{flex:1;text-align:center;color:#a98fe0}
+
+  /* „gilt hier" auf dem schreibblatt — liegt da, wird nicht nachgeschlagen */
+  .gilthier{border:1px solid var(--line);border-left:2px solid #a98fe0;border-radius:5px;
+    background:rgba(169,143,224,.05);margin:0 0 12px}
+  .giltkopf{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:transparent;
+    border:0;padding:8px 11px;cursor:pointer;color:inherit}
+  .giltpfeil{font-family:var(--term);font-size:11px;color:var(--dim)}
+  .giltcap{font-family:var(--term);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#a98fe0}
+  .giltzahl{font-family:var(--term);font-size:9.5px;letter-spacing:.06em;color:var(--dim);margin-left:auto}
+  .giltkoerper{padding:0 11px 10px}
+  .giltleer{font-size:11.5px;color:var(--dim);font-style:italic;padding:2px 0 8px}
+  .giltliste{list-style:none;margin:0 0 9px;padding:0;max-height:168px;overflow:auto}
+  .giltliste li{display:flex;align-items:baseline;gap:9px;padding:3px 0;border-bottom:1px dotted var(--line)}
+  .giltliste li:last-child{border-bottom:0}
+  .giltab{flex:0 0 26px;text-align:right;font-family:var(--term);font-size:9.5px;color:var(--dim)}
+  .giltliste li.frisch .giltab{color:#a98fe0}
+  .gilttext{flex:1;font-family:var(--mono);font-size:12px;line-height:1.5;color:var(--muted)}
+  .giltliste li.frisch .gilttext{color:var(--ink)}
+  .giltweg{flex:0 0 auto;background:transparent;border:0;color:var(--dim);cursor:pointer;
+    font-size:10px;padding:0 2px;opacity:0;transition:.12s}
+  .giltliste li:hover .giltweg{opacity:1}
+  .giltweg:hover{color:#a98fe0}
+  .giltneu{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .giltneu .ti{flex:1;min-width:180px}
 
   /* wegweiser auf sk_ultra · die buch-matrix zum draufschauen, etwas kleiner */
   .mx.wegw{margin-bottom:2px}
