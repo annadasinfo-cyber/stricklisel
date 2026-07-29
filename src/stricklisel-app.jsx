@@ -1677,51 +1677,6 @@ function CtStrahl({ z }) {
   );
 }
 
-// SCHLANKER STREIFEN · alle offenen fragen auf einen blick, über der szenenwand.
-// gleicher schnitt wie „gilt hier", nur gelb und über das ganze buch statt
-// über eine szene. eingelöste fallen raus — hier steht nur, was noch aussteht.
-function OffeneFragen() {
-  const [liste, setListe] = useState([]);
-  const [offen, setOffen] = useState(true);
-  useEffect(() => { (async () => setListe(await qLaden()))(); }, []);
-
-  const gilt = liste.filter(qOffen).sort(qSort);
-  if (!liste.length) return null;
-
-  return (
-    <div className="gilthier qstreifen">
-      <button className="giltkopf" onClick={() => setOffen((v) => !v)}>
-        <span className="giltpfeil">{offen ? "▾" : "▸"}</span>
-        <span className="giltcap">offene fragen</span>
-        <span className="giltzahl">
-          {gilt.length} offen · {liste.length - gilt.length} eingelöst
-        </span>
-      </button>
-      {offen && (
-        <div className="giltkoerper">
-          {!gilt.length && <div className="giltleer">nichts offen. alles eingelöst.</div>}
-          {!!gilt.length && (
-            <ul className="giltliste">
-              {gilt.map((f) => {
-                const tab = qTablett(f);
-                return (
-                  <li key={f.id}>
-                    <span className="giltab" title={f.szene == null ? "ohne szene" : szLabel(f.szene)}>
-                      {f.szene == null ? "–" : istGlobal(f.szene) ? "◇" : f.szene}
-                    </span>
-                    <span className="gilttext">{f.frage}</span>
-                    {tab.length > 0 && <span className="qtabmini" title="wieder aufs tablett">↻{tab.length}</span>}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // KOMPAKT · auf dem schreibblatt: was hier gerade wahr ist, plus ein feld
 // zum hinwerfen. eine zeile, im moment des schreibens, ohne formular.
 function GiltHier({ szNr }) {
@@ -1927,6 +1882,132 @@ function ContinuityTafel({ panelId, titel, sub }) {
 }
 
 // ============================================================
+// DRAMATURGIE · zwei linien über die 63 szenen, story und held.
+// gezeichnet wird nichts von hand: jede szene trägt eine änderung von
+// -3 bis +3, die app summiert ab dem startwert auf. wo sich die linien
+// kreuzen, sitzt ein blitz — das sind die kipp-punkte der geschichte.
+// akte: 1 = szene 1–16, 2a = 17–32, 2b = 33–48, 3 = 49–63.
+// ============================================================
+const AKT_BAENDER = [
+  { von: 1, bis: 16, name: "akt 1" },
+  { von: 17, bis: 32, name: "2a" },
+  { von: 33, bis: 48, name: "2b" },
+  { von: 49, bis: SZ_ANZAHL, name: "3" },
+];
+
+function Dramaturgie({ startStory, startHeld, setStart }) {
+  const [szenen, setSzenen] = useState([]);
+  useEffect(() => {
+    (async () => {
+      const d = await dbGet("szenen", `${SUPABASE_URL}/rest/v1/szenen?select=nr,wert_story,wert_held&order=nr.asc&limit=100`).catch(() => []);
+      setSzenen(Array.isArray(d) ? d : []);
+    })();
+  }, []);
+
+  const nach = new Map(szenen.map((z) => [Number(z.nr), z]));
+  const letzte = szenen.length ? Math.max(...szenen.map((z) => Number(z.nr))) : 0;
+
+  // aufsummieren: startwert plus alle änderungen bis hierher
+  const bahn = [];
+  let s = Number(startStory) || 0, h = Number(startHeld) || 0;
+  bahn.push({ nr: 0, s, h });
+  for (let n = 1; n <= SZ_ANZAHL; n++) {
+    const z = nach.get(n);
+    s += z ? Number(z.wert_story) || 0 : 0;
+    h += z ? Number(z.wert_held) || 0 : 0;
+    bahn.push({ nr: n, s, h });
+  }
+  const bisHier = bahn.slice(0, letzte + 1);
+
+  const maxAbs = Math.max(15, ...bisHier.map((p) => Math.max(Math.abs(p.s), Math.abs(p.h))));
+  const SKALA = Math.ceil(maxAbs / 5) * 5;
+
+  // zeichenfläche
+  const X0 = 34, X1 = 632, Y0 = 30, Y1 = 254;
+  const px = (n) => X0 + ((n - 1) / (SZ_ANZAHL - 1)) * (X1 - X0);
+  const py = (v) => Y0 + ((SKALA - v) / (2 * SKALA)) * (Y1 - Y0);
+  const linie = (feld) => bisHier.filter((p) => p.nr >= 1).map((p) => `${px(p.nr)},${py(p[feld])}`).join(" ");
+
+  // kreuzungen: wo wechselt das vorzeichen von (story − held)?
+  const blitze = [];
+  for (let i = 1; i < bisHier.length - 1; i++) {
+    const a = bisHier[i], b = bisHier[i + 1];
+    if (a.nr < 1) continue;
+    const d1 = a.s - a.h, d2 = b.s - b.h;
+    if (d1 === 0 || (d1 > 0) === (d2 > 0)) continue;
+    const t = d1 / (d1 - d2);
+    blitze.push({ x: px(a.nr) + t * (px(b.nr) - px(a.nr)), y: py(a.s + t * (b.s - a.s)), nr: b.nr });
+  }
+
+  const leer = letzte === 0;
+
+  return (
+    <Panel id="sk-dramaturgie" title="DRAMATURGIE"
+      sub={leer ? "noch nichts eingetragen" : `bis szene ${letzte} · story ${bahn[letzte].s > 0 ? "+" : ""}${bahn[letzte].s} · held ${bahn[letzte].h > 0 ? "+" : ""}${bahn[letzte].h}`}>
+      {leer && <p className="hint">trag im datenblatt einer szene die beiden werte ein — hier entsteht daraus die kurve.</p>}
+
+      <svg className="dramasvg" viewBox="0 0 640 300" preserveAspectRatio="xMidYMid meet" role="img"
+           aria-label="verlauf von story und held über die szenen">
+        {/* akt-bänder */}
+        {AKT_BAENDER.map((a, n) => (
+          <g key={a.name}>
+            {n > 0 && <line x1={px(a.von) - 4} y1={Y0 - 6} x2={px(a.von) - 4} y2={Y1 + 6}
+                            className="dramaakt" />}
+            <text x={(px(a.von) + px(a.bis)) / 2} y={18} className="dramaaktlabel">{a.name}</text>
+          </g>
+        ))}
+
+        {/* null-linie und rahmen */}
+        <line x1={X0} y1={py(0)} x2={X1} y2={py(0)} className="dramanull" />
+        <text x={X0 - 6} y={py(0) + 3} className="dramaskala" textAnchor="end">0</text>
+        <text x={X0 - 6} y={Y0 + 4} className="dramaskala" textAnchor="end">+{SKALA}</text>
+        <text x={X0 - 6} y={Y1 + 3} className="dramaskala" textAnchor="end">−{SKALA}</text>
+
+        {!leer && (
+          <>
+            <polyline className="dramastory" points={linie("s")} />
+            <polyline className="dramaheld" points={linie("h")} />
+            {blitze.map((b, n) => (
+              <g key={n} transform={`translate(${b.x},${b.y})`}>
+                <polygon className="dramablitz" points="0,-9 -4,0 -1,0 -3,9 4,-1 1,-1" />
+                <title>{`kipp-punkt bei szene ${b.nr}`}</title>
+              </g>
+            ))}
+            {bisHier.filter((p) => p.nr >= 1).map((p) => (
+              <g key={p.nr}>
+                <circle cx={px(p.nr)} cy={py(p.s)} r="2.5" className="dramapunkt story" />
+                <circle cx={px(p.nr)} cy={py(p.h)} r="2.5" className="dramapunkt held" />
+                <circle cx={px(p.nr)} cy={(py(p.s) + py(p.h)) / 2} r="9" className="dramahover">
+                  <title>{`szene ${p.nr} · story ${p.s > 0 ? "+" : ""}${p.s} · held ${p.h > 0 ? "+" : ""}${p.h}`}</title>
+                </circle>
+              </g>
+            ))}
+          </>
+        )}
+
+        {/* szenennummern */}
+        {[1, 16, 32, 48, SZ_ANZAHL].map((n) => (
+          <text key={n} x={px(n)} y={Y1 + 20} className="dramaskala" textAnchor="middle">{n}</text>
+        ))}
+      </svg>
+
+      <div className="dramafuss">
+        <span className="dramaleg story">● story</span>
+        <span className="dramaleg held">● held</span>
+        <span className="qspacer" />
+        <span className="cap" style={{ display: "inline", margin: 0 }}>startwerte</span>
+        <input className="ti minifeld" type="number" min="-15" max="15" value={startStory ?? 0}
+          title="wo die story-linie beginnt"
+          onChange={(e) => setStart("start_story", Number(e.target.value) || 0)} />
+        <input className="ti minifeld" type="number" min="-15" max="15" value={startHeld ?? 0}
+          title="wo die helden-linie beginnt"
+          onChange={(e) => setStart("start_held", Number(e.target.value) || 0)} />
+      </div>
+    </Panel>
+  );
+}
+
+// ============================================================
 // BESETZUNG auf sk_ultra · wie die steckbriefe im denkbrett, aber
 // nicht nur die drei meistgenannten: ALLE figuren dieses projekts,
 // nach häufigkeit sortiert. wer oben steht, trägt das buch.
@@ -2097,6 +2178,9 @@ function SkUltra({ springe, zuLog, zurPerson }) {
   const [synopsis, setSynopsis] = useState("");           // kurzzusammenfassung, über den ermittlungen
   // die zentrale frage · ein satz. innere, äußere und universelle ebene in einem.
   const [qed, setQed] = useState("");
+  // wo die beiden dramaturgie-linien beginnen — einmal fürs buch
+  const [startStory, setStartStory] = useState(0);
+  const [startHeld, setStartHeld] = useState(0);
   const [cWurzel, setCWurzel] = useState("");   // gewähltes matrix-projekt (wurzel-id) für die szenenwand
   const [alle, setAlle] = useState([]);         // alle skripte, für projekt-auswahl + szenenwand
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
@@ -2242,7 +2326,7 @@ function SkUltra({ springe, zuLog, zurPerson }) {
     if (tRef.current) clearTimeout(tRef.current);
     tRef.current = setTimeout(() => speichern(true), 2000);
     return () => clearTimeout(tRef.current);
-  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, arche, synopsis, qed, cWurzel, dirty]);
+  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, arche, synopsis, qed, startStory, startHeld, cWurzel, dirty]);
 
   const aend = (fn) => { fn(); setDirty(true); };
 
@@ -2262,6 +2346,7 @@ function SkUltra({ springe, zuLog, zurPerson }) {
       setArche([r.a1 || "", r.a2 || "", r.a3 || "", r.a4 || ""]);
       setSynopsis(r.synopsis || "");
       setQed(r.zentrale_frage || "");
+      setStartStory(r.start_story ?? 0); setStartHeld(r.start_held ?? 0);
       setCWurzel(r.c_wurzel || "");
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
@@ -2279,6 +2364,7 @@ function SkUltra({ springe, zuLog, zurPerson }) {
       a1: arche[0], a2: arche[1], a3: arche[2], a4: arche[3],
       synopsis,
       zentrale_frage: qed,
+      start_story: startStory, start_held: startHeld,
       c_wurzel: cWurzel || null,
       updated_at: new Date().toISOString(),
     };
@@ -2314,9 +2400,10 @@ function SkUltra({ springe, zuLog, zurPerson }) {
 
       <BesetzungTafel figuren={figuren} ordnerId={wurzel ? wurzel.ordner_id : null} skripte={alle} zurPerson={zurPerson} />
 
-      <OffeneFragen />
-
       <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} entw={entw} qListe={qListe} />
+
+      <Dramaturgie startStory={startStory} startHeld={startHeld}
+        setStart={(feld, w) => aend(() => (feld === "start_story" ? setStartStory(w) : setStartHeld(w)))} />
 
       <div className="skgrid">
         <Panel id="sk-projekt" title="PROJEKT" sub="gegenzeichnung · ohne administrative rechte">
@@ -3705,6 +3792,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
 
         {szNr != null && <GiltHier szNr={szNr} />}
         {szNr != null && <FragenHier szNr={szNr} />}
+        {szNr != null && <NotizenHier szNr={szNr} text={texte[i] || ""} />}
 
         <AutoTa className="ta log" value={texte[i]} onChange={(e) => setT(i, e.target.value)}
           placeholder={"> " + POS[i].k + "\n> hier wird geschrieben …"} />
@@ -3724,6 +3812,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
         </div>
         <p className="hint">speichert sich still von selbst, zwei sekunden nach dem letzten tastendruck.</p>
 
+        {szNr != null && <Datenblatt szNr={szNr} text={texte[i] || ""} />}
       </>
     );
   }
@@ -6622,6 +6711,56 @@ function Styles() {
   .qstreifen .giltweg:hover{color:#e8cf5f}
   .qtabmini{flex:0 0 auto;font-family:var(--term);font-size:9px;color:#e8cf5f;
     border:1px solid rgba(232,207,95,.35);border-radius:3px;padding:1px 4px}
+
+  /* dramaturgie-graph */
+  .dramasvg{width:100%;height:auto;display:block;margin:4px 0 2px}
+  .dramaakt{stroke:var(--line);stroke-width:1;stroke-dasharray:5 5}
+  .dramaaktlabel{fill:var(--dim);font-family:var(--term);font-size:10px;letter-spacing:.14em;text-anchor:middle}
+  .dramanull{stroke:var(--line);stroke-width:1;stroke-dasharray:2 4}
+  .dramaskala{fill:var(--dim);font-family:var(--term);font-size:9.5px}
+  .dramastory{fill:none;stroke:var(--green);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;
+    filter:drop-shadow(0 0 4px rgba(53,255,111,.45))}
+  .dramaheld{fill:none;stroke:#e88fc0;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;
+    filter:drop-shadow(0 0 4px rgba(232,143,192,.45))}
+  .dramapunkt.story{fill:var(--green)}
+  .dramapunkt.held{fill:#e88fc0}
+  .dramahover{fill:transparent;cursor:help}
+  .dramablitz{fill:var(--amber);filter:drop-shadow(0 0 6px rgba(224,178,106,.8))}
+  .dramafuss{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;
+    font-family:var(--term);font-size:9.5px;letter-spacing:.06em}
+  .dramaleg.story{color:var(--green)}
+  .dramaleg.held{color:#e88fc0}
+  .dramafuss .minifeld{width:62px}
+
+  /* notizen-streifen · dritte farbe neben lila und gelb */
+  .gilthier.ntstreifen{border-left-color:#6fd8c4;background:rgba(111,216,196,.05)}
+  .ntstreifen .giltcap{color:#6fd8c4}
+  .ntstreifen .giltliste li.frisch .gilttext{color:var(--ink)}
+  .ntstreifen .giltweg:hover{color:#6fd8c4}
+  .ntbox{flex:0 0 auto;background:transparent;border:0;color:#6fd8c4;cursor:pointer;
+    font-size:12px;line-height:1;padding:0 2px}
+  .gilttext.durch{text-decoration:line-through;opacity:.55}
+
+  /* datenblatt der szene */
+  .dbgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px}
+  @media(max-width:640px){.dbgrid{grid-template-columns:1fr}}
+  .dbfeld{min-width:0;margin-bottom:14px}
+  .dbfeld .cap{margin-bottom:6px}
+  .wertreihe{display:flex;gap:4px;flex-wrap:wrap}
+  .wertknopf{flex:1 1 34px;min-width:34px;padding:7px 0;border:1px solid var(--line);border-radius:4px;
+    background:transparent;color:var(--dim);font-family:var(--term);font-size:11.5px;cursor:pointer;transition:.12s}
+  .wertknopf:hover{color:var(--ink);border-color:var(--line-hot)}
+  .wertknopf.on.story{color:#0a0f0c;background:var(--green);border-color:var(--green);font-weight:600}
+  .wertknopf.on.held{color:#0a0f0c;background:#e88fc0;border-color:#e88fc0;font-weight:600}
+  .figchips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .figchip{font-family:var(--term);font-size:10.5px;letter-spacing:.04em;padding:5px 9px;border-radius:4px;
+    border:1px dashed var(--line);background:transparent;color:var(--dim);cursor:pointer;transition:.12s}
+  .figchip.vorschlag:hover{color:var(--ink);border-color:var(--line-hot)}
+  .figchip.aktiv{border-style:solid;border-color:var(--green-dim);color:var(--green);
+    background:rgba(53,255,111,.07);text-shadow:var(--glow)}
+  .figchip.inaktiv{border-style:solid;border-color:var(--line-hot);color:var(--muted)}
+  .zeitreihe{display:flex;gap:8px;flex-wrap:wrap}
+  .zeitreihe .ti{flex:1;min-width:120px}
 
   /* wegweiser auf sk_ultra · die buch-matrix zum draufschauen, etwas kleiner */
   .mx.wegw{margin-bottom:2px}
