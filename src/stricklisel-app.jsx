@@ -1682,7 +1682,7 @@ function CtStrahl({ z }) {
 function GiltHier({ szNr }) {
   const [liste, setListe] = useState([]);
   const [neu, setNeu] = useState("");
-  const [offen, setOffen] = useState(true);
+  const [offen, setOffen] = merkeAufZu("off:gilt-auf");
   useEffect(() => { (async () => setListe(await ctLaden()))(); }, []);
 
   async function anlegen() {
@@ -1742,7 +1742,7 @@ function GiltHier({ szNr }) {
 function FragenHier({ szNr }) {
   const [liste, setListe] = useState([]);
   const [neu, setNeu] = useState("");
-  const [auf, setAuf] = useState(true);
+  const [auf, setAuf] = merkeAufZu("off:fragenhier-auf");
   useEffect(() => { (async () => setListe(await qLaden()))(); }, []);
 
   async function stellen() {
@@ -1886,6 +1886,21 @@ function ContinuityTafel({ panelId, titel, sub }) {
 // danach sind text und notiz unabhängig: die klammer im text zu löschen
 // entfernt die notiz nicht — abgehakt wird hier in der liste.
 // ============================================================
+// auf/zu eines streifens überlebt das neuladen und gilt für alle szenen —
+// einmal zugeklappt bleibt zugeklappt, damit der text nicht weggedrückt wird.
+function merkeAufZu(schluessel, standard = true) {
+  const [auf, setAufRoh] = useState(() => {
+    try { const v = localStorage.getItem(schluessel); return v === null ? standard : v === "1"; }
+    catch { return standard; }
+  });
+  const setAuf = (w) => {
+    const n = typeof w === "function" ? w(auf) : w;
+    setAufRoh(n);
+    try { localStorage.setItem(schluessel, n ? "1" : "0"); } catch {}
+  };
+  return [auf, setAuf];
+}
+
 const NOTIZ_MUSTER = /\(\(([^()]{1,300})\)\)/g;
 const notizenImText = (t) => {
   const raus = [];
@@ -1903,7 +1918,7 @@ const ntLaden = () => dbGet("notizen", `${SUPABASE_URL}/rest/v1/notizen?select=*
 
 function NotizenHier({ szNr, text }) {
   const [liste, setListe] = useState([]);
-  const [auf, setAuf] = useState(true);
+  const [auf, setAuf] = merkeAufZu("off:notizen-auf");
   const geladen = useRef(false);
 
   useEffect(() => { (async () => { setListe(await ntLaden()); geladen.current = true; })(); }, []);
@@ -1968,10 +1983,15 @@ function NotizenHier({ szNr, text }) {
 // ============================================================
 const ST_STUFEN = [["entwurf", "entwurf"], ["ue1", "ü1"], ["ue2", "ü2"], ["ue3", "ü3"], ["lektorat", "lektorat"], ["fertig", "fertig"]];
 const ZEIT_MODI = [
-  ["folgt", "läuft weiter"],
-  ["sprung", "später"],
+  ["danach", "direkt danach"],
+  ["spaeter", "später"],
   ["datum", "festes datum"],
   ["gleichzeitig", "gleichzeitig mit"],
+];
+// eine szene dauert minuten oder wochen, und dazwischen können jahre liegen
+const EINHEITEN = [
+  ["min", "minuten"], ["std", "stunden"], ["tag", "tage"],
+  ["woche", "wochen"], ["monat", "monate"], ["jahr", "jahre"],
 ];
 const WERTE = [-3, -2, -1, 0, 1, 2, 3];
 
@@ -1994,7 +2014,8 @@ function Datenblatt({ szNr, text }) {
       const d = await dbGet("szene-" + szNr, `${SUPABASE_URL}/rest/v1/szenen?select=*&nr=eq.${szNr}`).catch(() => []);
       setRow(Array.isArray(d) && d[0] ? d[0] : {
         id: neueId(), nr: Number(szNr), pov: null, wert_story: 0, wert_held: 0,
-        aktiv: [], inaktiv: [], zeit_modus: "folgt", zeit_wert: "", dauer: null, status: "entwurf", neu: true,
+        aktiv: [], inaktiv: [], zeit_modus: "danach", zeit_wert: "", zeit_szene: null,
+        sprung_wert: null, sprung_eh: "tag", dauer: null, dauer_eh: "min", status: "entwurf", neu: true,
       });
     })();
   }, [szNr]);
@@ -2096,22 +2117,49 @@ function Datenblatt({ szNr, text }) {
 
       <div className="dbgrid">
         <div className="dbfeld">
-          <label className="cap">wann</label>
+          <label className="cap">wann beginnt die szene</label>
           <div className="zeitreihe">
-            <select className="ti" value={row.zeit_modus || "folgt"} onChange={(e) => setz("zeit_modus", e.target.value)}>
+            <select className="ti" value={row.zeit_modus || "danach"} onChange={(e) => setz("zeit_modus", e.target.value)}>
               {ZEIT_MODI.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
             </select>
-            {row.zeit_modus !== "folgt" && (
+            {row.zeit_modus === "spaeter" && (
+              <>
+                <input className="ti minifeld" type="number" min="0" value={row.sprung_wert ?? ""}
+                  onChange={(e) => setz("sprung_wert", e.target.value === "" ? null : Number(e.target.value))}
+                  placeholder="3" />
+                <select className="ti minifeld" value={row.sprung_eh || "tag"} onChange={(e) => setz("sprung_eh", e.target.value)}>
+                  {EINHEITEN.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                </select>
+                <span className="zeithinweis">später als die vorige szene</span>
+              </>
+            )}
+            {row.zeit_modus === "datum" && (
               <input className="ti" value={row.zeit_wert || ""} onChange={(e) => setz("zeit_wert", e.target.value)}
-                placeholder={row.zeit_modus === "sprung" ? "+3 tage" : row.zeit_modus === "datum" ? "01.02. 08:00" : "szene 24"} />
+                placeholder="1. februar, 8:00" />
+            )}
+            {row.zeit_modus === "gleichzeitig" && (
+              <select className="ti minifeld" value={row.zeit_szene ?? ""}
+                onChange={(e) => setz("zeit_szene", e.target.value === "" ? null : Number(e.target.value))}>
+                <option value="">szene …</option>
+                {Array.from({ length: SZ_ANZAHL }, (_, n) => n + 1).filter((n) => n !== Number(szNr))
+                  .map((n) => <option key={n} value={n}>szene {n}</option>)}
+              </select>
             )}
           </div>
+          {(row.zeit_modus || "danach") === "danach" && (
+            <p className="hint" style={{ marginTop: 6 }}>schließt ohne pause an die vorige szene an.</p>
+          )}
         </div>
         <div className="dbfeld">
-          <label className="cap">wie lange · minuten</label>
-          <input className="ti" type="number" min="0" value={row.dauer ?? ""}
-            onChange={(e) => setz("dauer", e.target.value === "" ? null : Number(e.target.value))}
-            placeholder="20" />
+          <label className="cap">wie lange dauert sie</label>
+          <div className="zeitreihe">
+            <input className="ti minifeld" type="number" min="0" value={row.dauer ?? ""}
+              onChange={(e) => setz("dauer", e.target.value === "" ? null : Number(e.target.value))}
+              placeholder="20" />
+            <select className="ti minifeld" value={row.dauer_eh || "min"} onChange={(e) => setz("dauer_eh", e.target.value)}>
+              {EINHEITEN.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -7000,7 +7048,8 @@ function Styles() {
   .figchip.aktiv{border-style:solid;border-color:var(--green-dim);color:var(--green);
     background:rgba(53,255,111,.07);text-shadow:var(--glow)}
   .figchip.inaktiv{border-style:solid;border-color:var(--line-hot);color:var(--muted)}
-  .zeitreihe{display:flex;gap:8px;flex-wrap:wrap}
+  .zeitreihe{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .zeithinweis{font-size:10.5px;color:var(--dim);font-style:italic}
   .zeitreihe .ti{flex:1;min-width:120px}
 
   /* wegweiser auf sk_ultra · die buch-matrix zum draufschauen, etwas kleiner */
