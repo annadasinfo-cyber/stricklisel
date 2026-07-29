@@ -611,7 +611,7 @@ function Panel({ id, title, sub, sw, children }) {
     return n;
   });
   return (
-    <section className={"panel" + (open ? "" : " collapsed")}>
+    <section id={id} className={"panel" + (open ? "" : " collapsed")}>
       <div className="phead" onClick={kippen}>
         {sw}
         <span className="prompt">&gt;</span>
@@ -1677,6 +1677,51 @@ function CtStrahl({ z }) {
   );
 }
 
+// SCHLANKER STREIFEN · alle offenen fragen auf einen blick, über der szenenwand.
+// gleicher schnitt wie „gilt hier", nur gelb und über das ganze buch statt
+// über eine szene. eingelöste fallen raus — hier steht nur, was noch aussteht.
+function OffeneFragen() {
+  const [liste, setListe] = useState([]);
+  const [offen, setOffen] = useState(true);
+  useEffect(() => { (async () => setListe(await qLaden()))(); }, []);
+
+  const gilt = liste.filter(qOffen).sort(qSort);
+  if (!liste.length) return null;
+
+  return (
+    <div className="gilthier qstreifen">
+      <button className="giltkopf" onClick={() => setOffen((v) => !v)}>
+        <span className="giltpfeil">{offen ? "▾" : "▸"}</span>
+        <span className="giltcap">offene fragen</span>
+        <span className="giltzahl">
+          {gilt.length} offen · {liste.length - gilt.length} eingelöst
+        </span>
+      </button>
+      {offen && (
+        <div className="giltkoerper">
+          {!gilt.length && <div className="giltleer">nichts offen. alles eingelöst.</div>}
+          {!!gilt.length && (
+            <ul className="giltliste">
+              {gilt.map((f) => {
+                const tab = qTablett(f);
+                return (
+                  <li key={f.id}>
+                    <span className="giltab" title={f.szene == null ? "ohne szene" : szLabel(f.szene)}>
+                      {f.szene == null ? "–" : istGlobal(f.szene) ? "◇" : f.szene}
+                    </span>
+                    <span className="gilttext">{f.frage}</span>
+                    {tab.length > 0 && <span className="qtabmini" title="wieder aufs tablett">↻{tab.length}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // KOMPAKT · auf dem schreibblatt: was hier gerade wahr ist, plus ein feld
 // zum hinwerfen. eine zeile, im moment des schreibens, ohne formular.
 function GiltHier({ szNr }) {
@@ -1728,6 +1773,79 @@ function GiltHier({ szNr }) {
               onChange={(e) => setNeu(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && anlegen()} />
             <button className="btn" onClick={anlegen} disabled={!neu.trim()}>+ gilt ab hier</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// FRAGEN HIER · auf dem szenen-blatt, gelbe schwester von „gilt hier".
+// zeigt ALLE offenen fragen des buches, nicht nur die dieser szene — beim
+// schreiben will man wissen, was man aufgreifen könnte. was zu dieser szene
+// gehört, steht hell; der rest ist hintergrund.
+function FragenHier({ szNr }) {
+  const [liste, setListe] = useState([]);
+  const [neu, setNeu] = useState("");
+  const [auf, setAuf] = useState(true);
+  useEffect(() => { (async () => setListe(await qLaden()))(); }, []);
+
+  async function stellen() {
+    const t = neu.trim();
+    if (!t) return;
+    const row = { id: neueId(), user_id: getUserId(), frage: t, szene: Number(szNr),
+      antwort: null, szene_antwort: null, tablett: [], created_at: new Date().toISOString() };
+    setNeu(""); setListe((l) => [row, ...l]);
+    await dbSchreiben("POST", `${SUPABASE_URL}/rest/v1/fragen`, row);
+  }
+  // „kommt hier nochmal hoch" — die szene aufs tablett der frage legen
+  async function aufsTablett(f) {
+    const jetzt = qTablett(f);
+    if (jetzt.includes(Number(szNr))) return;
+    const t = [...jetzt, Number(szNr)].sort((a, b) => a - b);
+    setListe((l) => l.map((x) => x.id === f.id ? { ...x, tablett: t } : x));
+    await dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`, { tablett: t });
+  }
+
+  const offen = liste.filter(qOffen).sort(qSort);
+  const hier = offen.filter((f) => qBeruehrt(f, Number(szNr))).length;
+
+  return (
+    <div className="gilthier qstreifen">
+      <button className="giltkopf" onClick={() => setAuf((v) => !v)}>
+        <span className="giltpfeil">{auf ? "▾" : "▸"}</span>
+        <span className="giltcap">offene fragen</span>
+        <span className="giltzahl">{offen.length} offen{hier ? ` · ${hier} betreffen diese szene` : ""}</span>
+      </button>
+      {auf && (
+        <div className="giltkoerper">
+          {!offen.length && <div className="giltleer">nichts offen. was lässt diese szene liegen?</div>}
+          {!!offen.length && (
+            <ul className="giltliste">
+              {offen.map((f) => {
+                const tab = qTablett(f);
+                const meins = qBeruehrt(f, Number(szNr));
+                return (
+                  <li key={f.id} className={meins ? "frisch" : ""}>
+                    <span className="giltab" title={f.szene == null ? "ohne szene" : szLabel(f.szene)}>
+                      {f.szene == null ? "–" : istGlobal(f.szene) ? "◇" : f.szene}
+                    </span>
+                    <span className="gilttext">{f.frage}</span>
+                    {tab.length > 0 && <span className="qtabmini" title="wieder aufs tablett">↻{tab.length}</span>}
+                    {!meins && (
+                      <button className="giltweg" onClick={() => aufsTablett(f)}
+                        title="kommt in dieser szene nochmal hoch">↻</button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="giltneu">
+            <input className="ti" value={neu} placeholder="welche frage wirft das hier auf? …"
+              onChange={(e) => setNeu(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && stellen()} />
+            <button className="btn" onClick={stellen} disabled={!neu.trim()}>+ aufwerfen</button>
           </div>
         </div>
       )}
@@ -2211,6 +2329,8 @@ function SkUltra({ springe, zuLog, zurPerson }) {
 
       <BesetzungTafel figuren={figuren} ordnerId={wurzel ? wurzel.ordner_id : null} skripte={alle} zurPerson={zurPerson} />
 
+      <OffeneFragen />
+
       <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} entw={entw} qListe={qListe} />
 
       <div className="skgrid">
@@ -2648,6 +2768,10 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
   const [szene, setSzene] = useState("");      // 1–63, wenn der text zu einer projekt-szene gehört
   const flagKlick = (k) => { setLogFlags((f) => f.includes(k) ? f.filter((x) => x !== k) : [...f, k]); setDirty(true); };
 
+  // wieviele fragen warten unten noch auf einlösung? nur anzeige, kein schalter.
+  const [qOffenN, setQOffenN] = useState(0);
+  useEffect(() => { (async () => setQOffenN((await qLaden()).filter(qOffen).length))(); }, []);
+
   // um mitternacht still auf den neuen tag springen — aber nur, wenn der alte
   // eintrag leer und gespeichert ist. wer um 00:00 mitten im schreiben ist,
   // bleibt wo er ist und bekommt oben den „↺ heute"-knopf.
@@ -2833,6 +2957,11 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
         <button type="button" className={"logflag magisch blau" + (logFlags.includes("r") ? " on" : "")}
                 onClick={() => flagKlick("r")}
                 title="recherche zu einer projekt-szene">R</button>
+        <button type="button" className={"logflag magisch gelb" + (qOffenN ? " on" : "")}
+                onClick={() => document.getElementById("log-questionary")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                title={qOffenN ? qOffenN + " offene fragen — unten im questionary" : "keine offenen fragen"}>
+          Q{qOffenN ? <span className="qzahlmini">{qOffenN}</span> : null}
+        </button>
         {(logFlags.includes("p") || logFlags.includes("r")) && (
           <label className="logfeld" title="welcher szene gehört das? global = noch nicht einzuordnen oder für mehrere geschichten">
             <span>szene</span>
@@ -2845,7 +2974,7 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
           </label>
         )}
         <div className="logflags wf">
-          {[["skripte", "s_t"], ["ue2", "Ü2"], ["ue1", "Ü1"], ["htsm", "hts_max"]].map(([k, l]) => (
+          {[["htsm", "hts_u"]].map(([k, l]) => (
             <button key={k} type="button" className={"logflag" + (logFlags.includes(k) ? " on" : "")} onClick={() => flagKlick(k)}>{l}</button>
           ))}
         </div>
@@ -3590,6 +3719,7 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
         </div>
 
         {szNr != null && <GiltHier szNr={szNr} />}
+        {szNr != null && <FragenHier szNr={szNr} />}
 
         <AutoTa className="ta log" value={texte[i]} onChange={(e) => setT(i, e.target.value)}
           placeholder={"> " + POS[i].k + "\n> hier wird geschrieben …"} />
@@ -3609,10 +3739,6 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
         </div>
         <p className="hint">speichert sich still von selbst, zwei sekunden nach dem letzten tastendruck.</p>
 
-        {szNr != null && (
-          <FragenAkkordeon panelId="skript-questionary" titel="QUESTIONARY"
-            szeneVorgabe={szNr} nurSzene={szNr} />
-        )}
       </>
     );
   }
@@ -5919,6 +6045,9 @@ function Styles() {
   .logfeld select.minifeld{width:64px;cursor:pointer;color:var(--green)}
   .logfeld select.moodfeld{width:132px}
   .logflags.wf .logflag{font-size:11px;padding:7px 8px;letter-spacing:.02em}
+  .logflag.magisch.gelb.on{color:#e8cf5f;border-color:rgba(232,207,95,.55);
+    background:rgba(232,207,95,.1);box-shadow:0 0 12px rgba(232,207,95,.25)}
+  .qzahlmini{font-size:9px;letter-spacing:0;margin-left:3px;vertical-align:super;opacity:.85}
   .logflag.magisch{font-family:var(--term);font-size:13px;letter-spacing:.1em;padding:8px 14px;
     border-color:#e88fc0;color:#e88fc0}
   .logflag.magisch:hover{color:#ffb6db;border-color:#ffb6db}
@@ -6497,6 +6626,17 @@ function Styles() {
   .giltweg:hover{color:#a98fe0}
   .giltneu{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .giltneu .ti{flex:1;min-width:180px}
+
+  /* offene fragen · derselbe schnitt wie „gilt hier", nur gelb */
+  .gilthier.qstreifen{border-left-color:#e8cf5f;background:rgba(232,207,95,.05);margin-bottom:22px}
+  .qstreifen .giltcap{color:#e8cf5f}
+  .qstreifen .giltliste li .giltab{color:var(--dim)}
+  .qstreifen .gilttext{color:var(--muted)}
+  .qstreifen .giltliste li.frisch .giltab{color:#e8cf5f}
+  .qstreifen .giltliste li.frisch .gilttext{color:var(--ink)}
+  .qstreifen .giltweg:hover{color:#e8cf5f}
+  .qtabmini{flex:0 0 auto;font-family:var(--term);font-size:9px;color:#e8cf5f;
+    border:1px solid rgba(232,207,95,.35);border-radius:3px;padding:1px 4px}
 
   /* wegweiser auf sk_ultra · die buch-matrix zum draufschauen, etwas kleiner */
   .mx.wegw{margin-bottom:2px}
