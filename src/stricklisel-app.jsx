@@ -3660,7 +3660,6 @@ const POS = [
 // Geschrieben wird: mainstate zuerst, dann im uhrzeigersinn ab position 3.
 const SCHREIB_ORDER = [4, 2, 5, 8, 7, 6, 3, 0, 1];
 const AKT_ROEMISCH = { 1: "I", 2: "II", 3: "III" };
-const ZIEL_ABSATZ = 200;
 // wörter je szene. eine zahl mit SZ_ZIEL (szenenwand), damit beide nie auseinanderlaufen.
 const ZIEL_SZENE = SZ_ZIEL;
 const leer9 = () => ["", "", "", "", "", "", "", "", ""];
@@ -6381,7 +6380,6 @@ function Styles() {
     border:1px solid var(--line);border-radius:4px;color:var(--dim);padding:3px 9px;cursor:pointer;transition:.12s}
   .laufbtn:hover{border-color:var(--line-hot);color:var(--green)}
   .laufbtn.on{color:var(--green);border-color:var(--line-hot);text-shadow:var(--glow)}
-  .laufinput{flex:1 1 160px;min-width:0}
   @media(prefers-reduced-motion:reduce){.laufinner.langsam,.laufinner.schnell{animation:none}}
 
   /* reaktor-ladung · sanfter entlade-balken, sticky unterm header */
@@ -6692,44 +6690,8 @@ function Styles() {
   .hookzeile{font-size:13px;color:var(--muted);border-left:2px solid var(--green-dim);
     padding:4px 0 4px 12px;margin-bottom:14px;font-style:italic}
 
-  .szene{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:10px}
-  .szene.mitte{border-color:var(--line-hot);background:var(--panel-2)}
-  .szene.blitz{border-color:var(--green);box-shadow:0 0 0 1px var(--green-dim),0 0 22px rgba(53,255,111,.3);
-    animation:ankunft 1.6s ease-out}
   @keyframes ankunft{0%{box-shadow:0 0 0 3px var(--green),0 0 40px rgba(53,255,111,.7)}100%{box-shadow:0 0 0 1px var(--green-dim)}}
-  .skopf{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap;cursor:pointer}
-  .snr{font-family:var(--term);font-size:11px;color:var(--green-dim);letter-spacing:.1em}
-  .skopf .akt{position:static;opacity:.5}
-  .smatrix{flex:1;font-size:12px;color:var(--ink);font-style:italic;min-width:120px}
-  .szene.zu .smatrix{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* das feld wächst mit dem text — 200 wörter passen rein, ohne zu scrollen */
-  .szene .ta{min-height:200px;overflow:hidden;resize:none}
-  .szene .chev{color:var(--green-mid);font-size:12px;transition:transform .15s;margin-left:6px;flex:0 0 auto}
-  .szene.zu .chev{transform:rotate(-90deg)}
-  .szene.zu{padding-bottom:14px}
-  .szene.zu .skopf{margin-bottom:0}
-  .szu{font-family:var(--term);font-size:10.5px;color:var(--green-dim);flex:0 0 auto;
-    font-variant-numeric:tabular-nums;margin-left:auto}
-  .mshinweis{color:var(--dim);font-style:normal;font-size:10.5px;letter-spacing:.04em}
-  .msuebersicht{background:var(--void);border:1px solid var(--line);border-radius:6px;padding:14px}
-  .msvoll{font-size:13.5px;color:var(--ink);line-height:1.65;white-space:pre-wrap}
-  .mserbe{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
-  .mserbekopf{display:flex;align-items:baseline;gap:6px;font-family:var(--term);font-size:10.5px;
-    letter-spacing:.08em;color:var(--dim);margin-bottom:8px}
-  .mserbekopf b{color:var(--green);font-weight:400}
-  .mserbekopf i{margin-left:auto;font-style:normal;color:var(--green-dim)}
-  .mserbetext{font-size:12.5px;color:var(--muted);line-height:1.7;white-space:pre-wrap;
-    max-height:260px;overflow-y:auto;padding-right:6px}
-  .mserbetext::-webkit-scrollbar{width:7px}
-  .mserbetext::-webkit-scrollbar-track{background:transparent}
-  .mserbetext::-webkit-scrollbar-thumb{background:var(--green-dim);border-radius:4px}
   .zweig{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .zweigbtn{padding:5px 11px;font-size:11px;color:var(--dim);border-color:var(--line);
-    background:transparent;opacity:.5;transition:.15s}
-  .zweigbtn:hover{opacity:1;color:var(--green);border-color:var(--line-hot)}
-  .kind{font-family:var(--mono);font-size:11.5px;background:var(--green-dim);border:1px solid var(--line-hot);
-    color:var(--white);border-radius:4px;padding:6px 12px;cursor:pointer}
-  .kind:hover{background:var(--green-mid);color:#04150a}
 
   @media(max-width:640px){
     /* einspaltig ergäbe die rasterreihenfolge — also die geschichte rückwärts.
@@ -6795,9 +6757,6 @@ function Styles() {
   /* gedanken-fang · orakel-impuls */
   .gfang{display:flex;gap:8px;margin-bottom:10px}
   .gfang .ti{flex:1;min-width:0}
-  .oraklspruch{font-family:var(--mono);font-size:12.5px;font-style:italic;color:var(--green);
-    text-shadow:var(--glow);background:var(--panel-2);border:1px solid var(--line-hot);border-radius:6px;
-    padding:11px 13px;margin-bottom:12px;line-height:1.55;animation:ankunft .4s ease-out}
   .raeder{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px}
   .rad{flex:1 1 180px;min-width:0;text-align:left;border:1px solid var(--line-hot);border-radius:8px;
     background:var(--panel-2);padding:11px 13px;cursor:pointer;display:flex;flex-direction:column;gap:7px;
@@ -6872,26 +6831,10 @@ function Styles() {
   .rfuss select{flex:0 0 auto;background:var(--panel-2);border:1px solid var(--line);border-radius:4px;color:var(--green);
     font-family:var(--term);font-size:12px;letter-spacing:.1em;padding:5px 8px;cursor:pointer}
   .rfuss select:focus{outline:none;border-color:var(--line-hot)}
-  .rradius{font-family:var(--term);font-size:10.5px;color:var(--dim);letter-spacing:.1em}
   .rfuss .status{font-size:10.5px}
 
   .ppanel{flex:1 1 300px;max-width:520px;min-width:0;display:flex;flex-direction:column;justify-content:center}
-  .puhr{font-family:var(--term);color:var(--green);text-shadow:var(--glow);letter-spacing:.06em;
-    font-variant-numeric:tabular-nums;line-height:1;font-size:clamp(38px,6.6vw,64px);margin-bottom:20px;text-align:left}
-  .puhr i{font-style:normal;opacity:.42;font-size:.68em}
-  .wheel{width:100%;text-align:left;border:1px solid var(--line-hot);border-radius:8px;
-    background:var(--panel-2);padding:16px 16px 12px;margin-bottom:20px;cursor:pointer;
-    display:flex;flex-direction:column;gap:10px;transition:.15s;font-family:inherit}
-  .wheel:hover:not(:disabled){box-shadow:0 0 14px rgba(53,255,111,.18);border-color:var(--green)}
-  .wheel:disabled{cursor:default;opacity:.6}
-  .wheeltext{font-family:var(--mono);font-size:14px;line-height:1.5;color:var(--green);
-    text-shadow:var(--glow);min-height:2.6em;transition:opacity .25s}
-  .wheel.dreht .wheeltext{opacity:.15}
-  .wheeldreh{font-family:var(--term);font-size:10.5px;letter-spacing:.1em;color:var(--dim);align-self:flex-end}
-  .wheel.dreht .wheeldreh{animation:wheelspin .55s linear}
   @keyframes wheelspin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
-  .wheelrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:14px}
-  .wheelrow .ti{flex:1 1 200px;min-width:0}
 
   /* spielecke im denkbrett */
   .spielraum{display:flex;gap:12px;flex-wrap:wrap;margin-top:22px;margin-bottom:6px}
@@ -6969,14 +6912,11 @@ function Styles() {
 
   /* besetzung */
   .besetzung{background:var(--panel-2);border:1px solid var(--line);border-radius:6px;padding:14px;margin-top:14px}
-  .bz{display:flex;align-items:baseline;gap:8px;padding:4px 0;flex-wrap:wrap}
   .bzrolle{font-family:var(--term);font-size:11.5px;letter-spacing:.08em;color:var(--green);flex:0 0 auto}
-  .bz i{flex:1;border-bottom:1px dotted var(--line);opacity:.5;transform:translateY(-3px);min-width:20px}
   .bzname{font-family:var(--mono);font-size:12.5px;background:transparent;border:0;color:var(--ink);
     cursor:pointer;padding:0;flex:0 0 auto}
   .bzname:hover{color:var(--green);text-shadow:var(--glow)}
   .bzname em{font-style:normal;font-size:10.5px;color:var(--dim);padding-left:7px}
-  .bz.frei .bzrolle{color:var(--dim)}
   .bzname.bzfrei{color:var(--dim);cursor:default;font-style:italic}
   .bzname.bzfrei:hover{color:var(--dim);text-shadow:none}
   .bzgrid{display:flex;flex-direction:column;gap:10px;margin-bottom:6px}
@@ -7251,8 +7191,6 @@ function Styles() {
     100%{transform:translate3d(var(--drift),112vh,0) rotate(260deg);opacity:0}
   }
 
-  .szeneworum{margin:14px 0 12px}
-  .szeneworum .ta{min-height:56px;font-size:12.5px;color:var(--muted)}
   .logfoot{display:flex;align-items:center;gap:14px;margin-top:8px}
   .logbar{flex:1;height:2px;background:var(--line);overflow:hidden}
   .logbar i{display:block;height:100%;background:var(--green-mid);transition:width .3s}
