@@ -1993,7 +1993,9 @@ const EINHEITEN = [
   ["min", "minuten"], ["std", "stunden"], ["tag", "tage"],
   ["woche", "wochen"], ["monat", "monate"], ["jahr", "jahre"],
 ];
-const WERTE = [-3, -2, -1, 0, 1, 2, 3];
+// von oben nach unten gelesen — genauso wie die kurve im graphen steht,
+// damit man beim eintragen nicht umdenken muss
+const WERTE = [3, 2, 1, 0, -1, -2, -3];
 
 function Datenblatt({ szNr, text }) {
   const [row, setRow] = useState(null);
@@ -2057,6 +2059,25 @@ function Datenblatt({ szNr, text }) {
 
   return (
     <Panel id="szene-datenblatt" title="DATENBLATT" sub={`szene ${szNr} · ${ST_STUFEN.find(([k]) => k === row.status)?.[1] || "entwurf"}`}>
+      <div className="dbaufbau">
+
+      <div className="wertsaeulen">
+        <label className="cap">was tut das an</label>
+        <div className="saeulenpaar">
+          {[["story", "wert_story", "story"], ["held", "wert_held", "held"]].map(([titel, feld, farbe]) => (
+            <div className="wertsaeule" key={feld}>
+              <span className="saeulenkopf" data-f={farbe}>{titel}</span>
+              {WERTE.map((w) => (
+                <button key={w}
+                  className={"wertknopf" + (row[feld] === w ? " on " + farbe : "") + (w === 0 ? " null" : "")}
+                  onClick={() => setz(feld, w)}>{w > 0 ? "+" + w : w}</button>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="dbfelder">
       <div className="dbgrid">
         <div className="dbfeld">
           <label className="cap">pov · durch wessen augen</label>
@@ -2070,27 +2091,6 @@ function Datenblatt({ szNr, text }) {
           <select className="ti" value={row.status} onChange={(e) => setz("status", e.target.value)}>
             {ST_STUFEN.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
-        </div>
-      </div>
-
-      <div className="dbgrid">
-        <div className="dbfeld">
-          <label className="cap">was tut das der story an</label>
-          <div className="wertreihe">
-            {WERTE.map((w) => (
-              <button key={w} className={"wertknopf" + (row.wert_story === w ? " on story" : "")}
-                onClick={() => setz("wert_story", w)}>{w > 0 ? "+" + w : w}</button>
-            ))}
-          </div>
-        </div>
-        <div className="dbfeld">
-          <label className="cap">was tut das dem helden an</label>
-          <div className="wertreihe">
-            {WERTE.map((w) => (
-              <button key={w} className={"wertknopf" + (row.wert_held === w ? " on held" : "")}
-                onClick={() => setz("wert_held", w)}>{w > 0 ? "+" + w : w}</button>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -2161,6 +2161,9 @@ function Datenblatt({ szNr, text }) {
             </select>
           </div>
         </div>
+      </div>
+
+      </div>
       </div>
 
       <div className="actions" style={{ marginTop: 12 }}>
@@ -2271,40 +2274,49 @@ function Zeitstrahl({ alle, wurzelId, springe }) {
 
       {benutzteBloecke.map((b, bi) => {
         const drin = [...info.values()].filter((x) => x.block === b.nr);
-        const breite = Math.max(1, ...drin.map((x) => x.start + x.dauer));
+        const spanne = Math.max(1, ...drin.map((x) => x.start + x.dauer));
+        // die höhe wächst mit der dauer, bleibt aber lesbar
+        const hoehe = Math.min(420, Math.max(120, drin.length * 34));
+        const aktiv = spuren.filter((pov) => drin.some((x) => (x.row.pov || "") === pov));
         return (
           <div className="zsblock" key={b.nr}>
             <div className="zskopf">
-              {bi > 0 && <span className="zsbruch">⋯ {b.label} ⋯</span>}
-              {bi === 0 && <span className="zsbeginn">beginn</span>}
-              <span className="zsgesamt">{dauerText(breite)}</span>
+              {bi > 0 ? <span className="zsbruch">⋯ {b.label} ⋯</span> : <span className="zsbeginn">beginn</span>}
+              <span className="zsgesamt">{dauerText(spanne)}</span>
             </div>
-            {spuren.map((pov, si) => {
-              const meine = drin.filter((x) => (x.row.pov || "") === pov);
-              if (!meine.length) return null;
-              const farbe = spurFarben[si % spurFarben.length];
-              return (
-                <div className="zsspur" key={pov || "ohne"}>
-                  <span className="zsname" style={{ color: farbe }}>
-                    {pov ? (namen.get(pov) || "unbekannt") : "ohne pov"}
-                  </span>
-                  <div className="zsbahn">
-                    {meine.map((x) => {
-                      const links = (x.start / breite) * 100;
-                      const w = Math.max(1.5, (x.dauer / breite) * 100);
-                      return (
-                        <button key={x.row.nr} className="zsbalken"
-                          style={{ left: links + "%", width: w + "%", background: farbe, borderColor: farbe }}
-                          onClick={() => zurSzene(x.row.nr)}
-                          title={`szene ${x.row.nr} · ${dauerText(x.dauer)}${x.row.zeit_modus === "gleichzeitig" ? " · gleichzeitig mit szene " + x.row.zeit_szene : ""}`}>
-                          <span>{x.row.nr}</span>
-                        </button>
-                      );
-                    })}
+            <div className="zsraster" style={{ height: hoehe + "px" }}>
+              <div className="zsachse">
+                <span>0</span>
+                <span>{dauerText(Math.round(spanne / 2))}</span>
+                <span>{dauerText(spanne)}</span>
+              </div>
+              {aktiv.map((pov) => {
+                const si = spuren.indexOf(pov);
+                const meine = drin.filter((x) => (x.row.pov || "") === pov);
+                const farbe = spurFarben[si % spurFarben.length];
+                return (
+                  <div className="zsspalte" key={pov || "ohne"}>
+                    <span className="zsname" style={{ color: farbe }} title={pov ? (namen.get(pov) || "unbekannt") : "ohne pov"}>
+                      {pov ? (namen.get(pov) || "unbekannt") : "ohne pov"}
+                    </span>
+                    <div className="zsbahn">
+                      {meine.map((x) => {
+                        const oben = (x.start / spanne) * 100;
+                        const h = Math.max(3, (x.dauer / spanne) * 100);
+                        return (
+                          <button key={x.row.nr} className="zsbalken"
+                            style={{ top: oben + "%", height: h + "%", background: farbe, borderColor: farbe }}
+                            onClick={() => zurSzene(x.row.nr)}
+                            title={`szene ${x.row.nr} · ${dauerText(x.dauer)}${x.row.zeit_modus === "gleichzeitig" ? " · gleichzeitig mit szene " + x.row.zeit_szene : ""}`}>
+                            <span>{x.row.nr}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         );
       })}
@@ -2833,15 +2845,6 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         <div className="skradtext qedsatz">{qed.trim() || "— noch keine prämisse —"}</div>
       </div>
 
-      <BesetzungTafel figuren={figuren} ordnerId={wurzel ? wurzel.ordner_id : null} skripte={alle} zurPerson={zurPerson} />
-
-      <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} entw={entw} qListe={qListe} />
-
-      <Dramaturgie startStory={startStory} startHeld={startHeld}
-        setStart={(feld, w) => aend(() => (feld === "start_story" ? setStartStory(w) : setStartHeld(w)))} />
-
-      <Zeitstrahl alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} />
-
       <div className="skgrid">
         <Panel id="sk-projekt" title="PROJEKT" sub="gegenzeichnung · ohne administrative rechte">
           <div className="field">
@@ -2920,6 +2923,15 @@ function SkUltra({ springe, zuLog, zurPerson }) {
           </div>
         </Panel>
       </div>
+
+      <BesetzungTafel figuren={figuren} ordnerId={wurzel ? wurzel.ordner_id : null} skripte={alle} zurPerson={zurPerson} />
+
+      <SzenenWand alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} entw={entw} qListe={qListe} />
+
+      <Dramaturgie startStory={startStory} startHeld={startHeld}
+        setStart={(feld, w) => aend(() => (feld === "start_story" ? setStartStory(w) : setStartHeld(w)))} />
+
+      <Zeitstrahl alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} />
 
       <div className="skgrid schmal">
         <div className={"skrad" + (frage && frage.offen ? " gelb" : "") + (frageDreht ? " dreht" : "") + (qHalt ? " haelt" : "")}
@@ -4405,6 +4417,22 @@ const ROLLEN = [
     ["lazarus-joker", "gibt neuen mut, wenn alles verloren scheint"],
     ["lazarus-charakter", "totgeglaubt und wieder da — kommt zurück, wenn niemand mehr mit ihm rechnet"],
   ]},
+  { g: "gruppen · organisationen", r: [
+    ["armee", "die geordnete masse — kämpft auf befehl"],
+    ["mannschaft", "die eingeschworene kleingruppe · crew"],
+    ["kohorte", "der harte kern, der mitzieht"],
+    ["garde", "leibwache · bewacht jemanden oder etwas"],
+    ["horde", "die ungeordnete masse — kämpft aus wut"],
+    ["mob", "spontane menge, kippt in beide richtungen"],
+    ["partei", "vertritt eine sache, nicht eine person"],
+    ["orden", "verschworen auf ein gelübde"],
+    ["gilde · zunft", "verbunden übers handwerk"],
+    ["sippe · clan", "verbunden übers blut"],
+    ["rat", "entscheidet · über dem helden"],
+    ["sekte · zirkel", "im verborgenen, mit eigener wahrheit"],
+    ["syndikat", "organisiert und käuflich"],
+    ["expedition", "gruppe mit einem ziel und einem rückweg"],
+  ]},
   { g: "gegner", r: [
     ["schurke · schatten", ""],
     ["handlanger des schurken", ""],
@@ -4512,38 +4540,84 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
     setOffen(null);
   }
 
-  // wo kommt das vor? — quer durch alle skripte des projekts
+  // CALLINGS · wo wird das gerufen? gegenstück zur continuity: die sagt,
+  // was ab wann gilt — die callings sagen, wo es überall auftaucht.
+  // sucht IMMER über ALLE projekte, weil bei einer serie eine figur in
+  // mehreren büchern vorkommt. jeder treffer nennt sein projekt.
   async function fundstellen(th) {
-    const q = (th.name || "").trim();
-    if (!q) { setMsg({ t: "erst einen namen eintragen", c: "err" }); return; }
+    const name = (th.name || "").trim();
+    if (!name) { setMsg({ t: "erst einen namen eintragen", c: "err" }); return; }
     try {
       setMsg({ t: "suche …", c: "work" }); setFunde(null);
-      let url = `${SUPABASE_URL}/rest/v1/skripte?select=id,name,matrix,texte,eltern_id,eltern_pos`;
-      if (aktOrdner) url += `&ordner_id=eq.${aktOrdner}`;
-      const sk = await dbGet("things-suche-" + (aktOrdner || "alle"), url);
-      const low = q.toLowerCase();
+      // ohne ordner-filter — alle projekte, plus die ordnernamen dazu
+      const [sk, ord] = await Promise.all([
+        dbGet("callings-skripte", `${SUPABASE_URL}/rest/v1/skripte?select=id,name,matrix,texte,eltern_id,eltern_pos,ordner_id&limit=2000`),
+        dbGet("skript_ordner", `${SUPABASE_URL}/rest/v1/skript_ordner?select=id,name&order=created_at.asc`).catch(() => []),
+      ]);
+      const ordName = new Map((Array.isArray(ord) ? ord : []).map((o) => [o.id, o.name]));
       const arr = Array.isArray(sk) ? sk : [];
-      // wie tief hängt ein skript? 0 = das buch, 1 = eine station.
-      // nur zellen einer station tragen eine der 63 szenennummern.
+
+      // gesucht wird der ganze name UND jedes eigenständige wort daraus:
+      // „Max Cunningham" findet auch stellen, an denen nur „Max" steht.
+      // einzelne wörter nur an WORTGRENZEN — sonst fände „max" auch „maximilian".
+      const FUELL = new Set(["der", "die", "das", "des", "dem", "den", "ein", "eine", "einer", "eines",
+        "und", "von", "vom", "zur", "zum", "aus", "bei", "mit", "für", "auf", "the", "of"]);
+      const woerter = name.split(/[\s,]+/)
+        .map((w) => w.replace(/^[^\wÄÖÜäöüß-]+|[^\wÄÖÜäöüß-]+$/g, ""))
+        .filter((w) => w.length >= 3 && !FUELL.has(w.toLowerCase()) && w.toLowerCase() !== name.toLowerCase());
+      // ein einzelnes wort wird immer an der wortgrenze geprüft; ein ganzer
+      // mehrwort-name ist von sich aus eindeutig genug für die freie suche
+      const einWort = !/\s/.test(name.trim());
+      const suchen = [
+        { t: name.toLowerCase(), ganz: einWort },
+        ...woerter.map((w) => ({ t: w.toLowerCase(), ganz: true })),
+      ];
+      const istBuchstabe = (c) => !!c && /[\wÄÖÜäöüß]/.test(c);
+      const findeStelle = (tief, eintrag) => {
+        let p = tief.indexOf(eintrag.t);
+        while (p >= 0) {
+          if (!eintrag.ganz) return p;
+          const davor = tief[p - 1];
+          const rest = tief.slice(p + eintrag.t.length);
+          // „Jarsons Schwert" soll treffen, „Maximilian" bei „Max" nicht
+          const endeOk = !istBuchstabe(rest[0]) || (rest[0] === "s" && !istBuchstabe(rest[1]));
+          if (!istBuchstabe(davor) && endeOk) return p;
+          p = tief.indexOf(eintrag.t, p + 1);
+        }
+        return -1;
+      };
+
       const nach = new Map(arr.map((s) => [s.id, s]));
       const tiefe = (s) => { let n = 0, c = s; while (c?.eltern_id && n < 12) { c = nach.get(c.eltern_id); n++; } return n; };
+
       const tr = [];
       arr.forEach((s) => {
         const ist1 = tiefe(s) === 1;
+        const projekt = ordName.get(s.ordner_id) || "ohne projekt";
         for (let i = 0; i < 9; i++) {
-          const m = (s.matrix?.[i] || ""), x = (s.texte?.[i] || "");
-          const wo = (x.toLowerCase().includes(low) ? x : m.toLowerCase().includes(low) ? m : null);
-          if (!wo) continue;
-          const p = wo.toLowerCase().indexOf(low), a = p > 50 ? p - 50 : 0;
-          const nr = ist1 && i !== 4 && s.eltern_pos != null ? szNummer(s.eltern_pos, i) : null;
-          tr.push({ id: s.id, i, nr, skript: s.name || "unbenannt", pos: POS[i].k,
-            schnipsel: (a ? "… " : "") + wo.slice(a, a + 150).replace(/\n+/g, " ") + (wo.length > a + 150 ? " …" : "") });
+          // matrix (die grobe idee) UND text getrennt prüfen — beides zählt
+          for (const [quelle, wo] of [["text", s.texte?.[i] || ""], ["idee", s.matrix?.[i] || ""]]) {
+            if (!wo) continue;
+            const tief = wo.toLowerCase();
+            let treffer = null, p = -1;
+            for (const e of suchen) { const k = findeStelle(tief, e); if (k >= 0) { treffer = e; p = k; break; } }
+            if (!treffer) continue;
+            const a = p > 50 ? p - 50 : 0;
+            const nr = ist1 && i !== 4 && s.eltern_pos != null ? szNummer(s.eltern_pos, i) : null;
+            tr.push({
+              id: s.id, i, nr, projekt, quelle,
+              treffer: treffer.t === name.toLowerCase() ? null : treffer.t,
+              skript: s.name || "unbenannt", pos: POS[i].k,
+              schnipsel: (a ? "… " : "") + wo.slice(a, a + 150).replace(/\n+/g, " ") + (wo.length > a + 150 ? " …" : ""),
+            });
+          }
         }
       });
-      // nach szenennummer sortieren — das ist die reihenfolge, in der man liest
-      tr.sort((a, b) => (a.nr == null ? 999 : a.nr) - (b.nr == null ? 999 : b.nr));
-      setFunde({ q, tr });
-      setMsg({ t: tr.length + " fundstelle" + (tr.length === 1 ? "" : "n"), c: "ok" });
+      // nach projekt, dann nach szenennummer — die reihenfolge, in der man liest
+      tr.sort((a, b) => a.projekt.localeCompare(b.projekt)
+        || (a.nr == null ? 999 : a.nr) - (b.nr == null ? 999 : b.nr));
+      setFunde({ q: name, tr, projekte: new Set(tr.map((x) => x.projekt)).size });
+      setMsg({ t: tr.length + " calling" + (tr.length === 1 ? "" : "s"), c: "ok" });
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
 
@@ -4725,7 +4799,7 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
                     <textarea className="ta klein" value={th.notizen} onChange={(e) => feld(th, "notizen", e.target.value)} placeholder="…" />
                   </div>
                   <div className="zweig" style={{ marginTop: 12 }}>
-                    <button className="btn" onClick={() => fundstellen(th)}>⌕ wo kommt das vor?</button>
+                    <button className="btn" onClick={() => fundstellen(th)} title="wo wird das überall gerufen — über alle projekte">⌕ callings</button>
                     <button className="btn stop" style={{ marginLeft: "auto" }} onClick={() => weg(th)}>■ löschen</button>
                   </div>
                 </div>
@@ -4736,15 +4810,30 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
 
         {funde && (
           <div className="treffer">
-            <div className="tkopf">{funde.tr.length} fundstelle{funde.tr.length === 1 ? "" : "n"} für <b>{funde.q}</b></div>
-            {funde.tr.map((f, n) => (
-              <button className="tzeile" key={n} onClick={() => springe(f.id, f.i)} title="zur szene springen">
-                <span className="tdatum">{f.nr != null ? "szene " + f.nr : f.skript}</span>
-                <span className="twoerter" style={{ color: "var(--green)" }}>{f.nr != null ? f.skript + " › " + f.pos : f.pos}</span>
-                <span className="tschnipsel">{f.schnipsel}</span>
-              </button>
-            ))}
-            {!funde.tr.length && <div className="tkopf">nirgends. noch nicht.</div>}
+            <div className="tkopf">
+              {funde.tr.length} calling{funde.tr.length === 1 ? "" : "s"} für <b>{funde.q}</b>
+              {funde.projekte > 1 && <> · in {funde.projekte} projekten</>}
+            </div>
+            {funde.tr.map((f, n) => {
+              // projekt-überschrift nur beim wechsel — bei einer serie sieht man
+              // dadurch auf einen blick, in welchem buch die figur wo auftaucht
+              const neuesProjekt = n === 0 || funde.tr[n - 1].projekt !== f.projekt;
+              return (
+                <span key={n}>
+                  {funde.projekte > 1 && neuesProjekt && <div className="tprojekt">{f.projekt}</div>}
+                  <button className="tzeile" onClick={() => springe(f.id, f.i)} title="zur szene springen">
+                    <span className="tdatum">{f.nr != null ? "szene " + f.nr : f.skript}</span>
+                    <span className="twoerter" style={{ color: "var(--green)" }}>
+                      {f.nr != null ? f.skript + " › " + f.pos : f.pos}
+                    </span>
+                    {f.quelle === "idee" && <span className="tquelle">idee</span>}
+                    {f.treffer && <span className="tquelle teil">„{f.treffer}"</span>}
+                    <span className="tschnipsel">{f.schnipsel}</span>
+                  </button>
+                </span>
+              );
+            })}
+            {!funde.tr.length && <div className="tkopf">nirgends gerufen. noch nicht.</div>}
           </div>
         )}
       </Panel>
@@ -7096,17 +7185,27 @@ function Styles() {
   .zsbruch{color:var(--amber);text-transform:lowercase}
   .zsbeginn{color:var(--green-mid);text-transform:uppercase;letter-spacing:.16em}
   .zsgesamt{margin-left:auto;color:var(--dim)}
-  .zsspur{display:flex;align-items:center;gap:10px;margin-bottom:5px}
-  .zsname{flex:0 0 96px;font-family:var(--term);font-size:10px;letter-spacing:.04em;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
-  @media(max-width:640px){.zsname{flex-basis:64px;font-size:9px}}
-  .zsbahn{position:relative;flex:1;height:20px;border-left:1px solid var(--line);
-    border-bottom:1px dotted var(--line);min-width:0}
-  .zsbalken{position:absolute;top:2px;height:15px;border:1px solid;border-radius:3px;
-    opacity:.82;cursor:pointer;padding:0;min-width:0;overflow:hidden;transition:.12s}
-  .zsbalken:hover{opacity:1;box-shadow:0 0 8px currentColor}
+  /* die zeit läuft nach unten · links die achse, daneben je pov eine spalte */
+  .zsraster{display:flex;gap:8px;align-items:stretch}
+  .zsachse{flex:0 0 52px;display:flex;flex-direction:column;justify-content:space-between;
+    align-items:flex-end;padding:14px 0 2px;font-family:var(--term);font-size:9px;
+    color:var(--dim);border-right:1px dashed var(--line);padding-right:8px}
+  .zsspalte{flex:1 1 0;min-width:38px;display:flex;flex-direction:column}
+  .zsname{font-family:var(--term);font-size:9.5px;letter-spacing:.04em;text-align:center;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px;flex:0 0 auto}
+  .zsbahn{position:relative;flex:1;border-left:1px dotted var(--line);min-height:0}
+  .zsbalken{position:absolute;left:2px;right:2px;border:1px solid;border-radius:3px;
+    opacity:.82;cursor:pointer;padding:0;overflow:hidden;transition:.12s}
+  .zsbalken:hover{opacity:1;box-shadow:0 0 8px currentColor;z-index:2}
   .zsbalken span{display:block;font-family:var(--term);font-size:8.5px;color:#0a0f0c;
-    line-height:15px;text-align:center;font-weight:600}
+    line-height:1.2;text-align:center;font-weight:600;padding-top:1px}
+
+  /* callings · projekt-überschrift und herkunfts-etiketten */
+  .tprojekt{font-family:var(--term);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--amber);margin:12px 0 4px;padding-top:8px;border-top:1px dashed var(--line)}
+  .tquelle{font-family:var(--term);font-size:9px;letter-spacing:.06em;color:var(--dim);
+    border:1px solid var(--line);border-radius:3px;padding:1px 5px;flex:0 0 auto}
+  .tquelle.teil{color:var(--amber);border-color:rgba(224,178,106,.4)}
 
   /* dramaturgie-graph */
   .dramasvg{width:100%;height:auto;display:block;margin:4px 0 2px}
@@ -7142,7 +7241,19 @@ function Styles() {
   @media(max-width:640px){.dbgrid{grid-template-columns:1fr}}
   .dbfeld{min-width:0;margin-bottom:14px}
   .dbfeld .cap{margin-bottom:6px}
-  .wertreihe{display:flex;gap:4px;flex-wrap:wrap}
+  /* die zwei wert-säulen · stehen wie die kurve im graphen: +3 oben, -3 unten */
+  .dbaufbau{display:flex;gap:22px;align-items:flex-start}
+  @media(max-width:640px){.dbaufbau{flex-direction:column;gap:8px}}
+  .wertsaeulen{flex:0 0 auto}
+  .dbfelder{flex:1;min-width:0}
+  .saeulenpaar{display:flex;gap:6px}
+  .wertsaeule{display:flex;flex-direction:column;gap:3px}
+  .saeulenkopf{font-family:var(--term);font-size:9px;letter-spacing:.1em;text-align:center;
+    margin-bottom:3px;color:var(--dim)}
+  .saeulenkopf[data-f="story"]{color:var(--green)}
+  .saeulenkopf[data-f="held"]{color:#e88fc0}
+  .wertsaeule .wertknopf{width:46px;flex:0 0 auto;padding:5px 0}
+  .wertknopf.null{border-style:dashed;opacity:.7}
   .wertknopf{flex:1 1 34px;min-width:34px;padding:7px 0;border:1px solid var(--line);border-radius:4px;
     background:transparent;color:var(--dim);font-family:var(--term);font-size:11.5px;cursor:pointer;transition:.12s}
   .wertknopf:hover{color:var(--ink);border-color:var(--line-hot)}
