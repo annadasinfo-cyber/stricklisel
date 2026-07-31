@@ -1901,6 +1901,50 @@ function merkeAufZu(schluessel, standard = true) {
   return [auf, setAuf];
 }
 
+// ============================================================
+// NAMENS-ABGLEICH · eine stelle für alle: callings, besetzungstafel,
+// steckbriefe im denkbrett und die figuren-vorschläge im datenblatt.
+// gesucht wird der ganze name UND jedes eigenständige wort daraus,
+// einzelwörter nur an wortgrenzen (mit erlaubtem genitiv-s):
+// „Max" trifft „Max ging" und „Maxs Hut", aber nicht „Maximilian".
+// ============================================================
+const NA_FUELL = new Set(["der", "die", "das", "des", "dem", "den", "ein", "eine", "einer", "eines",
+  "und", "von", "vom", "zur", "zum", "aus", "bei", "mit", "für", "auf", "the", "of"]);
+const naBuchstabe = (c) => !!c && /[\wÄÖÜäöüß]/.test(c);
+
+function naSuche(name) {
+  const roh = (name || "").trim();
+  if (!roh) return [];
+  const woerter = roh.split(/[\s,]+/)
+    .map((w) => w.replace(/^[^\wÄÖÜäöüß-]+|[^\wÄÖÜäöüß-]+$/g, ""))
+    .filter((w) => w.length >= 3 && !NA_FUELL.has(w.toLowerCase()) && w.toLowerCase() !== roh.toLowerCase());
+  return [
+    { t: roh.toLowerCase(), ganz: !/\s/.test(roh) },
+    ...woerter.map((w) => ({ t: w.toLowerCase(), ganz: true })),
+  ];
+}
+
+// wo im text steht der eintrag? -1 = nirgends
+function naStelle(tief, eintrag) {
+  let p = tief.indexOf(eintrag.t);
+  while (p >= 0) {
+    if (!eintrag.ganz) return p;
+    const davor = tief[p - 1];
+    const rest = tief.slice(p + eintrag.t.length);
+    const endeOk = !naBuchstabe(rest[0]) || (rest[0] === "s" && !naBuchstabe(rest[1]));
+    if (!naBuchstabe(davor) && endeOk) return p;
+    p = tief.indexOf(eintrag.t, p + 1);
+  }
+  return -1;
+}
+
+// kommt der name in diesem text vor? (für zähler und vorschläge)
+function naTrifft(suche, text) {
+  if (!suche.length || !text) return false;
+  const tief = String(text).toLowerCase();
+  return suche.some((e) => naStelle(tief, e) >= 0);
+}
+
 const NOTIZ_MUSTER = /\(\(([^()]{1,300})\)\)/g;
 const notizenImText = (t) => {
   const raus = [];
@@ -2044,8 +2088,7 @@ function Datenblatt({ szNr, text }) {
 
   const aktiv = row.aktiv || [], inaktiv = row.inaktiv || [];
   // vorschlag: wessen name steht im text? die soll sie nur noch antippen.
-  const imText = figuren.filter((f) => (f.name || "").trim() &&
-    (text || "").toLowerCase().includes(f.name.trim().toLowerCase()));
+  const imText = figuren.filter((f) => naTrifft(naSuche(f.name), text));
   const gezeigt = figuren.filter((f) => imText.includes(f) || aktiv.includes(f.id) || inaktiv.includes(f.id));
   // durchtippen: vorschlag → aktiv → inaktiv → weg
   const kippeFigur = (f) => {
@@ -2272,11 +2315,12 @@ function Zeitstrahl({ alle, wurzelId, springe }) {
       sub={gefuellt ? `${info.size} szenen · ${spuren.length} ${spuren.length === 1 ? "spur" : "spuren"}` : "noch keine zeiten eingetragen"}>
       {!gefuellt && <p className="hint">trag im datenblatt einer szene beginn und dauer ein — hier entstehen daraus die spuren.</p>}
 
+      <div className="zsrolle">
       {benutzteBloecke.map((b, bi) => {
         const drin = [...info.values()].filter((x) => x.block === b.nr);
         const spanne = Math.max(1, ...drin.map((x) => x.start + x.dauer));
         // die höhe wächst mit der dauer, bleibt aber lesbar
-        const hoehe = Math.min(420, Math.max(120, drin.length * 34));
+        const hoehe = Math.min(200, Math.max(80, drin.length * 22));
         const aktiv = spuren.filter((pov) => drin.some((x) => (x.row.pov || "") === pov));
         return (
           <div className="zsblock" key={b.nr}>
@@ -2320,6 +2364,7 @@ function Zeitstrahl({ alle, wurzelId, springe }) {
           </div>
         );
       })}
+      </div>
 
       {offenGeblieben > 0 && (
         <p className="hint">{offenGeblieben} {offenGeblieben === 1 ? "szene hängt" : "szenen hängen"} an einer szene, die noch keine zeit hat — dort erst beginn und dauer eintragen.</p>
@@ -2463,14 +2508,13 @@ function BesetzungTafel({ figuren, ordnerId, skripte, zurPerson }) {
   const sk = Array.isArray(skripte) ? skripte : [];
   // wie oft taucht der name in den skripten dieses projekts auf?
   const zaehlen = (name) => {
-    const low = (name || "").trim().toLowerCase();
-    if (!low) return 0;
+    const suche = naSuche(name);
+    if (!suche.length) return 0;
     let n = 0;
     sk.forEach((s) => {
       if (ordnerId && s.ordner_id !== ordnerId) return;
       for (let i = 0; i < 9; i++) {
-        const m = (s.matrix?.[i] || ""), x = (s.texte?.[i] || "");
-        if (x.toLowerCase().includes(low) || m.toLowerCase().includes(low)) n++;
+        if (naTrifft(suche, s.texte?.[i]) || naTrifft(suche, s.matrix?.[i])) n++;
       }
     });
     return n;
@@ -4559,32 +4603,7 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
       // gesucht wird der ganze name UND jedes eigenständige wort daraus:
       // „Max Cunningham" findet auch stellen, an denen nur „Max" steht.
       // einzelne wörter nur an WORTGRENZEN — sonst fände „max" auch „maximilian".
-      const FUELL = new Set(["der", "die", "das", "des", "dem", "den", "ein", "eine", "einer", "eines",
-        "und", "von", "vom", "zur", "zum", "aus", "bei", "mit", "für", "auf", "the", "of"]);
-      const woerter = name.split(/[\s,]+/)
-        .map((w) => w.replace(/^[^\wÄÖÜäöüß-]+|[^\wÄÖÜäöüß-]+$/g, ""))
-        .filter((w) => w.length >= 3 && !FUELL.has(w.toLowerCase()) && w.toLowerCase() !== name.toLowerCase());
-      // ein einzelnes wort wird immer an der wortgrenze geprüft; ein ganzer
-      // mehrwort-name ist von sich aus eindeutig genug für die freie suche
-      const einWort = !/\s/.test(name.trim());
-      const suchen = [
-        { t: name.toLowerCase(), ganz: einWort },
-        ...woerter.map((w) => ({ t: w.toLowerCase(), ganz: true })),
-      ];
-      const istBuchstabe = (c) => !!c && /[\wÄÖÜäöüß]/.test(c);
-      const findeStelle = (tief, eintrag) => {
-        let p = tief.indexOf(eintrag.t);
-        while (p >= 0) {
-          if (!eintrag.ganz) return p;
-          const davor = tief[p - 1];
-          const rest = tief.slice(p + eintrag.t.length);
-          // „Jarsons Schwert" soll treffen, „Maximilian" bei „Max" nicht
-          const endeOk = !istBuchstabe(rest[0]) || (rest[0] === "s" && !istBuchstabe(rest[1]));
-          if (!istBuchstabe(davor) && endeOk) return p;
-          p = tief.indexOf(eintrag.t, p + 1);
-        }
-        return -1;
-      };
+      const suchen = naSuche(name);
 
       const nach = new Map(arr.map((s) => [s.id, s]));
       const tiefe = (s) => { let n = 0, c = s; while (c?.eltern_id && n < 12) { c = nach.get(c.eltern_id); n++; } return n; };
@@ -4599,7 +4618,7 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
             if (!wo) continue;
             const tief = wo.toLowerCase();
             let treffer = null, p = -1;
-            for (const e of suchen) { const k = findeStelle(tief, e); if (k >= 0) { treffer = e; p = k; break; } }
+            for (const e of suchen) { const k = naStelle(tief, e); if (k >= 0) { treffer = e; p = k; break; } }
             if (!treffer) continue;
             const a = p > 50 ? p - 50 : 0;
             const nr = ist1 && i !== 4 && s.eltern_pos != null ? szNummer(s.eltern_pos, i) : null;
@@ -5263,13 +5282,12 @@ function Pausenschirm({ springe, zuM42, zurPerson }) {
     ]).then(([sk, pe]) => {
       const skripte = Array.isArray(sk) ? sk : [];
       const zaehlen = (name) => {
-        const low = (name || "").trim().toLowerCase();
-        if (!low) return 0;
+        const suche = naSuche(name);
+        if (!suche.length) return 0;
         let n = 0;
         skripte.forEach((s) => {
           for (let i = 0; i < 9; i++) {
-            const m = (s.matrix?.[i] || ""), x = (s.texte?.[i] || "");
-            if (x.toLowerCase().includes(low) || m.toLowerCase().includes(low)) n++;
+            if (naTrifft(suche, s.texte?.[i]) || naTrifft(suche, s.matrix?.[i])) n++;
           }
         });
         return n;
@@ -7185,6 +7203,11 @@ function Styles() {
   .zsbeginn{color:var(--green-mid);text-transform:uppercase;letter-spacing:.16em}
   .zsgesamt{margin-left:auto;color:var(--dim)}
   /* die zeit läuft nach unten · links die achse, daneben je pov eine spalte */
+  /* eigener scrollbereich — 63 szenen dürfen die seite nicht in die länge ziehen */
+  .zsrolle{max-height:360px;overflow-y:auto;padding-right:6px}
+  .zsrolle::-webkit-scrollbar{width:7px}
+  .zsrolle::-webkit-scrollbar-track{background:transparent}
+  .zsrolle::-webkit-scrollbar-thumb{background:var(--green-dim);border-radius:4px}
   .zsraster{display:flex;gap:6px;align-items:stretch;justify-content:flex-start}
   .skgrid.drei{grid-template-columns:1fr 1fr 1fr}
   @media(max-width:820px){.skgrid.drei{grid-template-columns:1fr}}
