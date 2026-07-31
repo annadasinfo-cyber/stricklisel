@@ -4634,7 +4634,7 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
       // nach projekt, dann nach szenennummer — die reihenfolge, in der man liest
       tr.sort((a, b) => a.projekt.localeCompare(b.projekt)
         || (a.nr == null ? 999 : a.nr) - (b.nr == null ? 999 : b.nr));
-      setFunde({ q: name, tr, projekte: new Set(tr.map((x) => x.projekt)).size });
+      setFunde({ q: name, tr, fuer: th.id, projekte: new Set(tr.map((x) => x.projekt)).size });
       setMsg({ t: tr.length + " calling" + (tr.length === 1 ? "" : "s"), c: "ok" });
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
@@ -4820,40 +4820,44 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
                     <button className="btn" onClick={() => fundstellen(th)} title="wo wird das überall gerufen — über alle projekte">⌕ callings</button>
                     <button className="btn stop" style={{ marginLeft: "auto" }} onClick={() => weg(th)}>■ löschen</button>
                   </div>
+
+                  {/* die treffer stehen IN der akte, direkt unter dem knopf —
+                      vorher landeten sie ganz unten unter allen anderen figuren */}
+                  {funde && funde.fuer === th.id && (
+                    <div className="treffer">
+                      <div className="tkopf">
+                        {funde.tr.length} calling{funde.tr.length === 1 ? "" : "s"} für <b>{funde.q}</b>
+                        {funde.projekte > 1 && <> · in {funde.projekte} projekten</>}
+                        <button className="btn tzu" onClick={() => setFunde(null)} title="liste schließen">✕</button>
+                      </div>
+                      {funde.tr.map((f, n) => {
+                        // projekt-überschrift nur beim wechsel — bei einer serie sieht man
+                        // dadurch auf einen blick, in welchem buch die figur wo auftaucht
+                        const neuesProjekt = n === 0 || funde.tr[n - 1].projekt !== f.projekt;
+                        return (
+                          <span key={n}>
+                            {funde.projekte > 1 && neuesProjekt && <div className="tprojekt">{f.projekt}</div>}
+                            <button className="tzeile" onClick={() => springe(f.id, f.i)} title="zur szene springen">
+                              <span className="tdatum">{f.nr != null ? "szene " + f.nr : f.skript}</span>
+                              <span className="twoerter" style={{ color: "var(--green)" }}>
+                                {f.nr != null ? f.skript + " › " + f.pos : f.pos}
+                              </span>
+                              {f.quelle === "idee" && <span className="tquelle">idee</span>}
+                              {f.treffer && <span className="tquelle teil">„{f.treffer}"</span>}
+                              <span className="tschnipsel">{f.schnipsel}</span>
+                            </button>
+                          </span>
+                        );
+                      })}
+                      {!funde.tr.length && <div className="tkopf">nirgends gerufen. noch nicht.</div>}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           ))}
         </div>
 
-        {funde && (
-          <div className="treffer">
-            <div className="tkopf">
-              {funde.tr.length} calling{funde.tr.length === 1 ? "" : "s"} für <b>{funde.q}</b>
-              {funde.projekte > 1 && <> · in {funde.projekte} projekten</>}
-            </div>
-            {funde.tr.map((f, n) => {
-              // projekt-überschrift nur beim wechsel — bei einer serie sieht man
-              // dadurch auf einen blick, in welchem buch die figur wo auftaucht
-              const neuesProjekt = n === 0 || funde.tr[n - 1].projekt !== f.projekt;
-              return (
-                <span key={n}>
-                  {funde.projekte > 1 && neuesProjekt && <div className="tprojekt">{f.projekt}</div>}
-                  <button className="tzeile" onClick={() => springe(f.id, f.i)} title="zur szene springen">
-                    <span className="tdatum">{f.nr != null ? "szene " + f.nr : f.skript}</span>
-                    <span className="twoerter" style={{ color: "var(--green)" }}>
-                      {f.nr != null ? f.skript + " › " + f.pos : f.pos}
-                    </span>
-                    {f.quelle === "idee" && <span className="tquelle">idee</span>}
-                    {f.treffer && <span className="tquelle teil">„{f.treffer}"</span>}
-                    <span className="tschnipsel">{f.schnipsel}</span>
-                  </button>
-                </span>
-              );
-            })}
-            {!funde.tr.length && <div className="tkopf">nirgends gerufen. noch nicht.</div>}
-          </div>
-        )}
       </Panel>
     </>
   );
@@ -7126,7 +7130,7 @@ function Styles() {
   .chipweg{font-style:normal;font-size:10px;opacity:.35;cursor:pointer;padding:3px 9px 3px 3px;transition:.12s}
   .chipweg:hover{opacity:1;color:var(--amber)}
   .treffer{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
-  .tkopf{font-family:var(--term);font-size:11px;letter-spacing:.12em;color:var(--dim);margin-bottom:8px}
+  .tkopf{font-family:var(--term);font-size:11px;letter-spacing:.12em;color:var(--dim);margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
   .tkopf b{color:var(--green);font-weight:400}
   .tzeile{display:flex;align-items:baseline;gap:12px;width:100%;text-align:left;background:transparent;
     border:0;border-bottom:1px solid var(--line);padding:9px 2px;cursor:pointer;transition:.12s}
@@ -7234,6 +7238,7 @@ function Styles() {
   .tquelle{font-family:var(--term);font-size:9px;letter-spacing:.06em;color:var(--dim);
     border:1px solid var(--line);border-radius:3px;padding:1px 5px;flex:0 0 auto}
   .tquelle.teil{color:var(--amber);border-color:rgba(224,178,106,.4)}
+  .tzu{margin-left:auto;padding:2px 8px;font-size:11px}
 
   /* dramaturgie-graph */
   .dramasvg{width:100%;height:auto;display:block;margin:4px 0 2px}
