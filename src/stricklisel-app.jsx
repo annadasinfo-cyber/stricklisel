@@ -2931,9 +2931,8 @@ function SkUltra({ springe, zuLog, zurPerson }) {
       <Dramaturgie startStory={startStory} startHeld={startHeld}
         setStart={(feld, w) => aend(() => (feld === "start_story" ? setStartStory(w) : setStartHeld(w)))} />
 
-      <Zeitstrahl alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} />
-
-      <div className="skgrid schmal">
+      <div className="skgrid schmal drei">
+        <Zeitstrahl alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} />
         <div className={"skrad" + (frage && frage.offen ? " gelb" : "") + (frageDreht ? " dreht" : "") + (qHalt ? " haelt" : "")}
              onMouseEnter={() => setQHalt(true)} onMouseLeave={() => setQHalt(false)}
              title={qHalt ? "angehalten — solange die maus hier liegt" : "blättert alle 90 sekunden weiter"}>
@@ -7186,11 +7185,17 @@ function Styles() {
   .zsbeginn{color:var(--green-mid);text-transform:uppercase;letter-spacing:.16em}
   .zsgesamt{margin-left:auto;color:var(--dim)}
   /* die zeit läuft nach unten · links die achse, daneben je pov eine spalte */
-  .zsraster{display:flex;gap:8px;align-items:stretch}
-  .zsachse{flex:0 0 52px;display:flex;flex-direction:column;justify-content:space-between;
-    align-items:flex-end;padding:14px 0 2px;font-family:var(--term);font-size:9px;
-    color:var(--dim);border-right:1px dashed var(--line);padding-right:8px}
-  .zsspalte{flex:1 1 0;min-width:38px;display:flex;flex-direction:column}
+  .zsraster{display:flex;gap:6px;align-items:stretch;justify-content:flex-start}
+  .skgrid.drei{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:820px){.skgrid.drei{grid-template-columns:1fr}}
+  /* der zeitstrahl steht in der reihe der schaukästen — etwas schlanker gesetzt */
+  .skgrid.drei .panel{margin-bottom:0;padding:11px 13px 13px;background:rgba(0,0,0,.18)}
+  .skgrid.drei .phead{margin-bottom:10px;padding-bottom:8px}
+  .zsachse{flex:0 0 42px;display:flex;flex-direction:column;justify-content:space-between;
+    align-items:flex-end;padding:14px 0 2px;font-family:var(--term);font-size:8.5px;
+    color:var(--dim);border-right:1px dashed var(--line);padding-right:6px}
+  /* schmale spalten — eine einzelne spur soll keinen block über die ganze breite geben */
+  .zsspalte{flex:1 1 0;min-width:26px;max-width:56px;display:flex;flex-direction:column}
   .zsname{font-family:var(--term);font-size:9.5px;letter-spacing:.04em;text-align:center;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px;flex:0 0 auto}
   .zsbahn{position:relative;flex:1;border-left:1px dotted var(--line);min-height:0}
