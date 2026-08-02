@@ -666,7 +666,48 @@ const WMO = {
 // wird über konfetti() von überall ausgelöst; die komponente hängt einmal in der app.
 // ============================================================
 let konfettiFn = null;
-const konfetti = () => { try { konfettiFn && konfettiFn(); } catch {} };
+const konfetti = (menge, wucht) => { try { konfettiFn && konfettiFn(menge, wucht); } catch {} };
+
+// ============================================================
+// DURCHBRUCH · wenn die schallmauer des alten handicaps fällt.
+// feuert genau EINMAL je handicap-wert — danach ist die zahl ja überholt.
+// ============================================================
+let durchbruchFn = null;
+const durchbruchZeigen = (info) => { try { durchbruchFn && durchbruchFn(info); } catch {} };
+// hat es für diesen wert schon geknallt?
+const durchbruchPruefen = (woerter, handicap) => {
+  const k = "off:durchbruch:" + handicap;
+  try { if (localStorage.getItem(k)) return; localStorage.setItem(k, String(Date.now())); } catch {}
+  durchbruchZeigen({ woerter, handicap });
+};
+
+function Durchbruch() {
+  const [zeig, setZeig] = useState(null);
+  useEffect(() => {
+    durchbruchFn = (info) => {
+      setZeig(info);
+      // drei wellen, damit es wirklich schüttet
+      konfetti(220, 1.8);
+      setTimeout(() => konfetti(180, 1.6), 700);
+      setTimeout(() => konfetti(140, 1.4), 1500);
+      setTimeout(() => setZeig(null), 11000);
+    };
+    return () => { durchbruchFn = null; };
+  }, []);
+  if (!zeig) return null;
+  return (
+    <div className="durchbruch" onClick={() => setZeig(null)}>
+      <div className="dbkasten">
+        <div className="dbklein">schallmauer</div>
+        <div className="dbgross">DURCHBROCHEN</div>
+        <div className="dbzahl">{zeig.woerter.toLocaleString("de-DE")}<i>w</i></div>
+        <div className="dbalt">altes handicap {zeig.handicap.toLocaleString("de-DE")}w</div>
+        <div className="dbzeile">ab hier ist jedes wort neuland.</div>
+        <div className="dbweiter">weiterschreiben →</div>
+      </div>
+    </div>
+  );
+}
 const KF_ZEICHEN = "01アイウエオカキクケコサシスセソタチツテトナニヌネノ<>/{}[]=+*".split("");
 
 function KonfettiRegen() {
@@ -674,20 +715,20 @@ function KonfettiRegen() {
   const lauf = useRef(0);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion:reduce)").matches) return;
-    konfettiFn = () => {
+    konfettiFn = (menge = 70, wucht = 1) => {
       const n = ++lauf.current;
-      const neu = Array.from({ length: 70 }, (_, i) => ({
+      const neu = Array.from({ length: menge }, (_, i) => ({
         k: n + "-" + i,
         x: Math.random() * 100,
         z: KF_ZEICHEN[Math.floor(Math.random() * KF_ZEICHEN.length)],
-        dauer: 1.9 + Math.random() * 1.5,
-        wart: Math.random() * 0.8,
-        gr: Math.round(11 + Math.random() * 13),
+        dauer: (1.9 + Math.random() * 1.5) * wucht,
+        wart: Math.random() * 0.8 * wucht,
+        gr: Math.round((11 + Math.random() * 13) * (wucht > 1 ? 1.35 : 1)),
         drift: Math.round(-70 + Math.random() * 140),
-        hell: Math.random() < 0.16,
+        hell: Math.random() < (wucht > 1 ? 0.32 : 0.16),
       }));
       setTeile((t) => [...t, ...neu]);
-      setTimeout(() => setTeile((t) => t.filter((x) => !x.k.startsWith(n + "-"))), 4400);
+      setTimeout(() => setTeile((t) => t.filter((x) => !x.k.startsWith(n + "-"))), 4400 * wucht);
     };
     return () => { konfettiFn = null; };
   }, []);
@@ -3061,13 +3102,20 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         setStart={(feld, w) => aend(() => (feld === "start_story" ? setStartStory(w) : setStartHeld(w)))} />
 
       <div className="skgrid schmal drei">
-        <Wortzahl alle={alle} wurzel={wurzel} ziel={wZiel} handicap={wHandicap}
-          setWert={(f, v) => aend(() => (f === "ziel" ? setWZiel(v) : setWHandicap(v)))} />
+        <div className={"skrad" + (wheelDreht ? " dreht" : "")}>
+          <div className="skradkopf">
+            <span className="skradtitel">hitch_wheel</span>
+            <button className="skraddreh" onClick={wheelDrehen} disabled={!wheelListe.length}
+              title={wheelListe.length ? "neue wendung ziehen" : "noch keine wendungen — unten in der verwaltung eintragen"}>↻</button>
+          </div>
+          <div className="skradtext" key={wendung}>{wheelListe.length ? (wendung || "…") : "— noch keine wendungen —"}</div>
+        </div>
         <div className={"skrad" + (frage && frage.offen ? " gelb" : "") + (frageDreht ? " dreht" : "") + (qHalt ? " haelt" : "")}
              onMouseEnter={() => setQHalt(true)} onMouseLeave={() => setQHalt(false)}
              title={qHalt ? "angehalten — solange die maus hier liegt" : "blättert alle 90 sekunden weiter"}>
           <div className="skradkopf">
-            <span className="skradtitel">{frage ? (frage.offen ? "offene frage" : "eingelöst") : "questionary"}</span>
+            <span className="skradtitel">questionary</span>
+            {frage && <span className="qzustand">{frage.offen ? "offen" : "eingelöst"}</span>}
             {frage && (
               <span className={"ftag sz" + (istGlobal(frage.szene) ? " glob" : "")}>
                 {frage.szene == null ? "ohne szene" : szLabel(frage.szene)}
@@ -3083,14 +3131,8 @@ function SkUltra({ springe, zuLog, zurPerson }) {
             {qPool.length ? ((frage && frage.text) || "…") : "— noch keine fragen —"}
           </div>
         </div>
-        <div className={"skrad" + (wheelDreht ? " dreht" : "")}>
-          <div className="skradkopf">
-            <span className="skradtitel">hitch_wheel</span>
-            <button className="skraddreh" onClick={wheelDrehen} disabled={!wheelListe.length}
-              title={wheelListe.length ? "neue wendung ziehen" : "noch keine wendungen — unten in der verwaltung eintragen"}>↻</button>
-          </div>
-          <div className="skradtext" key={wendung}>{wheelListe.length ? (wendung || "…") : "— noch keine wendungen —"}</div>
-        </div>
+        <Wortzahl alle={alle} wurzel={wurzel} ziel={wZiel} handicap={wHandicap}
+          setWert={(f, v) => aend(() => (f === "ziel" ? setWZiel(v) : setWHandicap(v)))} />
       </div>
 
       <Wegweiser wurzel={wurzel} springe={springe} />
@@ -3999,9 +4041,24 @@ function Skripte({ sprung, setSprung, projekt, setProjekt, zurKonsole, zeigeAbsc
 
   const aendern = (fn) => { fn(); setDirty(true); };
   const setM = (i, v) => aendern(() => setMatrix((m) => m.map((x, n) => (n === i ? v : x))));
+  // das alte handicap aus dem commit-bogen — für die schallmauer
+  const [handicap, setHandicap] = useState(0);
+  useEffect(() => {
+    (async () => {
+      const d = await dbGet("skultra", `${SUPABASE_URL}/rest/v1/skultra?select=*&limit=1`).catch(() => null);
+      setHandicap(Number(d?.[0]?.w_handicap) || 0);
+    })();
+  }, []);
+
   const setT = (i, v) => {
     // konfetti nur beim eigenen tippen über die marke — siehe log_files
     if (zaehleWoerter(texte[i] || "") < ZIEL_SZENE && zaehleWoerter(v) >= ZIEL_SZENE) konfetti();
+    // und die schallmauer: das GANZE projekt über das alte handicap
+    if (handicap > 0) {
+      const vorher = projektWoerter;
+      const nachher = vorher - zaehleWoerter(texte[i] || "") + zaehleWoerter(v);
+      if (vorher <= handicap && nachher > handicap) durchbruchPruefen(nachher, handicap);
+    }
     aendern(() => setTexte((m) => m.map((x, n) => (n === i ? v : x))));
   };
 
@@ -6245,6 +6302,7 @@ export default function StricklieselApp() {
       <Fehlerfang>
       <Rain />
       <KonfettiRegen />
+      <Durchbruch />
       <ScrollTop />
       <SchwebeFenster text={abschreib} onClose={() => setAbschreib(null)} />
       <div className="wrap">
@@ -7415,7 +7473,13 @@ function Styles() {
   .zsrolle::-webkit-scrollbar-track{background:transparent}
   .zsrolle::-webkit-scrollbar-thumb{background:var(--green-dim);border-radius:4px}
   .zsraster{display:flex;gap:6px;align-items:stretch;justify-content:flex-start}
-  .skgrid.drei{grid-template-columns:1fr 1fr 1fr}
+  /* alle drei gleich hoch — der text wächst nach unten weg, nicht die karte */
+  .skgrid.drei{grid-template-columns:1fr 1fr 1fr;align-items:stretch}
+  .skgrid.drei > *{height:100%}
+  .skgrid.drei .skrad{min-height:150px}
+  .skgrid.drei .skradtext{flex:1}
+  .wzkasten .wzblock{margin-top:auto}
+  .qzustand{font-family:var(--term);font-size:9px;letter-spacing:.1em;color:var(--dim)}
   @media(max-width:820px){.skgrid.drei{grid-template-columns:1fr}}
   /* der zeitstrahl steht in der reihe der schaukästen — etwas schlanker gesetzt */
   .skgrid.drei .panel{margin-bottom:0;padding:11px 13px 13px;background:rgba(0,0,0,.18)}
@@ -7523,6 +7587,31 @@ function Styles() {
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .stapeltext{font-family:var(--mono);font-size:12.5px;line-height:1.55;color:var(--muted)}
   .stapelbox.jetzt .stapeltext{color:var(--ink)}
+
+  /* durchbruch · die schallmauer fällt. einmal je handicap-wert. */
+  .durchbruch{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center,rgba(4,21,10,.82) 0%,rgba(2,8,4,.94) 70%);
+    cursor:pointer;animation:dbauf .5s ease-out;padding:20px}
+  @keyframes dbauf{from{opacity:0}to{opacity:1}}
+  .dbkasten{text-align:center;max-width:min(560px,92vw);border:1px solid var(--green);
+    border-radius:8px;padding:32px 28px;background:rgba(4,21,10,.6);
+    box-shadow:0 0 60px rgba(53,255,111,.35),inset 0 0 40px rgba(53,255,111,.06);
+    animation:dbrein .6s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes dbrein{from{transform:scale(.88);opacity:0}to{transform:scale(1);opacity:1}}
+  .dbklein{font-family:var(--term);font-size:11px;letter-spacing:.34em;color:var(--green-mid);
+    text-transform:uppercase;margin-bottom:6px}
+  .dbgross{font-family:var(--term);font-size:clamp(26px,6vw,46px);letter-spacing:.14em;
+    color:var(--green);text-shadow:0 0 18px rgba(53,255,111,.8);line-height:1.05;
+    animation:dbpuls 1.8s ease-in-out infinite}
+  @keyframes dbpuls{0%,100%{text-shadow:0 0 18px rgba(53,255,111,.8)}50%{text-shadow:0 0 34px rgba(53,255,111,1)}}
+  .dbzahl{font-family:var(--term);font-size:clamp(34px,8vw,64px);color:#fff;
+    text-shadow:0 0 24px var(--green);letter-spacing:.06em;margin-top:18px;
+    font-variant-numeric:tabular-nums;line-height:1}
+  .dbzahl i{font-style:normal;opacity:.5;font-size:.42em;margin-left:3px}
+  .dbalt{font-family:var(--term);font-size:11px;letter-spacing:.1em;color:var(--amber);
+    margin-top:10px;text-decoration:line-through;opacity:.8}
+  .dbzeile{font-family:var(--mono);font-size:13.5px;color:var(--ink);margin-top:16px;line-height:1.6}
+  .dbweiter{font-family:var(--term);font-size:10.5px;letter-spacing:.16em;color:var(--dim);margin-top:22px}
 
   /* konfetti · matrix-regen für einen moment */
   .konfetti{position:fixed;inset:0;pointer-events:none;z-index:9999;overflow:hidden}
