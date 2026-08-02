@@ -62,6 +62,13 @@ const offSchreibenCache = (key, wert) => { try { localStorage.setItem("off:" + k
 const offQueue = () => { try { return JSON.parse(localStorage.getItem("off:queue") || "[]"); } catch { return []; } };
 const offQueueSetzen = (q) => { try { localStorage.setItem("off:queue", JSON.stringify(q)); } catch {} };
 const offAusstehend = () => offQueue().length;
+// aus der url die tabelle herausziehen, damit man sieht WORAN es haengt
+const offTabelle = (url) => {
+  const m = String(url || "").match(new RegExp("/rest/v1/([a-z_0-9]+)", "i"));
+  return m ? m[1] : "unbekannt";
+};
+const offVerwerfen = (t) => offQueueSetzen(offQueue().filter((o) => o.t !== t));
+const offAllesVerwerfen = () => offQueueSetzen([]);
 
 // fetch mit zeitgrenze — navigator.onLine lügt manchmal ("online" trotz totem netz),
 // ohne das hier würde ein hängender request die app minutenlang blockieren.
@@ -115,8 +122,13 @@ async function offSyncJetzt() {
   for (const op of q) {
     try {
       const r = await fetchZeit(op.url, { method: op.methode, headers: { ...dbHeaders(getToken()), Prefer: op.prefer || "return=minimal" }, body: op.body ? JSON.stringify(op.body) : undefined });
-      if (!r.ok) rest.push(op);
-    } catch { rest.push(op); }
+      if (!r.ok) {
+        // grund festhalten - sonst blinkt die anzeige ewig, ohne zu sagen woran es liegt
+        let grund = "";
+        try { grund = (await r.text() || "").slice(0, 300); } catch (e2) {}
+        rest.push({ ...op, versuche: (op.versuche || 0) + 1, fehler: grund || ("status " + r.status) });
+      }
+    } catch (e) { rest.push({ ...op, versuche: (op.versuche || 0) + 1, fehler: String((e && e.message) || e).slice(0, 300) }); }
   }
   offQueueSetzen(rest);
   offSyncLaeuft = false;
@@ -763,17 +775,76 @@ function ScrollTop() {
 function SyncStatus() {
   const [n, setN] = useState(0);
   const [on, setOn] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [auf, setAuf] = useState(false);
+  const [liste, setListe] = useState([]);
+  const [msg, setMsg] = useState("");
+
   useEffect(() => {
-    const check = () => setN(offAusstehend());
+    const check = () => { setN(offAusstehend()); setListe(offQueue()); };
     check();
     const iv = setInterval(check, 4000);
     const onOn = () => setOn(true), onOff = () => setOn(false);
     window.addEventListener("online", onOn); window.addEventListener("offline", onOff);
     return () => { clearInterval(iv); window.removeEventListener("online", onOn); window.removeEventListener("offline", onOff); };
   }, []);
-  if (!on) return <span className="syncstat offline" title="kein netz — alles wird lokal zwischengespeichert">◌ offline</span>;
-  if (n > 0) return <span className="syncstat wartet" title={n + " änderung" + (n === 1 ? "" : "en") + " wartet noch auf sync"}>◍ sync {n}</span>;
-  return null;
+
+  const nochmal = async () => {
+    setMsg("versuche noch mal ...");
+    await offSyncJetzt();
+    const rest = offQueue();
+    setListe(rest); setN(rest.length);
+    setMsg(rest.length ? "geht immer noch nicht durch" : "alles durch");
+    if (!rest.length) setTimeout(() => setAuf(false), 1200);
+  };
+  const weg = (t) => { offVerwerfen(t); const r = offQueue(); setListe(r); setN(r.length); if (!r.length) setAuf(false); };
+  const allesWeg = () => {
+    if (!confirm("alle wartenden aenderungen verwerfen?\n\nsie sind dann endgueltig weg und stehen nicht in der datenbank.")) return;
+    offAllesVerwerfen(); setListe([]); setN(0); setAuf(false);
+  };
+
+  if (!on) return <span className="syncstat offline" title="kein netz - alles wird lokal zwischengespeichert">◌ offline</span>;
+  if (!n) return null;
+
+  return (
+    <>
+      <button className="syncstat wartet" onClick={() => setAuf(true)}
+        title={n + " aenderung" + (n === 1 ? "" : "en") + " haengt noch - antippen zeigt woran"}>◍ sync {n}</button>
+      {auf && (
+        <div className="syncfenster" onClick={(e) => e.target === e.currentTarget && setAuf(false)}>
+          <div className="synckasten">
+            <div className="synckopf">
+              <span className="syncid">◍ was noch nicht durch ist</span>
+              <button className="btn" onClick={() => setAuf(false)}>✕</button>
+            </div>
+            <p className="hint">
+              das sind aenderungen, die nicht in der datenbank angekommen sind. sie liegen lokal
+              und werden alle 20 sekunden neu versucht. haeufigster grund: eine spalte oder tabelle
+              fehlt, weil ein SQL noch nicht eingespielt wurde.
+            </p>
+            <div className="syncliste">
+              {liste.map((op) => (
+                <div className="synczeile" key={op.t}>
+                  <div className="syncoben">
+                    <span className="syncart">{op.methode}</span>
+                    <span className="synctab">{offTabelle(op.url)}</span>
+                    <span className="syncalt">{new Date(op.t).toLocaleString("de-DE")}</span>
+                    {op.versuche > 0 && <span className="syncalt">{op.versuche}x versucht</span>}
+                    <button className="btn stop klein" onClick={() => weg(op.t)} title="diese eine aenderung verwerfen">■</button>
+                  </div>
+                  {op.fehler && <div className="syncfehler">{op.fehler}</div>}
+                </div>
+              ))}
+            </div>
+            <div className="rezrow" style={{ marginTop: 12 }}>
+              <button className="btn primary" onClick={nochmal}>↻ nochmal versuchen</button>
+              <button className="btn stop" style={{ marginLeft: "auto" }} onClick={allesWeg}>■ alle verwerfen</button>
+            </div>
+            {msg && <div className="actions" style={{ marginTop: 8 }}><span className="status ok">{msg}</span></div>}
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 function Wetter() {
@@ -6696,6 +6767,27 @@ function Styles() {
   .syncstat{font-size:11px;letter-spacing:.08em;white-space:nowrap;padding:2px 7px;border-radius:4px;
     border:1px solid var(--line);cursor:default}
   .syncstat.offline{color:var(--dim)}
+  button.syncstat{cursor:pointer;font-family:inherit;background:transparent}
+  button.syncstat:hover{color:#ffd48a;border-color:#ffd48a}
+  /* was haengt noch? - kleines fenster ueber der seite */
+  .syncfenster{position:fixed;inset:0;z-index:9997;display:flex;align-items:center;justify-content:center;
+    background:rgba(2,8,4,.82);padding:20px}
+  .synckasten{width:min(640px,94vw);max-height:80vh;overflow-y:auto;background:var(--panel);
+    border:1px solid var(--amber);border-radius:8px;padding:18px 18px 20px;
+    box-shadow:0 0 40px rgba(224,178,106,.25)}
+  .synckopf{display:flex;align-items:center;gap:10px;margin-bottom:10px;
+    border-bottom:1px dashed var(--line);padding-bottom:10px}
+  .syncid{flex:1;font-family:var(--term);font-size:12px;letter-spacing:.14em;color:var(--amber);text-transform:uppercase}
+  .syncliste{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+  .synczeile{border:1px solid var(--line);border-left:2px solid var(--amber);border-radius:5px;
+    padding:9px 11px;background:rgba(0,0,0,.2)}
+  .syncoben{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .syncart{font-family:var(--term);font-size:9.5px;letter-spacing:.1em;color:var(--green);
+    border:1px solid var(--line);border-radius:3px;padding:2px 6px}
+  .synctab{font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+  .syncalt{font-family:var(--term);font-size:9.5px;color:var(--dim);margin-left:auto}
+  .syncfehler{font-family:var(--mono);font-size:11px;color:var(--amber);margin-top:6px;
+    line-height:1.5;word-break:break-word;opacity:.9}
   .syncstat.wartet{color:var(--amber);border-color:var(--amber);animation:puls 2s ease-in-out infinite}
   .wetter{margin-left:auto;color:var(--ink);letter-spacing:.08em;white-space:nowrap;font-size:17px;
     font-variant-numeric:tabular-nums;cursor:default;display:inline-flex;align-items:center;gap:6px}
@@ -6952,6 +7044,7 @@ function Styles() {
   .seitenkopf .btn{padding:9px 16px;font-size:12.5px}
   .txtbtn{padding:9px 14px;font-size:12px;flex:0 0 auto;font-variant-numeric:tabular-nums}
   .txtbtn.klein{padding:9px 11px}
+  .btn.klein{padding:4px 9px;font-size:11px}
   .ebadge{font-family:var(--term);font-size:11px;letter-spacing:.08em;flex:0 0 auto;
     color:var(--lvl);border:1px solid var(--lvl);border-radius:3px;padding:3px 7px;opacity:.75;cursor:default}
   .xfiles{flex:1;min-width:0;text-align:center;font-family:var(--term);font-size:15px;letter-spacing:.34em;
