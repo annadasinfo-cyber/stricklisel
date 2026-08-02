@@ -1486,6 +1486,17 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, nurSzene }) {
   const [auf, setAuf] = useState(null);
   const [entw, setEntw] = useState({});
   const [msg, setMsg] = useState("");
+  // halbe antworten gehen nicht mehr verloren: der entwurf wandert
+  // zwei sekunden nach dem letzten tastendruck still in die datenbank
+  const entwUhr = useRef({});
+  const entwurfMerken = (f, text) => {
+    setEntw((x) => ({ ...x, [f.id]: { ...x[f.id], text } }));
+    clearTimeout(entwUhr.current[f.id]);
+    entwUhr.current[f.id] = setTimeout(() => {
+      setListe((l) => l.map((x) => x.id === f.id ? { ...x, entwurf: text } : x));
+      dbSchreiben("PATCH", `${SUPABASE_URL}/rest/v1/fragen?id=eq.${f.id}`, { entwurf: text });
+    }, 2000);
+  };
 
   useEffect(() => { (async () => setListe(await qLaden()))(); }, []);
   // in den log_files und auf dem schreibblatt: die szene ist die voreinstellung
@@ -1510,11 +1521,12 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, nurSzene }) {
   }
 
   async function einloesen(f) {
-    const d = entw[f.id] || {};
+    const d = entw[f.id] || { text: f.entwurf || "", sz: f.szene_antwort ?? "" };
     const t = (d.text ?? "").trim();
     if (!t) { setMsg("noch keine antwort eingetragen"); return; }
     setAuf(null);
-    await patch(f, { antwort: t, szene_antwort: d.sz === "" || d.sz == null ? null : Number(d.sz), antwort_zeit: new Date().toISOString() });
+    clearTimeout(entwUhr.current[f.id]);
+    await patch(f, { antwort: t, entwurf: null, szene_antwort: d.sz === "" || d.sz == null ? null : Number(d.sz), antwort_zeit: new Date().toISOString() });
     setMsg("eingelöst");
   }
 
@@ -1537,9 +1549,9 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, nurSzene }) {
   const roh = nurSzene == null ? liste : liste.filter((f) => qBeruehrt(f, Number(nurSzene)));
   const sortiert = [...roh].sort(qSort);
   const offeneN = roh.filter(qOffen).length;
-  const untertitel = sub || (nurSzene == null
-    ? `${offeneN} offen · ${roh.length - offeneN} eingelöst`
-    : (roh.length ? `${offeneN} offen · ${roh.length} betreffen diese szene` : "nichts offen für diese szene"));
+  const untertitel = (sub ? sub + " · " : "") + (nurSzene == null
+    ? `${offeneN} von ${roh.length} offen`
+    : (roh.length ? `${offeneN} von ${roh.length} offen · betreffen diese szene` : "nichts offen für diese szene"));
 
   return (
     <Panel id={panelId} title={titel} sub={untertitel}>
@@ -1556,7 +1568,7 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, nurSzene }) {
         {sortiert.map((f, n) => {
           const offen = qOffen(f);
           const zu = auf !== f.id;
-          const d = entw[f.id] || {};
+          const d = entw[f.id] || { text: f.entwurf || "", sz: f.szene_antwort ?? "" };
           const tab = qTablett(f);
           const trenn = n > 0 && qOffen(sortiert[n - 1]) && !offen;
           return (
@@ -1606,11 +1618,12 @@ function FragenAkkordeon({ titel, sub, panelId, szeneVorgabe, nurSzene }) {
                     <>
                       <AutoTa className="ta" value={d.text || ""} placeholder="wie wird sie eingelöst? …"
                         style={{ minHeight: 70 }}
-                        onChange={(e) => setEntw((x) => ({ ...x, [f.id]: { ...x[f.id], text: e.target.value } }))} />
+                        onChange={(e) => entwurfMerken(f, e.target.value)} />
                       <div className="qzeile2">
                         <span className="qtag">eingelöst in</span>
                         <SzeneWahl wert={d.sz ?? ""} leer="–" titel="in welcher szene wird sie eingelöst?"
-                          setWert={(v) => setEntw((x) => ({ ...x, [f.id]: { ...x[f.id], sz: v } }))} />
+                          setWert={(v) => { setEntw((x) => ({ ...x, [f.id]: { ...x[f.id], sz: v } }));
+                            patch(f, { szene_antwort: v === "" ? null : Number(v) }); }} />
                         <span className="qtag" style={{ marginLeft: 12 }}>aufgeworfen in</span>
                         <SzeneWahl wert={f.szene ?? ""} leer="–" setWert={(v) => patch(f, { szene: v === "" ? null : Number(v) })} />
                         <span className="qspacer" />
@@ -3043,13 +3056,13 @@ function SkUltra({ springe, zuLog, zurPerson }) {
 
       <RohListe entw={entw} zuLog={zuLog} onPweg={pWeg} />
 
+      <FragenAkkordeon panelId="sk-questionary" titel="QUESTIONARY"
+        sub="aufgeworfen · aufs tablett · eingelöst — offene zuerst" />
+
       <RechercheListe entw={entw} zuLog={zuLog} onRweg={rWeg} />
 
       <ContinuityTafel panelId="sk-continuity" titel="CONTINUITY"
         sub="was ab einer szene wahr ist — und ab wann nicht mehr" />
-
-      <FragenAkkordeon panelId="sk-questionary" titel="QUESTIONARY"
-        sub="aufgeworfen · aufs tablett · eingelöst — offene zuerst" />
 
       <VerwaltKarte titel="hitch_wheel · wendungen" leer="noch keine wendungen — trag welche ein."
         liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
@@ -3605,6 +3618,10 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
           {datum !== heute() && <button className="btn" onClick={() => setDatum(heute())}>↺ heute</button>}
         </div>
 
+        <FragenAkkordeon panelId="log-questionary" titel="QUESTIONARY"
+          sub="was die szene offen lässt — aufwerfen, aufs tablett, einlösen"
+          szeneVorgabe={szene} />
+
         <AutoTa className="ta log" value={text}
           onChange={(e) => { beimTippen(text, e.target.value); setText(e.target.value); setDirty(true); }}
           placeholder={"> operator log\n> " + d.toLocaleDateString("de-DE") + "\n> was heute durch den reaktor ging …"} />
@@ -3629,10 +3646,6 @@ function LogFiles({ zeigeAbschreib, zurKonsole, sprungLog, setSprungLog }) {
         </div>
         <p className="hint">speichert sich still von selbst, zwei sekunden nach dem letzten tastendruck.</p>
       </Panel>
-
-      <FragenAkkordeon panelId="log-questionary" titel="QUESTIONARY"
-        sub="was die szene offen lässt — aufwerfen, aufs tablett, einlösen"
-        szeneVorgabe={szene} />
     </>
   );
 }
@@ -4798,6 +4811,31 @@ function Things({ springe, projekt, setProjekt, sprungPerson, setSprungPerson })
                         {th.archetyp && <p className="hint">{ARCHETYP_INFO[th.archetyp]}</p>}
                       </div>
                     </div>
+
+                    {/* zugehörigkeit · zu welchen gruppen gehört die figur.
+                        eine person kann in mehreren stecken (armee UND sippe). */}
+                    {(() => {
+                      const alleGr = liste.filter((x) => x.art === "gruppe" && x.id !== th.id
+                        && (aktOrdner ? x.ordner_id === aktOrdner : true));
+                      if (!alleGr.length) return null;
+                      const meine = Array.isArray(th.gruppen) ? th.gruppen : [];
+                      const kippen = (gid) => feld(th, "gruppen",
+                        meine.includes(gid) ? meine.filter((x) => x !== gid) : [...meine, gid]);
+                      return (
+                        <div className="field" style={{ marginTop: 12 }}>
+                          <label className="cap">{art === "gruppe" ? "gehört zu · übergeordnete gruppen" : "gehört zu"}</label>
+                          <div className="figchips">
+                            {alleGr.map((g) => (
+                              <button key={g.id} className={"figchip" + (meine.includes(g.id) ? " aktiv" : " vorschlag")}
+                                onClick={() => kippen(g.id)}
+                                title={meine.includes(g.id) ? "gehört dazu · tippen zum lösen" : "tippen: gehört dazu"}>
+                                {meine.includes(g.id) ? "● " : "· "}{g.name || "unbenannt"}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                     <div className="row" style={{ marginTop: 12 }}>
                       <div className="field">
                         <label className="cap">wants</label>
@@ -6664,6 +6702,8 @@ function Styles() {
   .logfeld select.minifeld{width:64px;cursor:pointer;color:var(--green)}
   .logfeld select.moodfeld{width:132px}
   .logflags.wf .logflag{font-size:11px;padding:7px 8px;letter-spacing:.02em}
+  .logflag.magisch.gelb{border-color:var(--line);color:var(--dim)}
+  .logflag.magisch.gelb:hover{color:#e8cf5f;border-color:rgba(232,207,95,.5)}
   .logflag.magisch.gelb.on{color:#e8cf5f;border-color:rgba(232,207,95,.55);
     background:rgba(232,207,95,.1);box-shadow:0 0 12px rgba(232,207,95,.25)}
   .qzahlmini{font-size:9px;letter-spacing:0;margin-left:3px;vertical-align:super;opacity:.85}
