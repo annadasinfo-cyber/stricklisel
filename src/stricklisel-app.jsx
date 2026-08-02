@@ -2266,7 +2266,11 @@ function Wortzahl({ alle, wurzel, ziel, handicap, setWert }) {
   const voll = Math.round((anteil / 100) * SEG);
 
   return (
-    <Panel id="sk-wortzahl" title="WORTZAHL" sub={seiten ? seiten + " seiten" : "noch nichts"}>
+    <div className="skrad wzkasten">
+      <div className="skradkopf">
+        <span className="skradtitel">wortzahl</span>
+        <span className="wzseiten">{seiten ? seiten + " seiten" : "noch nichts"}</span>
+      </div>
       <div className="wzblock">
         <div className="wzgross">{woerter.toLocaleString("de-DE")}<i>w</i></div>
         <div className="wzzeile">ziel: {zielW.toLocaleString("de-DE")}w</div>
@@ -2276,15 +2280,19 @@ function Wortzahl({ alle, wurzel, ziel, handicap, setWert }) {
             {drueber && <span className="wzplus"> · +{(woerter - hcW).toLocaleString("de-DE")}</span>}
           </div>
         )}
+        {/* der balken wächst von RECHTS nach links — wie der text, der rechts
+            anliegt und nach innen läuft. die marke sitzt darum auch von rechts. */}
         <div className="wzband">
-          {Array.from({ length: SEG }, (_, n) => (
-            <i key={n} className={"wzseg" + (n < voll ? " an" : "") + (drueber && n < voll ? " ueber" : "")} />
-          ))}
-          {hcAnteil != null && <span className="wzmarke" style={{ left: hcAnteil + "%" }} title={"handicap · " + hcW.toLocaleString("de-DE") + " wörter"} />}
+          {Array.from({ length: SEG }, (_, n) => {
+            const an = n >= SEG - voll;
+            return <i key={n} className={"wzseg" + (an ? " an" : "") + (drueber && an ? " ueber" : "")} />;
+          })}
+          {hcAnteil != null && <span className="wzmarke" style={{ right: hcAnteil + "%" }}
+            title={"handicap · " + hcW.toLocaleString("de-DE") + " wörter"} />}
         </div>
         <div className="wzzeile leise">{anteil.toFixed(1)} % vom ziel</div>
       </div>
-    </Panel>
+    </div>
   );
 }
 
@@ -3136,23 +3144,8 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
         wert={neueWendung} setWert={setNeueWendung} onAdd={wendungAdd} onWeg={wendungWeg} onEdit={wendungEdit}
         platzhalter="neue wendung …" />
-      <div className="vkarte">
-        <div className="vkopf" style={{ cursor: "default" }}>
-          <span className="vchev">·</span>
-          <span className="vtitel">wortzahl · ziel und handicap</span>
-        </div>
-        <div className="vbody">
-          <p className="vhinweis">ziel: ab 50.000 wörtern gilt es als roman. handicap: die zahl, die du bisher am weitesten getragen hast.</p>
-          <div className="zeitreihe">
-            <label className="cap" style={{ margin: 0 }}>ziel</label>
-            <input className="ti minifeld" type="number" min="0" step="1000" value={wZiel}
-              onChange={(e) => aend(() => setWZiel(Number(e.target.value) || 0))} />
-            <label className="cap" style={{ margin: "0 0 0 14px" }}>handicap</label>
-            <input className="ti minifeld" type="number" min="0" step="100" value={wHandicap}
-              onChange={(e) => aend(() => setWHandicap(Number(e.target.value) || 0))} />
-          </div>
-        </div>
-      </div>
+      <WortzahlVerwaltung ziel={wZiel} setZiel={(v) => aend(() => setWZiel(v))}
+        handicap={wHandicap} setHandicap={(v) => aend(() => setWHandicap(v))} />
 
       <VerwaltFeld titel="prämisse eintragen"
         hinweis="die zentrale frage in einem satz — innere, äußere und universelle ebene zusammen. macht man einmal pro projekt."
@@ -5205,6 +5198,33 @@ function VerwaltFeld({ titel, wert, setWert, platzhalter, hinweis }) {
           {hinweis && <p className="vhinweis">{hinweis}</p>}
           <AutoTa className="ta" value={wert} onChange={(e) => setWert(e.target.value)}
             placeholder={platzhalter} style={{ minHeight: 90 }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ziel und handicap · aufklappbar wie die anderen verwaltungs-kästen unten
+function WortzahlVerwaltung({ ziel, setZiel, handicap, setHandicap }) {
+  const [auf, setAuf] = useState(false);
+  return (
+    <div className="vkarte">
+      <button className="vkopf" onClick={() => setAuf((v) => !v)}>
+        <span className="vchev">{auf ? "▾" : "▸"}</span>
+        <span className="vtitel">wortzahl · ziel und handicap</span>
+        <span className="vzahl">{(Number(ziel) || 0).toLocaleString("de-DE")}w</span>
+      </button>
+      {auf && (
+        <div className="vbody">
+          <p className="vhinweis">ziel: ab 50.000 wörtern gilt es als roman. handicap: die zahl, die du bisher am weitesten getragen hast.</p>
+          <div className="zeitreihe">
+            <label className="cap" style={{ margin: 0 }}>ziel</label>
+            <input className="ti minifeld" type="number" min="0" step="1000" value={ziel}
+              onChange={(e) => setZiel(Number(e.target.value) || 0)} />
+            <label className="cap" style={{ margin: "0 0 0 14px" }}>handicap</label>
+            <input className="ti minifeld" type="number" min="0" step="100" value={handicap}
+              onChange={(e) => setHandicap(Number(e.target.value) || 0)} />
+          </div>
         </div>
       )}
     </div>
@@ -7357,7 +7377,10 @@ function Styles() {
   .qtabmini{flex:0 0 auto;font-family:var(--term);font-size:9px;color:#e8cf5f;
     border:1px solid rgba(232,207,95,.35);border-radius:3px;padding:1px 4px}
 
-  /* wortzahl · alles rechtsbündig, läuft ins projekt hinein */
+  /* wortzahl · gleiche karte wie die zwei schaukästen daneben.
+     alles liegt rechts an und läuft nach innen — auch der balken. */
+  .wzkasten{display:flex;flex-direction:column;gap:9px}
+  .wzseiten{margin-left:auto;font-family:var(--term);font-size:9.5px;letter-spacing:.06em;color:var(--dim)}
   .wzblock{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
   .wzgross{font-family:var(--term);color:var(--green);text-shadow:var(--glow);
     letter-spacing:.06em;font-size:clamp(26px,4.4vw,38px);line-height:1.05;
