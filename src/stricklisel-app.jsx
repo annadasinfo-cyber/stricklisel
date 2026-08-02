@@ -2230,6 +2230,65 @@ function Datenblatt({ szNr, text }) {
 }
 
 // ============================================================
+// WORTZAHL · wieviel steht schon. eine zahl, so groß wie die uhr im kopf.
+// darunter klein das ziel (50.000 = ab da heißt es roman) und ihr handicap,
+// also die zahl, die sie bisher am weitesten getragen hat.
+// alles rechtsbündig — es läuft ins projekt hinein, nicht heraus.
+// ============================================================
+const WZ_ZIEL = 50000;
+
+function Wortzahl({ alle, wurzel, ziel, handicap, setWert }) {
+  // alle texte des projekts: wurzel plus alles, was darunter hängt.
+  // die mitte (4) hat keinen text, die sagt nur, worum es geht.
+  const woerter = (() => {
+    if (!wurzel) return 0;
+    const arr = Array.isArray(alle) ? alle : [];
+    const baum = [wurzel];
+    for (let runde = 0; runde < 12; runde++) {
+      const ids = new Set(baum.map((x) => x.id));
+      const neu = arr.filter((x) => x.eltern_id && ids.has(x.eltern_id) && !ids.has(x.id));
+      if (!neu.length) break;
+      baum.push(...neu);
+    }
+    return baum.reduce((sum, sk) => sum + (Array.isArray(sk.texte)
+      ? sk.texte.reduce((a, t, i) => i === 4 ? a : a + zaehleWoerter(t || ""), 0) : 0), 0);
+  })();
+
+  const zielW = Number(ziel) > 0 ? Number(ziel) : WZ_ZIEL;
+  const hcW = Number(handicap) > 0 ? Number(handicap) : 0;
+  const anteil = Math.min(100, (woerter / zielW) * 100);
+  const hcAnteil = hcW > 0 ? Math.min(100, (hcW / zielW) * 100) : null;
+  const drueber = hcW > 0 && woerter > hcW;
+  const seiten = Math.floor(woerter / 250);
+
+  // segmente wie beim reaktor — nur füllen sie sich, statt zu erlöschen
+  const SEG = 40;
+  const voll = Math.round((anteil / 100) * SEG);
+
+  return (
+    <Panel id="sk-wortzahl" title="WORTZAHL" sub={seiten ? seiten + " seiten" : "noch nichts"}>
+      <div className="wzblock">
+        <div className="wzgross">{woerter.toLocaleString("de-DE")}<i>w</i></div>
+        <div className="wzzeile">ziel: {zielW.toLocaleString("de-DE")}w</div>
+        {hcW > 0 && (
+          <div className={"wzzeile hc" + (drueber ? " geschafft" : "")}>
+            handicap {hcW.toLocaleString("de-DE")}w
+            {drueber && <span className="wzplus"> · +{(woerter - hcW).toLocaleString("de-DE")}</span>}
+          </div>
+        )}
+        <div className="wzband">
+          {Array.from({ length: SEG }, (_, n) => (
+            <i key={n} className={"wzseg" + (n < voll ? " an" : "") + (drueber && n < voll ? " ueber" : "")} />
+          ))}
+          {hcAnteil != null && <span className="wzmarke" style={{ left: hcAnteil + "%" }} title={"handicap · " + hcW.toLocaleString("de-DE") + " wörter"} />}
+        </div>
+        <div className="wzzeile leise">{anteil.toFixed(1)} % vom ziel</div>
+      </div>
+    </Panel>
+  );
+}
+
+// ============================================================
 // ZEITSTRAHL · die POV-spuren nebeneinander.
 // jede szene hat einen beginn und eine dauer; wer denselben POV hat,
 // liegt auf derselben spur. wo zwei balken übereinander liegen, läuft
@@ -2685,6 +2744,9 @@ function SkUltra({ springe, zuLog, zurPerson }) {
   // wo die beiden dramaturgie-linien beginnen — einmal fürs buch
   const [startStory, setStartStory] = useState(0);
   const [startHeld, setStartHeld] = useState(0);
+  // wortziel und persönliches handicap — einmal fürs projekt
+  const [wZiel, setWZiel] = useState(WZ_ZIEL);
+  const [wHandicap, setWHandicap] = useState(0);
   const [cWurzel, setCWurzel] = useState("");   // gewähltes matrix-projekt (wurzel-id) für die szenenwand
   const [alle, setAlle] = useState([]);         // alle skripte, für projekt-auswahl + szenenwand
   const [msg, setMsg] = useState({ t: "bereit", c: "" });
@@ -2830,7 +2892,7 @@ function SkUltra({ springe, zuLog, zurPerson }) {
     if (tRef.current) clearTimeout(tRef.current);
     tRef.current = setTimeout(() => speichern(true), 2000);
     return () => clearTimeout(tRef.current);
-  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, arche, synopsis, qed, startStory, startHeld, cWurzel, dirty]);
+  }, [pName, pPraem, pSig, pDatum, cProjekt, cUmfang, cParam, cStart, cZiel, cSig, cDatum, fragen, arche, synopsis, qed, startStory, startHeld, wZiel, wHandicap, cWurzel, dirty]);
 
   const aend = (fn) => { fn(); setDirty(true); };
 
@@ -2851,6 +2913,7 @@ function SkUltra({ springe, zuLog, zurPerson }) {
       setSynopsis(r.synopsis || "");
       setQed(r.zentrale_frage || "");
       setStartStory(r.start_story ?? 0); setStartHeld(r.start_held ?? 0);
+      setWZiel(r.w_ziel ?? WZ_ZIEL); setWHandicap(r.w_handicap ?? 0);
       setCWurzel(r.c_wurzel || "");
     } catch (e) { setMsg({ t: String(e?.message || e), c: "err" }); }
   }
@@ -2869,6 +2932,7 @@ function SkUltra({ springe, zuLog, zurPerson }) {
       synopsis,
       zentrale_frage: qed,
       start_story: startStory, start_held: startHeld,
+      w_ziel: wZiel, w_handicap: wHandicap,
       c_wurzel: cWurzel || null,
       updated_at: new Date().toISOString(),
     };
@@ -2989,7 +3053,8 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         setStart={(feld, w) => aend(() => (feld === "start_story" ? setStartStory(w) : setStartHeld(w)))} />
 
       <div className="skgrid schmal drei">
-        <Zeitstrahl alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} />
+        <Wortzahl alle={alle} wurzel={wurzel} ziel={wZiel} handicap={wHandicap}
+          setWert={(f, v) => aend(() => (f === "ziel" ? setWZiel(v) : setWHandicap(v)))} />
         <div className={"skrad" + (frage && frage.offen ? " gelb" : "") + (frageDreht ? " dreht" : "") + (qHalt ? " haelt" : "")}
              onMouseEnter={() => setQHalt(true)} onMouseLeave={() => setQHalt(false)}
              title={qHalt ? "angehalten — solange die maus hier liegt" : "blättert alle 90 sekunden weiter"}>
@@ -3022,11 +3087,14 @@ function SkUltra({ springe, zuLog, zurPerson }) {
 
       <Wegweiser wurzel={wurzel} springe={springe} />
 
-      <Panel id="sk-synopsis" title="SYNOPSIS" sub="worum geht's — in kurz">
-        <AutoTa className="ta" value={synopsis} style={{ minHeight: 150 }}
-          onChange={(e) => aend(() => setSynopsis(e.target.value))}
-          placeholder="die ganze geschichte in ein paar sätzen — wer, was, wogegen, wie es ausgeht." />
-      </Panel>
+      <div className="skgrid">
+        <Panel id="sk-synopsis" title="SYNOPSIS" sub="worum geht's — in kurz">
+          <AutoTa className="ta" value={synopsis} style={{ minHeight: 150 }}
+            onChange={(e) => aend(() => setSynopsis(e.target.value))}
+            placeholder="die ganze geschichte in ein paar sätzen — wer, was, wogegen, wie es ausgeht." />
+        </Panel>
+        <Zeitstrahl alle={alle} wurzelId={wurzel ? wurzel.id : ""} springe={springe} />
+      </div>
 
       <div className="skgrid">
       <Panel id="sk-ermittlungen" title="ERMITTLUNGEN" sub="4 fragen">
@@ -3068,6 +3136,24 @@ function SkUltra({ springe, zuLog, zurPerson }) {
         liste={wheelListe} label={(w) => w.wendung} keyOf={(w) => w.id}
         wert={neueWendung} setWert={setNeueWendung} onAdd={wendungAdd} onWeg={wendungWeg} onEdit={wendungEdit}
         platzhalter="neue wendung …" />
+      <div className="vkarte">
+        <div className="vkopf" style={{ cursor: "default" }}>
+          <span className="vchev">·</span>
+          <span className="vtitel">wortzahl · ziel und handicap</span>
+        </div>
+        <div className="vbody">
+          <p className="vhinweis">ziel: ab 50.000 wörtern gilt es als roman. handicap: die zahl, die du bisher am weitesten getragen hast.</p>
+          <div className="zeitreihe">
+            <label className="cap" style={{ margin: 0 }}>ziel</label>
+            <input className="ti minifeld" type="number" min="0" step="1000" value={wZiel}
+              onChange={(e) => aend(() => setWZiel(Number(e.target.value) || 0))} />
+            <label className="cap" style={{ margin: "0 0 0 14px" }}>handicap</label>
+            <input className="ti minifeld" type="number" min="0" step="100" value={wHandicap}
+              onChange={(e) => aend(() => setWHandicap(Number(e.target.value) || 0))} />
+          </div>
+        </div>
+      </div>
+
       <VerwaltFeld titel="prämisse eintragen"
         hinweis="die zentrale frage in einem satz — innere, äußere und universelle ebene zusammen. macht man einmal pro projekt."
         wert={qed} setWert={(v) => aend(() => setQed(v))}
@@ -7270,6 +7356,27 @@ function Styles() {
   .qstreifen .giltweg:hover{color:#e8cf5f}
   .qtabmini{flex:0 0 auto;font-family:var(--term);font-size:9px;color:#e8cf5f;
     border:1px solid rgba(232,207,95,.35);border-radius:3px;padding:1px 4px}
+
+  /* wortzahl · alles rechtsbündig, läuft ins projekt hinein */
+  .wzblock{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+  .wzgross{font-family:var(--term);color:var(--green);text-shadow:var(--glow);
+    letter-spacing:.06em;font-size:clamp(26px,4.4vw,38px);line-height:1.05;
+    font-variant-numeric:tabular-nums;white-space:nowrap}
+  .wzgross i{font-style:normal;opacity:.42;font-size:.5em;margin-left:2px}
+  .wzzeile{font-family:var(--term);font-size:10px;letter-spacing:.08em;color:var(--dim);
+    font-variant-numeric:tabular-nums}
+  .wzzeile.hc{color:var(--amber)}
+  .wzzeile.hc.geschafft{color:var(--green)}
+  .wzplus{opacity:.75}
+  .wzzeile.leise{opacity:.6;margin-top:3px}
+  .wzband{position:relative;display:flex;gap:2px;height:14px;width:100%;margin-top:8px;
+    padding:2px;border:1px solid var(--line);border-radius:4px;background:var(--panel-2);align-items:stretch}
+  .wzseg{flex:1;min-width:0;border-radius:1px;background:var(--line);opacity:.45;
+    transition:background .5s ease-out,box-shadow .5s ease-out,opacity .5s ease-out}
+  .wzseg.an{background:var(--green-mid);box-shadow:0 0 5px var(--green-dim);opacity:1}
+  .wzseg.an.ueber{background:var(--green);box-shadow:0 0 6px var(--green)}
+  .wzmarke{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--amber);
+    box-shadow:0 0 5px var(--amber);pointer-events:none}
 
   /* zeitstrahl · spuren je pov, blöcke mit brüchen dazwischen */
   .zsblock{margin-bottom:16px}
