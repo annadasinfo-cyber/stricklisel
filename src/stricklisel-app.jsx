@@ -5781,6 +5781,10 @@ export default function StricklieselApp() {
   const [dl, setDl] = useState(null);
   const [prog, setProg] = useState(0);
   const [playing, setPlaying] = useState(false);
+  // pause · der audiokontext wird angehalten, nicht beendet. beim ablauf muss
+  // zusätzlich der weiter-wecker angehalten und mit der restzeit neu gestellt werden.
+  const [pausiert, setPausiert] = useState(false);
+  const pauseRef = useRef({ seit: 0, dauer: 0, weiter: null });
   const [gen, setGen] = useState(null);
 
   const [tab, setTab] = useState(() => offLesen("tab") || "konsole");
@@ -5942,9 +5946,10 @@ export default function StricklieselApp() {
       const master = await build(ctx, secs, it.cfg, it.audio);
       const an = ctx.createAnalyser(); an.fftSize = 4096; an.smoothingTimeConstant = 0.8;
       master.connect(an); an.connect(ctx.destination);
-      analyser.current = an; setPlaying(true);
+      analyser.current = an; setPlaying(true); setPausiert(false);
       say(`ablauf ${i + 1}/${q.items.length} · ${it.name}`, "work");
       if (q.timer) clearTimeout(q.timer);
+      pauseRef.current = { seit: Date.now(), dauer: secs * 1000, weiter: () => playQueueItem(i + 1) };
       q.timer = setTimeout(() => playQueueItem(i + 1), secs * 1000);
     } catch (e) { say("ablauf: " + (e?.message || e), "err"); stopAll(); }
   }
@@ -6040,7 +6045,28 @@ export default function StricklieselApp() {
   // ---- PLAY / RENDER ----
   function stop() {
     if (ctxRef.current) { ctxRef.current.close().catch(() => {}); ctxRef.current = null; }
-    analyser.current = null; setPlaying(false);
+    analyser.current = null; setPlaying(false); setPausiert(false);
+    pauseRef.current = { seit: 0, dauer: 0, weiter: null };
+  }
+
+  // anhalten und weiterlaufen lassen — mitten im satz, ohne von vorn zu beginnen
+  async function pauseUmschalten() {
+    const ctx = ctxRef.current;
+    if (!ctx || !playing) return;
+    const q = qRef.current;
+    if (!pausiert) {
+      const p = pauseRef.current;
+      if (q.timer) { clearTimeout(q.timer); q.timer = null; }
+      p.dauer = Math.max(0, p.dauer - (Date.now() - p.seit));
+      await ctx.suspend().catch(() => {});
+      setPausiert(true); say("angehalten", "work");
+    } else {
+      await ctx.resume().catch(() => {});
+      const p = pauseRef.current;
+      p.seit = Date.now();
+      if (p.weiter && p.dauer > 0) q.timer = setTimeout(p.weiter, p.dauer);
+      setPausiert(false); say("läuft weiter", "work");
+    }
   }
   async function play() {
     stop();
@@ -6052,7 +6078,9 @@ export default function StricklieselApp() {
       const master = await build(ctx, secs, cfg, A.current);
       const an = ctx.createAnalyser(); an.fftSize = 4096; an.smoothingTimeConstant = 0.8;
       master.connect(an); an.connect(ctx.destination);
-      analyser.current = an; setPlaying(true); say("spielt …", "work");
+      analyser.current = an; setPlaying(true); setPausiert(false);
+      pauseRef.current = { seit: Date.now(), dauer: secs * 1000, weiter: null };
+      say("spielt …", "work");
     } catch (e) { say(e?.message || e, "err"); stop(); }
   }
   async function render() {
@@ -6431,6 +6459,10 @@ export default function StricklieselApp() {
           </div>
           <div className="actions" style={{ marginTop: 18 }}>
             <button className="btn" disabled={playing} onClick={play}>▶ play</button>
+            <button className={"btn" + (pausiert ? " primary" : "")} disabled={!playing} onClick={pauseUmschalten}
+                    title={pausiert ? "weiter, wo es angehalten wurde" : "anhalten — geht ohne neu zu beginnen weiter"}>
+              {pausiert ? "▶ weiter" : "❚❚ pause"}
+            </button>
             <button className="btn stop" disabled={!playing} onClick={() => { stopAll(); say("gestoppt"); }}>■ stop</button>
             <button className="btn primary" onClick={render}>⇥ wav rendern</button>
             <span className={"status " + status.c}>{status.t}</span>
